@@ -21,6 +21,7 @@ async function req(method, url, body) {
 export const api = {
   info: () => req('GET', 'api/info'),
   backups: () => req('GET', 'api/backups'),
+  websdrMirror: (freq, modulation) => req('POST', 'api/websdr/mirror', { freq, modulation }),
   restore: async (file) => {
     const fd = new FormData();
     fd.append('file', file);

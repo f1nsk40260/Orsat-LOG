@@ -17,7 +17,7 @@ from pydantic import BaseModel
 from . import __version__, adif, auth, backup, geo, solar, weather
 from .db import Database
 from .tci import TciClient
-from .websdr import WebSdrServer
+from .websdr import FastApiPage, WebSdrServer
 
 log = logging.getLogger("orsatlog")
 
@@ -62,6 +62,9 @@ websdr = WebSdrServer(on_change=lambda st: _broadcast(st, "websdr"))
 
 
 async def _restart_websdr():
+    if auth.central_mode():
+        websdr.serve_central()     # la page arrive par /tci (même adresse que le WebSDR)
+        return
     s = db.get_settings()
     if s.get("websdr_enabled") == "1" and not auth.central_mode():
         await websdr.start(s.get("websdr_port") or 40001)
@@ -308,6 +311,19 @@ class TuneIn(BaseModel):
     mode: str = ""
     submode: str = ""
     kind: str = ""
+
+
+class MirrorIn(BaseModel):
+    freq: int | None = None
+    modulation: str = ""
+
+
+@app.post("/api/websdr/mirror")
+async def websdr_mirror(m: MirrorIn):
+    """Serveur central : AetherSDR (suivi par le navigateur) a changé de fréquence ; la page
+    WebSDR l'a suivi par CAT Sync sans le relayer au carnet."""
+    websdr.mirror(m.freq, m.modulation)
+    return {"ok": True}
 
 
 @app.post("/api/tune")
@@ -709,6 +725,16 @@ async def ws_endpoint(ws: WebSocket):
         pass
     finally:
         _clients.discard(ws)
+
+
+@app.websocket("/tci")
+async def tci_page(ws: WebSocket):
+    """Serveur central : la page WebSDR (CAT Sync) s'y connecte comme à un serveur TCI."""
+    if not auth.central_mode() or not _logged_in(ws.cookies):
+        await ws.close(code=4401)
+        return
+    await ws.accept()
+    await websdr.on_page(FastApiPage(ws))
 
 
 # ---------- frontend compilé ----------

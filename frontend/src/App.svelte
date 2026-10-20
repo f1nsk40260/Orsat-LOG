@@ -45,8 +45,16 @@
   // Serveur central : liaison TCI avec AetherSDR ouverte par ce navigateur (sur ce PC)
   function browserTci(s) {
     if (s.tci_enabled === '1') {
+      let lastF = null, lastM = null;
       startTci({ host: s.tci_host || '127.0.0.1', port: s.tci_port || 50001, trx: s.tci_trx || 0 },
-               (st) => (radio = st));
+               (st) => {
+                 radio = st;
+                 // La page WebSDR suit AetherSDR (CAT Sync) sans le relayer au carnet : on le lui dit
+                 if (st.connected && (st.freq !== lastF || st.modulation !== lastM)) {
+                   if (st.freq) api.websdrMirror(st.freq, st.modulation !== lastM ? st.modulation : '').catch(() => {});
+                   lastF = st.freq; lastM = st.modulation;
+                 }
+               });
     } else {
       stopTci();
     }

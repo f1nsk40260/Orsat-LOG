@@ -24,6 +24,31 @@ from .tci import TCI_MODES
 log = logging.getLogger("orsatlog.websdr")
 
 
+class PageClosed(Exception):
+    pass
+
+
+class FastApiPage:
+    """Page WebSDR arrivée par le WebSocket /tci du carnet central (même adresse que le
+    WebSDR, derrière proxy.py) : même interface qu'une connexion websockets."""
+
+    def __init__(self, ws):
+        self.ws = ws
+
+    async def send(self, text):
+        await self.ws.send_text(text)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        from starlette.websockets import WebSocketDisconnect
+        try:
+            return await self.ws.receive_text()
+        except WebSocketDisconnect:
+            raise StopAsyncIteration
+
+
 class WebSdrServer:
     def __init__(self, on_change):
         self._on_change = on_change
@@ -70,6 +95,13 @@ class WebSdrServer:
         log.info("WebSDR : serveur TCI sur ws://127.0.0.1:%s", self.port)
         self._set(listening=True, error="")
 
+    def serve_central(self):
+        """Serveur central : pas de port local, les pages arrivent par /tci (server.py)."""
+        self._set(listening=True, error="")
+
+    async def on_page(self, page):
+        await self._on_page(page)
+
     async def stop(self):
         if self._server:
             self._server.close()
@@ -97,7 +129,7 @@ class WebSdrServer:
                         cmd = cmd.strip()
                         if cmd:
                             await self._handle(ws, cmd)
-        except websockets.ConnectionClosed:
+        except (websockets.ConnectionClosed, PageClosed):
             pass
         finally:
             self._pages.discard(ws)
@@ -138,7 +170,7 @@ class WebSdrServer:
             if p is not sender:
                 try:
                     await p.send(text)
-                except websockets.ConnectionClosed:
+                except Exception:          # page fermée entre-temps
                     pass
 
     # --- recalage de la page depuis le carnet ---
@@ -152,7 +184,7 @@ class WebSdrServer:
         for p in list(self._pages):
             try:
                 await p.send(text)
-            except websockets.ConnectionClosed:
+            except Exception:              # page fermée entre-temps
                 pass
         self._set(freq=int(freq))
         if modulation:

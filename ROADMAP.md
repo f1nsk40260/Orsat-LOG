@@ -193,6 +193,18 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   `orsatlog-AAAAMMJJ-HHMM.db` ; migrations rejouées).
 - `install-server.sh` ne relance plus le proxy du WebSDR lors d'une simple mise à jour (`FORCE_PROXY=1` pour forcer).
 
+## Fait — v0.11.0 (21/10/2026) : liaison directe page WebSDR ↔ carnet central (étape 2)
+- Carnet central : WebSocket `/tci` (session requise) qui parle TCI comme le port 40001 du mode bureau ;
+  la page WebSDR s'y connecte par `wss://orsat.ddns.net/log/tci`. Panneau WebSDR actif en central.
+- PhantomSDR-ORSAT (page) : `catsync.js` accepte une adresse complète (`config.url`) ; au chargement,
+  la page sonde `/log/api/info` — si ce navigateur a une session au carnet, le carnet est ajouté aux
+  sources TCI (50001, 40001, « carnet ORSAT-LOG »). Auditeurs sans session : une requête 401, rien d'autre.
+- Clic sur une écoute SWL = la page se recale ; QSO = AetherSDR par la liaison du navigateur.
+- Miroir : l'interface du carnet signale au serveur les changements d'AetherSDR (`/api/websdr/mirror`),
+  que la page suit sans les relayer.
+- Condition : ouvrir la page WebSDR en **https** (cookie de session « Secure »), dans un navigateur
+  connecté au carnet, avec CAT Sync activé.
+
 ## Deux PC (question F1NSK 20/10)
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
