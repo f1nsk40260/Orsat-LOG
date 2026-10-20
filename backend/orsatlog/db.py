@@ -12,7 +12,8 @@ DEFAULT_SETTINGS = {
     "callsign": "",
     "locator": "",
     "tci_host": "127.0.0.1",
-    "tci_port": "40001",
+    "tci_port": "50001",
+    "tci_trx": "0",
     "tci_enabled": "1",
 }
 
@@ -62,6 +63,9 @@ class Database:
         self._con = sqlite3.connect(str(path), check_same_thread=False)
         self._con.row_factory = sqlite3.Row
         self._con.executescript(_SCHEMA)
+        # migration v0.1 -> v0.2 : port TCI par défaut 40001 -> 50001 (AetherSDR)
+        if self._con.execute("SELECT 1 FROM settings WHERE key = 'tci_trx'").fetchone() is None:
+            self._con.execute("UPDATE settings SET value = '50001' WHERE key = 'tci_port' AND value = '40001'")
         for k, v in DEFAULT_SETTINGS.items():
             self._con.execute("INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)", (k, v))
         self._con.commit()

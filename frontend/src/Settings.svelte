@@ -15,7 +15,8 @@
         callsign: s.callsign || '',
         locator: s.locator || '',
         tci_host: s.tci_host || '127.0.0.1',
-        tci_port: String(s.tci_port || '40001'),
+        tci_port: String(s.tci_port || '50001'),
+        tci_trx: String(s.tci_trx || '0'),
         tci_enabled: s.tci_enabled === '1' || s.tci_enabled === true ? '1' : '0',
       });
       onsaved(saved);
@@ -53,16 +54,24 @@
              onchange={(e) => (s.tci_enabled = e.currentTarget.checked ? '1' : '0')} />
       Activer la connexion TCI
     </label>
-    <div class="row">
+    <div class="row3">
       <div>
         <label for="s-host">Adresse</label>
         <input id="s-host" class="mono" bind:value={s.tci_host} />
       </div>
       <div>
         <label for="s-port">Port</label>
-        <input id="s-port" class="mono" bind:value={s.tci_port} />
+        <input id="s-port" class="mono" bind:value={s.tci_port}
+               title="AetherSDR : 50001 · ExpertSDR / SunSDR : 40001" />
+      </div>
+      <div>
+        <label for="s-trx">Récepteur</label>
+        <select id="s-trx" bind:value={s.tci_trx} title="Récepteur TCI suivi (slice de la Flex)">
+          {#each ['0', '1', '2', '3'] as n}<option value={n}>{'ABCD'[+n]} ({n})</option>{/each}
+        </select>
       </div>
     </div>
+    <p class="note">AetherSDR : ouvrir l'applet « TCI Server », port 50001, et démarrer le serveur.</p>
   </fieldset>
 
   <div class="actions">
@@ -81,6 +90,8 @@
   fieldset { border: 1px solid var(--panel-edge); border-radius: 6px; margin: 0 0 12px; padding: 10px 12px; }
   legend { color: var(--gold); padding: 0 6px; font-size: 0.85rem; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .row3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
+  .note { color: var(--muted); font-size: 0.78rem; margin: 8px 0 0; }
   .check { display: flex; align-items: center; gap: 8px; text-transform: none; font-size: 0.88rem; margin-bottom: 10px; }
   .check input { width: auto; }
   .actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }

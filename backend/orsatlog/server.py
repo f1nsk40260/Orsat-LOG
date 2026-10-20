@@ -43,7 +43,7 @@ tci = TciClient(on_change=_broadcast)
 def _restart_tci():
     s = db.get_settings()
     if s.get("tci_enabled") == "1":
-        tci.start(s.get("tci_host") or "127.0.0.1", s.get("tci_port") or 40001)
+        tci.start(s.get("tci_host") or "127.0.0.1", s.get("tci_port") or 50001, s.get("tci_trx") or 0)
     else:
         tci.stop()
 
@@ -66,7 +66,7 @@ def get_settings():
 
 
 @app.put("/api/settings")
-def put_settings(values: dict):
+async def put_settings(values: dict):
     before = db.get_settings()
     if values.get("locator") and not geo.valid_locator(values["locator"]):
         raise HTTPException(400, "Locator invalide")
@@ -76,7 +76,7 @@ def put_settings(values: dict):
         values["locator"] = values["locator"].strip().upper()
     db.set_settings(values)
     after = db.get_settings()
-    if any(before.get(k) != after.get(k) for k in ("tci_host", "tci_port", "tci_enabled")):
+    if any(before.get(k) != after.get(k) for k in ("tci_host", "tci_port", "tci_trx", "tci_enabled")):
         _restart_tci()
     return after
 

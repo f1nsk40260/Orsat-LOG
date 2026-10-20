@@ -18,7 +18,7 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 | Backend | Python 3, FastAPI + uvicorn (`backend/orsatlog/`) |
 | Fenêtre | pywebview (GTK/WebKit), repli automatique sur le navigateur |
 | Base | SQLite : `~/.local/share/orsat-log/orsatlog.db` (variable `ORSATLOG_DATA` pour changer) |
-| Radio | TCI WebSocket, port 40001 par défaut, récepteur 0 / VFO A |
+| Radio | TCI WebSocket, port 50001 par défaut (AetherSDR ; ExpertSDR = 40001), récepteur choisi / VFO A |
 | Solaire | hamqsl.com (SFI, A, K, X-ray), cache 15 min, figé dans chaque QSO |
 | Échange | ADIF 3.1 (export fait, import à faire) |
 | Port local | 8740 |
@@ -34,6 +34,12 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 - Réglages : indicatif, locator, hôte/port TCI.
 - Repli silencieux sur le navigateur si WebKit GTK absent (Main-PC : `sudo apt install gir1.2-webkit2-4.1`).
 
+## Fait — v0.2.0 (20/10/2026)
+- Compatibilité AetherSDR (vérifiée sur son code source) : port 50001, modes fm/cwr/rtty.
+- Réglage du récepteur TCI suivi (slice A/B/C/D).
+- Cause d'échec de connexion TCI affichée dans l'interface.
+- Lanceur `orsat-log` (icône Bureau/menu) : mise à jour + recompilation incrémentale + relance.
+
 ## À faire (ordre proposé)
 1. Import ADIF (reprise de l'ancien carnet).
 2. Édition d'un QSO existant.
@@ -48,7 +54,6 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 ## Sources TCI visées
 - **AetherSDR** (serveur TCI v2.0 : CAT, audio, IQ, CW, spots, événements récepteur ; FlexRadio en priorité,
   aussi récepteurs en réception seule). Port à régler dans les Réglages (pas de défaut documenté).
-  → prévoir le choix du récepteur/slice suivi (aujourd'hui : récepteur 0 seulement).
 - **Orsat-SDR** (plus tard) pour les logs SWL → nécessite d'ajouter un serveur TCI dans Orsat-SDR.
 
 ## Mode SWL (à concevoir)

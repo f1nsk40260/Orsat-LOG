@@ -192,6 +192,9 @@
       {/if}
       {#if radio.ptt}<span class="tx">TX</span>{/if}
     </div>
+    {#if !radio.connected && radio.error}
+      <div class="tci-error">{radio.error}</div>
+    {/if}
     <div class="freq mono">{fmtFreq(radio.freq)}<small> MHz</small></div>
     <div class="radio-mode">
       {radio.modulation ? radio.modulation.toUpperCase() : '—'}
@@ -340,6 +343,7 @@
   .tci-status { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); }
   .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 6px var(--bad); }
   .dot.on { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  .tci-error { color: var(--warn); font-size: 0.78rem; margin-top: 6px; }
   .tx { margin-left: auto; color: #fff; background: var(--bad); padding: 1px 8px; border-radius: 4px; font-weight: 700; }
   .freq { font-size: 2rem; color: var(--gold); margin: 14px 0 4px; text-shadow: 0 0 10px rgba(207, 181, 59, 0.35); }
   .freq small { font-size: 0.9rem; color: var(--gold-soft); }
