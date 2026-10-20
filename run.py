@@ -8,6 +8,7 @@
 
 import argparse
 import logging
+import os
 import socket
 import sys
 import threading
@@ -17,6 +18,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
 
 import uvicorn  # noqa: E402
+
+# WebKitGTK (fenêtre pywebview) plante sur certains pilotes graphiques des Ubuntu
+# récents (« WebKitWebProcess a rencontré une erreur fatale ») : rendu DMA-BUF désactivé.
+os.environ.setdefault("WEBKIT_DISABLE_DMABUF_RENDERER", "1")
 
 HOST = "127.0.0.1"
 
