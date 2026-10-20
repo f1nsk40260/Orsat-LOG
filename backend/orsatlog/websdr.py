@@ -51,9 +51,18 @@ class WebSdrServer:
     async def start(self, port):
         await self.stop()
         self.port = int(port)
+        # La page cherche « localhost », que Linux résout d'abord en ::1 (IPv6) :
+        # on écoute donc sur les deux boucles locales, IPv4 seule si IPv6 est coupé.
         try:
-            self._server = await websockets.serve(self._on_page, "127.0.0.1", self.port,
-                                                  max_size=2**20)
+            try:
+                self._server = await websockets.serve(self._on_page, ["127.0.0.1", "::1"],
+                                                      self.port, max_size=2**20)
+            except OSError as exc:
+                if "::1" in str(exc) or getattr(exc, "errno", None) in (97, 99):
+                    self._server = await websockets.serve(self._on_page, "127.0.0.1",
+                                                          self.port, max_size=2**20)
+                else:
+                    raise
         except OSError as exc:
             log.warning("WebSDR : port %s indisponible : %s", self.port, exc)
             self._set(error=f"port {self.port} déjà utilisé (un autre logiciel TCI ?)")
