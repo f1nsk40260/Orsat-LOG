@@ -1,5 +1,5 @@
 <script>
-  import { untrack } from 'svelte';
+  import { untrack, tick } from 'svelte';
   import { api } from './api.js';
   import { MODES, defaultRst, dayOf, timeOf, fmtDate } from './util.js';
   import GroupSession from './GroupSession.svelte';
@@ -108,6 +108,14 @@
   }
 
   export function focus() { callInput?.focus(); }
+
+  // Ouvre une session de groupe existante dans l'onglet Groupe (pastille ✎ de la page du jour)
+  let group = $state();
+  export async function openGroup(id) {
+    setKind('GRP');
+    await tick();
+    await group?.show(id);
+  }
 </script>
 
 <section class="panel entry" class:swl={kind === 'SWL'} class:grp={kind === 'GRP'}>
@@ -127,7 +135,7 @@
   </div>
 
   {#if kind === 'GRP'}
-    <GroupSession radio={src} follow={followTci} {sessions} onchanged={() => onlogged?.()} />
+    <GroupSession bind:this={group} radio={src} follow={followTci} {sessions} onchanged={() => onlogged?.()} />
   {:else}
   <form onsubmit={submit}>
     <div class="grid">

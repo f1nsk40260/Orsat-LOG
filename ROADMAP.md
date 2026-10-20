@@ -123,6 +123,8 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 - Passage de QSO de groupe : rattachement conservé, ou détaché (case à décocher ; un SWL est toujours détaché).
 - Serveur (`PUT /api/qsos/{id}`) : contrôle date / heure / locator / indicatif ; bande, distance et azimut
   recalculés.
+- v0.7.1 : pastilles des QSO de groupe de la page du jour : ✎ = ouvrir la session dans l'onglet Groupe
+  (Modifier / Clôturer / Supprimer), ✕ = supprimer la session et ses QSO.
 
 ## Deux PC (question F1NSK 20/10)
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.

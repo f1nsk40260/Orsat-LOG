@@ -135,6 +135,9 @@
     } catch (err) { error = err.message; }
   }
 
+  // Ouverture d'une session existante depuis la page du jour (pastille ✎)
+  export function show(id) { return load(id); }
+
   async function load(id) {
     active = await api.session(id);
     regulars = await api.regulars(active.name).catch(() => []);

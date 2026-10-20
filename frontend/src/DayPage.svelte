@@ -71,6 +71,13 @@
     load(day);
   }
 
+  async function removeSession(s) {
+    const n = s.count ? ` et ses ${s.count} QSO` : '';
+    if (!confirm(`Supprimer le QSO de groupe « ${s.name} »${n} ?`)) return;
+    await api.deleteSession(s.id);
+    load(day);
+  }
+
   export function clearForm() { form?.clear(); }
 
   const bandsList = $derived(page ? Object.entries(page.stats.bands).sort((a, b) => b[1] - a[1]) : []);
@@ -141,6 +148,11 @@
               <b>{s.name}</b>
               {s.time_start.slice(0, 2)}:{s.time_start.slice(2)}–{s.time_end ? `${s.time_end.slice(0, 2)}:${s.time_end.slice(2)}` : 'en cours'}
               · {s.count} station{s.count > 1 ? 's' : ''}{s.animator ? ` · anim. ${s.animator}` : ''}
+              {#if isToday}
+                <button class="ghost sess-btn" title="Ouvrir pour corriger (nom, horaires, fréquence, stations)"
+                        onclick={() => form?.openGroup(s.id)}>✎</button>
+              {/if}
+              <button class="ghost sess-btn del" title="Supprimer cette session et ses QSO" onclick={() => removeSession(s)}>✕</button>
             </span>
           {/each}
         </div>
@@ -189,6 +201,9 @@
   .sessions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
   .sess { font-size: 0.8rem; border: 1px solid rgba(95, 191, 107, 0.5); border-radius: 12px; padding: 2px 10px; }
   .sess b { color: var(--ok); }
+  .sess-btn { padding: 0 3px; margin-left: 4px; color: var(--gold-soft); font-size: 0.8rem; }
+  .sess-btn:hover { color: var(--gold); box-shadow: none; }
+  .sess-btn.del:hover { color: var(--bad); }
 
   .tci-status { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); }
   .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 6px var(--bad); }
