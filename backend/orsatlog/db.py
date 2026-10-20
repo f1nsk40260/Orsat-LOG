@@ -1,13 +1,39 @@
 """Base SQLite du carnet : QSO / écoutes SWL, relevés de propagation, notes du jour, réglages."""
 
 import json
+import logging
 import os
 import sqlite3
 import threading
 from pathlib import Path
 
-DATA_DIR = Path(os.environ.get("ORSATLOG_DATA", Path.home() / ".local/share/orsat-log"))
+# Données dans le dossier d'ORSAT-LOG lui-même : ~/Orsat-LOG/data (ignoré par git).
+# ORSATLOG_DATA permet toujours de choisir un autre dossier.
+ROOT = Path(__file__).resolve().parents[2]
+OLD_DATA_DIR = Path.home() / ".local/share/orsat-log"      # emplacement jusqu'à la v0.6.4
+DATA_DIR = Path(os.environ.get("ORSATLOG_DATA", ROOT / "data"))
 DB_PATH = DATA_DIR / "orsatlog.db"
+
+
+def _migrate_old_db():
+    """Reprend la base de l'ancien emplacement au premier lancement. L'ancienne est
+    renommée orsatlog.db.ancien (copie de sécurité), jamais supprimée."""
+    old = OLD_DATA_DIR / "orsatlog.db"
+    if "ORSATLOG_DATA" in os.environ or DB_PATH.exists() or not old.exists():
+        return
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    src = sqlite3.connect(old)
+    try:
+        dst = sqlite3.connect(DB_PATH)
+        src.backup(dst)          # copie cohérente, journal WAL compris
+        dst.close()
+    finally:
+        src.close()
+    old.rename(old.with_name("orsatlog.db.ancien"))
+    logging.getLogger("orsatlog").info("Base déplacée de %s vers %s", old, DB_PATH)
+
+
+_migrate_old_db()
 
 DEFAULT_SETTINGS = {
     "callsign": "",

@@ -17,7 +17,7 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 | Interface | Svelte 5 + Vite (`frontend/`), compilée dans `frontend/dist` |
 | Backend | Python 3, FastAPI + uvicorn (`backend/orsatlog/`) |
 | Fenêtre | pywebview (GTK/WebKit), repli automatique sur le navigateur |
-| Base | SQLite : `~/.local/share/orsat-log/orsatlog.db` (variable `ORSATLOG_DATA` pour changer) |
+| Base | SQLite : `~/Orsat-LOG/data/orsatlog.db`, journal `data/orsat-log.log` (dossier ignoré par git ; `ORSATLOG_DATA` pour changer). Jusqu'à v0.6.4 : `~/.local/share/orsat-log`, reprise automatique |
 | Radio | TCI WebSocket, port 50001 par défaut (AetherSDR ; ExpertSDR = 40001), récepteur choisi / VFO A |
 | Solaire | hamqsl.com (SFI, A, K, X-ray), cache 15 min, figé dans chaque QSO |
 | Météo | Weathercloud (station perso), relevé 15 min, table `weather` |
@@ -110,6 +110,8 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
   blanc sur blanc) ; rendu DMA-BUF de WebKitGTK désactivé (plantage WebKitWebProcess) ; le lanceur
   recompile l'interface si ses sources sont plus récentes que `dist`.
 - v0.6.4 : bouton **Tout recompiler** dans Réglages → Mise à jour (= `orsat-log --rebuild`).
+- v0.6.5 : base et journal dans `~/Orsat-LOG/data/` (demande F1NSK) ; ancienne base reprise au premier
+  lancement et gardée en `~/.local/share/orsat-log/orsatlog.db.ancien`.
 - Écarté : le pont `tci-bridge/orsat-tci-server.py` de PhantomSDR-ORSAT ouvre sa propre écoute,
   indépendante du navigateur → gardé pour donner l'audio du WebSDR aux décodeurs, pas pour le carnet.
 

@@ -53,7 +53,7 @@ Exec=$DIR/orsat-log.sh --rebuild
 
 [Desktop Action journal]
 Name=Voir le journal
-Exec=xdg-open $HOME/.local/share/orsat-log/orsat-log.log
+Exec=xdg-open $DIR/data/orsat-log.log
 EOF
 chmod +x "$DESKTOP_FILE"
 # icône sur le Bureau

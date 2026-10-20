@@ -7,9 +7,12 @@
 #   orsat-log --rebuild  force la recompilation complète
 cd "$(dirname "$(readlink -f "$0")")" || exit 1
 DIR="$(pwd)"
-LOG_DIR="$HOME/.local/share/orsat-log"
+LOG_DIR="$DIR/data"     # base et journal dans le dossier d'ORSAT-LOG
 LOG="$LOG_DIR/orsat-log.log"
 mkdir -p "$LOG_DIR"
+# Menu « Voir le journal » de l'icône : pointe sur le nouveau journal
+DESKTOP_FILE="$HOME/.local/share/applications/orsat-log.desktop"
+[ -f "$DESKTOP_FILE" ] && sed -i "s#xdg-open .*orsat-log\.log#xdg-open $LOG#" "$DESKTOP_FILE"
 
 notify() { command -v notify-send >/dev/null && notify-send -a ORSAT-LOG -i "$DIR/assets/orsat-log.svg" "ORSAT-LOG" "$1"; echo "$1"; }
 
