@@ -86,8 +86,13 @@ class WebSdrServer:
         try:
             await ws.send("protocol:ExpertSDR3,1.9;device:ORSAT-LOG;receive_only:true;"
                           "trx_count:1;channels_count:1;ready;")
+            seen = 0
             async for msg in ws:
                 if isinstance(msg, str):
+                    # Journal : les 30 premiers messages de chaque page (diagnostic)
+                    seen += 1
+                    if seen <= 30:
+                        log.info("WebSDR reçu : %s", msg.strip().replace("\n", " "))
                     for cmd in msg.replace("\n", "").split(";"):
                         cmd = cmd.strip()
                         if cmd:
