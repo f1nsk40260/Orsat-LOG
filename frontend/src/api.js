@@ -24,7 +24,7 @@ export const api = {
   worked: (call) => req('GET', `/api/worked/${encodeURIComponent(call)}`),
   // mise à jour
   updateCheck: () => req('GET', '/api/update/check'),
-  updateRun: () => req('POST', '/api/update'),
+  updateRun: (rebuild = false) => req('POST', `/api/update${rebuild ? '?rebuild=true' : ''}`),
   // QSO de groupe
   sessionNames: () => req('GET', '/api/sessions/names'),
   regulars: (name) => req('GET', `/api/sessions/regulars?name=${encodeURIComponent(name)}`),

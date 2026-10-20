@@ -109,6 +109,7 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 - v0.6.3 : listes déroulantes au style ORSAT (WebKitGTK les dessinait en thème clair : mode illisible,
   blanc sur blanc) ; rendu DMA-BUF de WebKitGTK désactivé (plantage WebKitWebProcess) ; le lanceur
   recompile l'interface si ses sources sont plus récentes que `dist`.
+- v0.6.4 : bouton **Tout recompiler** dans Réglages → Mise à jour (= `orsat-log --rebuild`).
 - Écarté : le pont `tci-bridge/orsat-tci-server.py` de PhantomSDR-ORSAT ouvre sa propre écoute,
   indépendante du navigateur → gardé pour donner l'audio du WebSDR aux décodeurs, pas pour le carnet.
 

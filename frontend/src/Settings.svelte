@@ -15,10 +15,10 @@
     try { upd = await api.updateCheck(); updState = ''; }
     catch (err) { updState = err.message; }
   }
-  async function runUpdate() {
+  async function runUpdate(rebuild = false) {
     updState = 'run';
     try {
-      await api.updateRun();
+      await api.updateRun(rebuild);
       // l'application redémarre : on attend le nouveau serveur puis on recharge la page
       await new Promise((r) => setTimeout(r, 4000));
       for (let i = 0; i < 90; i++) {
@@ -140,9 +140,13 @@
       <button type="button" onclick={checkUpdate} disabled={updState === 'check' || updState === 'run'}>
         {updState === 'check' ? 'Vérification…' : 'Vérifier'}
       </button>
-      <button type="button" class:primary={upd?.changes.length} onclick={runUpdate}
+      <button type="button" class:primary={upd?.changes.length} onclick={() => runUpdate(false)}
               disabled={updState === 'run'} title="Récupère les modifications, recompile et redémarre">
         Mettre à jour et redémarrer
+      </button>
+      <button type="button" onclick={() => runUpdate(true)} disabled={updState === 'run'}
+              title="Recompile toute l'interface et réinstalle les dépendances, puis redémarre (si l'affichage ne reflète pas une mise à jour)">
+        Tout recompiler
       </button>
     </div>
   </fieldset>

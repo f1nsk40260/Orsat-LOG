@@ -183,12 +183,14 @@ async def update_check():
 
 
 @app.post("/api/update")
-def update_run():
+def update_run(rebuild: bool = False):
     """Lance le lanceur (mise à jour + recompilation + redémarrage) dans un processus détaché :
     il ferme cette instance et rouvre l'application à jour."""
     if not LAUNCHER.exists():
         raise HTTPException(500, "Lanceur orsat-log.sh introuvable")
-    subprocess.Popen(["bash", str(LAUNCHER)], cwd=str(ROOT), start_new_session=True,
+    # rebuild = recompilation complète (comme « orsat-log --rebuild »)
+    cmd = ["bash", str(LAUNCHER)] + (["--rebuild"] if rebuild else [])
+    subprocess.Popen(cmd, cwd=str(ROOT), start_new_session=True,
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return {"ok": True}
 
