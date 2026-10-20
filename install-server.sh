@@ -23,7 +23,19 @@ say() { printf '\n== %s ==\n' "$1"; }
 die() { printf '\n[ERREUR] %s\n' "$1" >&2; exit 1; }
 
 [ -f "$CFG" ] || die "admin_config.json introuvable dans $PHANTOM (donnez le dossier du WebSDR en argument)"
+# npm vient de nvm sur la plupart des stations, et le terminal du panneau admin ne lit pas
+# ~/.bashrc : on charge nvm comme recompile.sh de PhantomSDR, puis on cherche ailleurs.
+if ! command -v npm >/dev/null && [ -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]; then
+    export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+    . "$NVM_DIR/nvm.sh" >/dev/null 2>&1 || true
+fi
+if ! command -v npm >/dev/null; then
+    for d in "$HOME"/.nvm/versions/node/*/bin "$HOME/.local/bin" /usr/local/bin /snap/bin; do
+        [ -x "$d/npm" ] && export PATH="$d:$PATH"
+    done
+fi
 command -v npm >/dev/null || die "npm introuvable (sudo apt install nodejs npm)"
+echo "npm : $(command -v npm)"
 python3 -m venv --help >/dev/null 2>&1 || die "python3-venv manquant (sudo apt install python3-venv)"
 
 say "Environnement Python"
