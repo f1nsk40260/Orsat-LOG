@@ -14,6 +14,7 @@
   let startTime = null;            // heure UTC figée dès la frappe de l'indicatif
   let callInput = $state();
   let lastRadioMode = null;
+  let lastSource = null;           // 'radio' (AetherSDR) ou 'web' (page WebSDR)
 
   function blank(prev = {}) {
     const label = prev.modeLabel ?? 'SSB';
@@ -32,11 +33,15 @@
   // Suivi de la radio : ne réagit qu'aux changements de la radio (un mode choisi à la main est respecté)
   $effect(() => {
     const { freq, mode, submode, connected } = src;
+    const source = kind === 'SWL' ? 'web' : 'radio';
     if (!followTci || !connected) return;
     untrack(() => {
       if (freq) form.freqMHz = (freq / 1e6).toFixed(6);
-      if (mode !== lastRadioMode) {
+      // Changement de mode de la source, ou passage QSO <-> SWL (autre source) :
+      // on reprend son mode, même s'il porte le même nom que celui de l'autre source.
+      if (mode !== lastRadioMode || source !== lastSource) {
         lastRadioMode = mode;
+        lastSource = source;
         if (mode && MODES.some((m) => m.label === mode)) setMode(mode);
       }
       form.submode = submode || '';
