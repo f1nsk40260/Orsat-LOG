@@ -80,6 +80,16 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 - v0.5.1 : **animateur** de la session (indicatif, repris de la dernière session du même nom) ;
   marqué ★, proposé en premier tant qu'il n'est pas contacté ; ADIF `APP_ORSATLOG_ANIMATOR`.
 
+## Fait — mise à jour depuis l'interface (20/10/2026)
+- Réglages → Mise à jour : version installée, liste des modifications disponibles sur GitHub,
+  bouton « Mettre à jour et redémarrer » (lance `orsat-log.sh` détaché : pull, recompilation, relance).
+
+## Deux PC (question F1NSK 20/10)
+- Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
+- **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
+  dossier synchronisé (Syncthing/Nextcloud, jamais les deux PC ouverts en même temps) /
+  sauvegarde-restauration complète dans les Réglages / un PC serveur accessible à distance.
+
 ## À faire (ordre proposé)
 1. Import ADIF (reprise de l'ancien carnet).
 2. Édition d'un QSO existant.
