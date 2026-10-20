@@ -16,6 +16,7 @@ DEFAULT_SETTINGS = {
     "tci_port": "50001",
     "tci_trx": "0",
     "tci_enabled": "1",
+    "weathercloud": "9224966553",   # identifiant de la station Weathercloud (F1NSK - Castets)
 }
 
 QSO_FIELDS = [
@@ -70,6 +71,25 @@ CREATE TABLE IF NOT EXISTS propagation (
     conditions  TEXT                -- JSON : état des bandes jour/nuit
 );
 CREATE INDEX IF NOT EXISTS idx_prop_day ON propagation(day, time);
+-- relevés météo de la station locale
+CREATE TABLE IF NOT EXISTS weather (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    day       TEXT NOT NULL,        -- AAAAMMJJ (UTC)
+    time      TEXT NOT NULL,        -- HHMMSS (UTC) de la mesure
+    epoch     INTEGER,
+    temp      REAL,                 -- °C
+    hum       REAL,                 -- %
+    dew       REAL,                 -- °C
+    bar       REAL,                 -- hPa
+    wspd      REAL,                 -- km/h
+    wspdhi    REAL,                 -- km/h (rafale)
+    wdir      REAL,                 -- degrés
+    rain      REAL,                 -- mm depuis minuit
+    rainrate  REAL,                 -- mm/h
+    solarrad  REAL,                 -- W/m²
+    uvi       REAL
+);
+CREATE INDEX IF NOT EXISTS idx_weather_day ON weather(day, time);
 -- page d'agenda : notes libres du jour
 CREATE TABLE IF NOT EXISTS day_note (
     day        TEXT PRIMARY KEY,
@@ -229,3 +249,25 @@ class Database:
             for r in self._con.execute("SELECT day FROM day_note WHERE day LIKE ?", (like,)):
                 out.setdefault(r["day"], {"qso": 0, "swl": 0})["note"] = True
         return out
+
+    # --- météo ---
+    WEATHER_FIELDS = ["temp", "hum", "dew", "bar", "wspd", "wspdhi", "wdir", "rain", "rainrate", "solarrad", "uvi"]
+
+    def add_weather(self, day, time, data):
+        cols = ["day", "time", "epoch"] + self.WEATHER_FIELDS
+        vals = [day, time, data.get("epoch")] + [data.get(f) for f in self.WEATHER_FIELDS]
+        with self._lock:
+            self._con.execute(
+                f"INSERT INTO weather({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})", vals)
+            self._con.commit()
+
+    def last_weather(self):
+        with self._lock:
+            row = self._con.execute(
+                "SELECT * FROM weather ORDER BY day DESC, time DESC, id DESC LIMIT 1").fetchone()
+        return dict(row) if row else None
+
+    def day_weather(self, day):
+        with self._lock:
+            rows = self._con.execute("SELECT * FROM weather WHERE day = ? ORDER BY time", (day,)).fetchall()
+        return [dict(r) for r in rows]

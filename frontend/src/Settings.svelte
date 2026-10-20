@@ -18,6 +18,7 @@
         tci_port: String(s.tci_port || '50001'),
         tci_trx: String(s.tci_trx || '0'),
         tci_enabled: s.tci_enabled === '1' || s.tci_enabled === true ? '1' : '0',
+        weathercloud: s.weathercloud || '',
       });
       onsaved(saved);
     } catch (err) {
@@ -72,6 +73,14 @@
       </div>
     </div>
     <p class="note">AetherSDR : ouvrir l'applet « TCI Server », port 50001, et démarrer le serveur.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>Météo</legend>
+    <label for="s-wc">Station Weathercloud</label>
+    <input id="s-wc" class="mono" bind:value={s.weathercloud}
+           placeholder="identifiant à 10 chiffres ou adresse de la station" />
+    <p class="note">Ex. https://app.weathercloud.net/d9224966553 — relevé toutes les 15 min.</p>
   </fieldset>
 
   <div class="actions">

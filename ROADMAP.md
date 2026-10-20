@@ -20,6 +20,7 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 | Base | SQLite : `~/.local/share/orsat-log/orsatlog.db` (variable `ORSATLOG_DATA` pour changer) |
 | Radio | TCI WebSocket, port 50001 par défaut (AetherSDR ; ExpertSDR = 40001), récepteur choisi / VFO A |
 | Solaire | hamqsl.com (SFI, A, K, X-ray), cache 15 min, figé dans chaque QSO |
+| Météo | Weathercloud (station perso), relevé 15 min, table `weather` |
 | Échange | ADIF 3.1 (export fait, SWL = `SWL:Y`, import à faire) |
 | Jour | Une page par jour **UTC** (tables `qso`, `propagation`, `day_note`) |
 | Port local | 8740 |
@@ -55,17 +56,26 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
   locator et site de l'émetteur ; bandes de radiodiffusion (« 31m BC ») ; export ADIF `SWL:Y`.
 - Contexte solaire de secours : dernier relevé enregistré si hamqsl ne répond pas.
 
+## Fait — v0.4.0 (20/10/2026) : météo locale
+- Station Weathercloud de F1NSK à Castets (identifiant 9224966553, modifiable dans Réglages → Météo,
+  adresse complète acceptée).
+- Adresse non officielle `app.weathercloud.net/device/values?code=…` (en-tête `X-Requested-With`
+  + cookie de session récupéré automatiquement). Peut changer sans préavis : à surveiller.
+- Relevé toutes les 15 min (table `weather`, une ligne par nouvelle mesure), au plus 1 requête / 5 min.
+- Panneau Météo de la page du jour : température, humidité, rosée, pression + tendance 3 h,
+  vent (direction, rafales), pluie, soleil/UV, mini/maxi, courbes température + pression 24 h.
+- Constat 20/10 : la page Weathercloud de la station affichait « - » partout (station n'émettant plus ?).
+
 ## À faire (ordre proposé)
-1. Météo locale dans la page du jour (source à choisir : station perso ? Open-Meteo ?).
-2. Import ADIF (reprise de l'ancien carnet).
-3. Édition d'un QSO existant.
-4. Onglet **Analyse** : QSO par bande × heure UTC, carte des contacts (grand cercle depuis le QTH),
+1. Import ADIF (reprise de l'ancien carnet).
+2. Édition d'un QSO existant.
+3. Onglet **Analyse** : QSO par bande × heure UTC, carte des contacts (grand cercle depuis le QTH),
    distances max par bande, corrélation avec SFI/K.
-5. Recherche / filtres dans le carnet (indicatif, bande, mode, période).
-6. Préfixes → pays DXCC (cty.dat) et entité dans chaque QSO.
-7. Spots TCI / DX cluster, croisement RBN / PSKReporter.
-8. Envoi de commandes TCI (cliquer un spot = changer de fréquence).
-9. Upload LoTW / QRZ / eQSL.
+4. Recherche / filtres dans le carnet (indicatif, bande, mode, période).
+5. Préfixes → pays DXCC (cty.dat) et entité dans chaque QSO.
+6. Spots TCI / DX cluster, croisement RBN / PSKReporter.
+7. Envoi de commandes TCI (cliquer un spot = changer de fréquence).
+8. Upload LoTW / QRZ / eQSL.
 
 ## Sources TCI visées
 - **AetherSDR** (serveur TCI v2.0 : CAT, audio, IQ, CW, spots, événements récepteur ; FlexRadio en priorité,

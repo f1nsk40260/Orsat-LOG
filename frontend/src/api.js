@@ -16,6 +16,7 @@ export const api = {
   settings: () => req('GET', '/api/settings'),
   saveSettings: (s) => req('PUT', '/api/settings', s),
   solar: () => req('GET', '/api/solar'),
+  weather: () => req('GET', '/api/weather'),
   qsos: (limit = 200) => req('GET', `/api/qsos?limit=${limit}`),
   addQso: (q) => req('POST', '/api/qsos', q),
   deleteQso: (id) => req('DELETE', `/api/qsos/${id}`),

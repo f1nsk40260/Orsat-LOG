@@ -12,7 +12,7 @@ from fastapi.responses import PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, geo, solar
+from . import __version__, adif, geo, solar, weather
 from .db import Database
 from .tci import TciClient
 
@@ -67,7 +67,23 @@ async def _propagation_recorder():
                     db.add_snapshot(utc_day(now), now.strftime("%H%M%S"), data)
         except Exception as exc:
             log.warning("relevé de propagation : %s", exc)
+        try:
+            await _record_weather()
+        except Exception as exc:
+            log.warning("relevé météo : %s", exc)
         await asyncio.sleep(15 * 60)
+
+
+async def _record_weather():
+    """Enregistre la mesure de la station si elle est nouvelle (heure de mesure différente)."""
+    data = await asyncio.to_thread(weather.get_weather, db.get_settings().get("weathercloud", ""))
+    if not data or not data.get("epoch"):
+        return
+    last = db.last_weather()
+    if last and last.get("epoch") == data["epoch"]:
+        return
+    at = datetime.fromtimestamp(data["epoch"], timezone.utc)
+    db.add_weather(utc_day(at), at.strftime("%H%M%S"), data)
 
 
 @asynccontextmanager
@@ -97,10 +113,14 @@ async def put_settings(values: dict):
         values["callsign"] = values["callsign"].strip().upper()
     if "locator" in values:
         values["locator"] = values["locator"].strip().upper()
+    if "weathercloud" in values:   # on accepte l'adresse complète de la station
+        values["weathercloud"] = weather.parse_code(values["weathercloud"])
     db.set_settings(values)
     after = db.get_settings()
     if any(before.get(k) != after.get(k) for k in ("tci_host", "tci_port", "tci_trx", "tci_enabled")):
         _restart_tci()
+    if before.get("weathercloud") != after.get("weathercloud"):
+        asyncio.create_task(_record_weather())
     return after
 
 
@@ -108,6 +128,12 @@ async def put_settings(values: dict):
 @app.get("/api/radio")
 def get_radio():
     return tci.state
+
+
+@app.get("/api/weather")
+async def get_weather():
+    data = await asyncio.to_thread(weather.get_weather, db.get_settings().get("weathercloud", ""))
+    return {"data": data, "error": weather.last_error()}
 
 
 @app.get("/api/solar")
@@ -197,6 +223,7 @@ def get_day(day: str):
         "day": day,
         "entries": entries,
         "propagation": db.day_snapshots(day),
+        "weather": db.day_weather(day),
         "note": db.get_note(day),
         "stats": {
             "qso": sum(e["kind"] == "QSO" for e in entries),

@@ -5,6 +5,7 @@
   import EntryForm from './EntryForm.svelte';
   import EntriesTable from './EntriesTable.svelte';
   import PropagationPanel from './PropagationPanel.svelte';
+  import WeatherPanel from './WeatherPanel.svelte';
 
   let { day, isToday, radio, settings } = $props();
 
@@ -142,10 +143,7 @@
       {/if}
     </section>
 
-    <section class="panel weather">
-      <h2 class="panel-title">Météo</h2>
-      <p class="muted">À venir : relevés météo locaux (température, pression, orages) enregistrés avec la page du jour.</p>
-    </section>
+    <WeatherPanel snapshots={page?.weather ?? []} {isToday} />
   </div>
 </div>
 
