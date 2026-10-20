@@ -203,7 +203,11 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - Miroir : l'interface du carnet signale au serveur les changements d'AetherSDR (`/api/websdr/mirror`),
   que la page suit sans les relayer.
 - Condition : ouvrir la page WebSDR en **https** (cookie de session « Secure »), dans un navigateur
-  connecté au carnet, avec CAT Sync activé.
+  connecté au carnet.
+- v0.11.1 (retour F1NSK : pas de synchro) : la page n'envoyait rien sans CAT Sync, réglage mémorisé par
+  adresse (http:8080 ≠ https). Désormais **liaison propre au carnet, indépendante de CAT Sync** : la page
+  envoie fréquence + mode dès la connexion puis à chaque changement (y compris ceux venus d'AetherSDR),
+  et obéit aux recalages du carnet. Le carnet ne répond plus aux questions `vfo:0;` / `modulation:0;`.
 
 ## Deux PC (question F1NSK 20/10)
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.

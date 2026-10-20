@@ -8,10 +8,9 @@ lui envoie la fréquence et le mode de ce que l'auditeur écoute vraiment.
     page -> ORSAT-LOG : vfo:0,0,<Hz>;  modulation:0,<mode>;  rx_filter_band:0,<bas>,<haut>;
     ORSAT-LOG -> page : vfo:0,0,<Hz>;  modulation:0,<mode>;   (recalage depuis le carnet)
 
-À la connexion, la page interroge « vfo:0; modulation:0; trx:0; ». Tant que
-la page n'a rien envoyé, ORSAT-LOG ne connaît pas la fréquence : il ne répond
-pas, pour ne pas lui faire croire à une fréquence nulle. Le premier réglage
-sur la page suffit à synchroniser.
+À la connexion, la page interroge « vfo:0; modulation:0; trx:0; ». Le carnet ne
+répond jamais à ces questions : la page est la référence. En serveur central, la
+page envoie d'elle-même sa fréquence et son mode dès la connexion.
 """
 
 import asyncio
@@ -148,14 +147,12 @@ class WebSdrServer:
                 except ValueError:
                     return
                 await self._send_others(ws, f"vfo:0,0,{st['freq']};")
-            elif st["freq"]:
-                await ws.send(f"vfo:0,0,{st['freq']};")
+            # Question « vfo:0; » : pas de réponse. La page est la référence ; lui renvoyer
+            # une fréquence connue la ferait sauter sur une ancienne écoute à l'ouverture.
         elif name == "modulation":
             if len(parts) >= 2:
                 self._set_modulation(parts[1])
                 await self._send_others(ws, f"modulation:0,{st['modulation']};")
-            elif st["modulation"]:
-                await ws.send(f"modulation:0,{st['modulation']};")
         # trx (PTT) : jamais de réponse. Un « trx:0,false » rétablirait le son de
         # la page si elle se connectait pendant une émission d'AetherSDR.
         # rx_filter_band et le reste : rien à faire pour un carnet
