@@ -181,6 +181,8 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - PhantomSDR-ORSAT `proxy.py` : `/log` = service annexe (comme /rade, /stats, /relay), préfixe retiré,
   `/log` → `/log/` ; inactif sans `log_port`. Chaîne proxy → carnet testée (connexion, assets, API, WebSocket).
 - Dépendance ajoutée : `python-multipart` (formulaire de connexion).
+- **En service le 20/10/2026 sur le PC ORSAT : https://orsat.ddns.net/log/** (retour F1NSK : aucune charge
+  notable). Mise à jour serveur : `cd ~/Orsat-LOG && git pull && bash install-server.sh ~/PhantomSDR-Plus`.
 - Reste du socle : sauvegardes (automatique + bouton) et reprise de la base de Main-PC.
 
 ## Deux PC (question F1NSK 20/10)
