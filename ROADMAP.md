@@ -172,6 +172,17 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - Mise à jour depuis les Réglages désactivée en central (se fera par le service, étape 3).
 - Mode bureau inchangé.
 
+## Fait — v0.9.1 (20/10/2026) : installation sur le PC ORSAT (étape 3 avancée)
+- `install-server.sh [dossier WebSDR]` (défaut `~/PhantomSDR-Plus`) : venv serveur (sans pywebview),
+  compilation de l'interface en `nice`, service systemd `orsat-log` (Nice=10, CPUQuota=30 %,
+  MemoryMax=300M, Restart=always, `ORSATLOG_PASSWORD_FILE` = admin_config.json du WebSDR),
+  ajout de `log_port: 8740` à admin_config.json (copie `.avant-orsat-log`), redémarrage de
+  `phantomsdr-proxy`, vérification.
+- PhantomSDR-ORSAT `proxy.py` : `/log` = service annexe (comme /rade, /stats, /relay), préfixe retiré,
+  `/log` → `/log/` ; inactif sans `log_port`. Chaîne proxy → carnet testée (connexion, assets, API, WebSocket).
+- Dépendance ajoutée : `python-multipart` (formulaire de connexion).
+- Reste du socle : sauvegardes (automatique + bouton) et reprise de la base de Main-PC.
+
 ## Deux PC (question F1NSK 20/10)
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
