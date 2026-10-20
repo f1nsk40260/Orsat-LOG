@@ -48,11 +48,34 @@ def _restart_tci():
         tci.stop()
 
 
+def utc_day(dt=None):
+    return (dt or datetime.now(timezone.utc)).strftime("%Y%m%d")
+
+
+async def _propagation_recorder():
+    """Relève la propagation toutes les 15 min ; enregistre un point à chaque nouvelle
+    publication de la source, et au moins un point par heure (page du jour bien remplie)."""
+    while True:
+        try:
+            data = await asyncio.to_thread(solar.get_solar)
+            if data:
+                now = datetime.now(timezone.utc)
+                last = db.last_snapshot()
+                new_hour = (not last or last["day"] != utc_day(now)
+                            or last["time"][:2] != now.strftime("%H"))
+                if not last or last.get("source_time") != data.get("updated") or new_hour:
+                    db.add_snapshot(utc_day(now), now.strftime("%H%M%S"), data)
+        except Exception as exc:
+            log.warning("relevé de propagation : %s", exc)
+        await asyncio.sleep(15 * 60)
+
+
 @asynccontextmanager
 async def lifespan(app):
     _restart_tci()
-    asyncio.create_task(asyncio.to_thread(solar.get_solar))  # préchargement
+    recorder = asyncio.create_task(_propagation_recorder())
     yield
+    recorder.cancel()
     tci.stop()
 
 
@@ -94,6 +117,7 @@ async def get_solar():
 
 # ---------- QSO ----------
 class QsoIn(BaseModel):
+    kind: str = "QSO"             # QSO = contact réalisé, SWL = écoute
     call: str
     qso_date: str | None = None   # AAAAMMJJ, défaut = maintenant UTC
     time_on: str | None = None    # HHMMSS
@@ -120,28 +144,86 @@ def worked(call: str):
 
 @app.post("/api/qsos")
 async def add_qso(q: QsoIn):
-    call = q.call.strip().upper()
+    kind = "SWL" if q.kind.upper() == "SWL" else "QSO"
+    # en SWL la station entendue peut être un nom (« Radio Romania ») : on garde la casse
+    call = q.call.strip() if kind == "SWL" else q.call.strip().upper()
     if not call:
-        raise HTTPException(400, "Indicatif obligatoire")
+        raise HTTPException(400, "Station entendue obligatoire" if kind == "SWL" else "Indicatif obligatoire")
     now = datetime.now(timezone.utc)
     rec = q.model_dump()
+    rec["kind"] = kind
     rec["call"] = call
+    if kind == "SWL":
+        rec["rst_sent"] = ""
     rec["qso_date"] = q.qso_date or now.strftime("%Y%m%d")
     rec["time_on"] = q.time_on or now.strftime("%H%M%S")
     rec["mode"] = q.mode.strip().upper()
     rec["submode"] = q.submode.strip().upper()
     rec["gridsquare"] = q.gridsquare.strip().upper()
-    rec["band"] = geo.band_of(q.freq)
+    rec["band"] = geo.band_of(q.freq, swl=kind == "SWL")
 
     my_loc = db.get_settings().get("locator", "")
     if geo.valid_locator(my_loc) and geo.valid_locator(rec["gridsquare"]):
         rec["distance_km"], rec["bearing"] = geo.distance_bearing(my_loc, rec["gridsquare"])
 
-    sol = await asyncio.to_thread(solar.get_solar)
+    sol = await asyncio.to_thread(solar.get_solar) or db.last_snapshot()
     if sol:
         rec["sfi"], rec["a_index"], rec["k_index"] = sol["sfi"], sol["a_index"], sol["k_index"]
 
     return db.add_qso(rec)
+
+
+# ---------- agenda ----------
+def _check_day(day):
+    if len(day) != 8 or not day.isdigit():
+        raise HTTPException(400, "Date attendue au format AAAAMMJJ")
+
+
+@app.get("/api/today")
+def today():
+    return {"day": utc_day()}
+
+
+@app.get("/api/day/{day}")
+def get_day(day: str):
+    """Page d'agenda : activité, relevés de propagation et notes d'un jour UTC."""
+    _check_day(day)
+    entries = db.day_qsos(day)
+    bands = {}
+    for e in entries:
+        if e["band"]:
+            bands[e["band"]] = bands.get(e["band"], 0) + 1
+    return {
+        "day": day,
+        "entries": entries,
+        "propagation": db.day_snapshots(day),
+        "note": db.get_note(day),
+        "stats": {
+            "qso": sum(e["kind"] == "QSO" for e in entries),
+            "swl": sum(e["kind"] == "SWL" for e in entries),
+            "bands": bands,
+            "max_km": max((e["distance_km"] or 0 for e in entries), default=0),
+        },
+    }
+
+
+class NoteIn(BaseModel):
+    text: str = ""
+
+
+@app.put("/api/day/{day}/note")
+def put_note(day: str, n: NoteIn):
+    _check_day(day)
+    db.set_note(day, n.text)
+    return {"ok": True}
+
+
+@app.get("/api/month/{month}")
+def get_month(month: str):
+    """Jours actifs d'un mois AAAAMM (pour le calendrier)."""
+    if len(month) != 6 or not month.isdigit():
+        raise HTTPException(400, "Mois attendu au format AAAAMM")
+    return db.month_activity(month)
 
 
 @app.delete("/api/qsos/{qso_id}")

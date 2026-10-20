@@ -20,6 +20,11 @@ export const api = {
   addQso: (q) => req('POST', '/api/qsos', q),
   deleteQso: (id) => req('DELETE', `/api/qsos/${id}`),
   worked: (call) => req('GET', `/api/worked/${encodeURIComponent(call)}`),
+  // agenda
+  today: () => req('GET', '/api/today'),
+  day: (day) => req('GET', `/api/day/${day}`),
+  saveNote: (day, text) => req('PUT', `/api/day/${day}/note`, { text }),
+  month: (month) => req('GET', `/api/month/${month}`),
 };
 
 /** WebSocket temps réel avec reconnexion automatique. */

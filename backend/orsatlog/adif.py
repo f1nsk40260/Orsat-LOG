@@ -3,6 +3,7 @@
 from datetime import datetime, timezone
 
 from . import __version__
+from .geo import ADIF_BANDS
 
 # champ base -> champ ADIF
 _MAP = [
@@ -34,8 +35,12 @@ def export(qsos, my_call="", my_grid=""):
         rec = []
         for key, tag in _MAP:
             v = q.get(key)
+            if key == "band" and v not in ADIF_BANDS:
+                continue  # bande de radiodiffusion : pas de valeur ADIF, FREQ suffit
             if v not in (None, ""):
                 rec.append(_field(tag, v))
+        if q.get("kind") == "SWL":
+            rec.append(_field("SWL", "Y"))  # écoute (Short Wave Listener), pas un contact
         if q.get("freq"):
             rec.append(_field("FREQ", f"{q['freq'] / 1e6:.6f}"))
         if my_call:

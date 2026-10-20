@@ -1,0 +1,69 @@
+<script>
+  import { fmtDate, fmtTime } from './util.js';
+
+  // showDate = false sur la page du jour (la date est déjà en tête de page)
+  let { entries, ondelete, ondate, showDate = true, empty = 'Aucune entrée.' } = $props();
+</script>
+
+<div class="table-wrap">
+  <table>
+    <thead>
+      <tr>
+        {#if showDate}<th>Date</th>{/if}
+        <th>UTC</th><th>Type</th><th>Indicatif / station</th><th>Bande</th><th>Fréq.</th><th>Mode</th>
+        <th>Env.</th><th title="RST reçu ou SINPO">Reçu</th><th>Locator</th><th>Dist.</th><th>Az.</th>
+        <th title="Flux solaire / indice K au moment de l'entrée">SFI / K</th><th>Nom / émetteur</th><th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {#each entries as q (q.id)}
+        <tr class:swl={q.kind === 'SWL'}>
+          {#if showDate}
+            <td>
+              {#if ondate}
+                <button class="ghost datelink" title="Ouvrir la page de ce jour" onclick={() => ondate(q.qso_date)}>{fmtDate(q.qso_date)}</button>
+              {:else}{fmtDate(q.qso_date)}{/if}
+            </td>
+          {/if}
+          <td class="mono">{fmtTime(q.time_on)}</td>
+          <td><span class="tag" class:tag-swl={q.kind === 'SWL'}>{q.kind}</span></td>
+          <td class="mono call-cell" title={q.comment}>{q.call}</td>
+          <td>{q.band}</td>
+          <td class="mono">{q.freq ? (q.freq / 1e6).toFixed(3) : ''}</td>
+          <td>{q.submode || q.mode}</td>
+          <td class="mono">{q.rst_sent}</td>
+          <td class="mono">{q.rst_rcvd}</td>
+          <td class="mono">{q.gridsquare}</td>
+          <td>{q.distance_km != null ? `${q.distance_km} km` : ''}</td>
+          <td>{q.bearing != null ? `${q.bearing}°` : ''}</td>
+          <td>{q.sfi ?? ''}{q.k_index != null ? ` / ${q.k_index}` : ''}</td>
+          <td>{q.kind === 'SWL' ? q.qth : q.name}</td>
+          <td>
+            {#if ondelete}
+              <button class="ghost del" title="Supprimer cette entrée" onclick={() => ondelete(q)}>✕</button>
+            {/if}
+          </td>
+        </tr>
+      {:else}
+        <tr><td colspan="15" class="muted empty">{empty}</td></tr>
+      {/each}
+    </tbody>
+  </table>
+</div>
+
+<style>
+  .table-wrap { overflow: auto; flex: 1; min-height: 0; }
+  td { white-space: nowrap; padding: 5px 6px; }
+  th { padding: 6px; }
+  td.call-cell { white-space: normal; min-width: 90px; }
+  .call-cell { color: var(--gold); font-weight: 600; }
+  .tag { font-size: 0.7rem; border: 1px solid var(--gold-soft); color: var(--gold); border-radius: 4px; padding: 0 5px; }
+  .tag-swl { border-color: rgba(120, 170, 220, 0.6); color: rgb(140, 185, 230); }
+  tr.swl .call-cell { color: rgb(160, 200, 240); }
+  .datelink { padding: 0; color: var(--text); text-decoration: underline dotted var(--gold-soft); }
+  .datelink:hover { color: var(--gold); box-shadow: none; }
+  .del { padding: 0 6px; color: var(--muted); }
+  .del:hover { color: var(--bad); }
+  .empty { text-align: center; padding: 24px; }
+  .muted { color: var(--muted); }
+</style>

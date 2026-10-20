@@ -27,7 +27,30 @@ BANDS = [
 ]
 
 
-def band_of(freq_hz):
+# bandes de radiodiffusion (écoute SWL) — hors nomenclature ADIF
+BROADCAST_BANDS = [
+    ("LW", 148_500, 283_500), ("MW", 526_500, 1_606_500),
+    ("120m", 2_300_000, 2_495_000), ("90m", 3_200_000, 3_400_000), ("75m", 3_900_000, 4_000_000),
+    ("60m", 4_750_000, 5_060_000), ("49m", 5_900_000, 6_200_000), ("41m", 7_200_000, 7_450_000),
+    ("31m", 9_400_000, 9_900_000), ("25m", 11_600_000, 12_100_000), ("22m", 13_570_000, 13_870_000),
+    ("19m", 15_100_000, 15_800_000), ("16m", 17_480_000, 17_900_000), ("15m", 18_900_000, 19_020_000),
+    ("13m", 21_450_000, 21_850_000), ("11m", 25_670_000, 26_100_000),
+]
+ADIF_BANDS = {b[0] for b in BANDS}
+
+
+def band_of(freq_hz, swl=False):
+    """Bande radioamateur ; en SWL, à défaut, bande de radiodiffusion (ex. « 31m BC »)."""
+    ham = _ham_band(freq_hz)
+    if ham or not swl or not freq_hz:
+        return ham
+    for name, lo, hi in BROADCAST_BANDS:
+        if lo <= freq_hz <= hi:
+            return name if name in ("LW", "MW") else f"{name} BC"
+    return ""
+
+
+def _ham_band(freq_hz):
     if not freq_hz:
         return ""
     for name, lo, hi in BANDS:
