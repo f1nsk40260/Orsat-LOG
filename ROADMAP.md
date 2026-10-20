@@ -115,6 +115,15 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 - Écarté : le pont `tci-bridge/orsat-tci-server.py` de PhantomSDR-ORSAT ouvre sa propre écoute,
   indépendante du navigateur → gardé pour donner l'audio du WebSDR aux décodeurs, pas pour le carnet.
 
+## Fait — v0.7.0 (20/10/2026) : édition complète d'une entrée
+- Bouton ✎ sur chaque ligne (page du jour et carnet complet), ou double-clic sur la ligne.
+- Fenêtre d'édition : type QSO/SWL, indicatif / station, date et heure UTC, fréquence, mode + sous-mode
+  (USB/LSB en SSB), reports (RST ou SINPO), locator, nom, QTH / émetteur, commentaire / programme,
+  contexte propagation (SFI, A, K). Supprimer depuis la fenêtre. Entrée = enregistrer, Échap = annuler.
+- Passage de QSO de groupe : rattachement conservé, ou détaché (case à décocher ; un SWL est toujours détaché).
+- Serveur (`PUT /api/qsos/{id}`) : contrôle date / heure / locator / indicatif ; bande, distance et azimut
+  recalculés.
+
 ## Deux PC (question F1NSK 20/10)
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
@@ -123,7 +132,7 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 
 ## À faire (ordre proposé)
 1. Import ADIF (reprise de l'ancien carnet).
-2. Édition d'un QSO existant.
+2. ~~Édition d'un QSO existant~~ (fait en v0.7.0).
 3. Onglet **Analyse** : QSO par bande × heure UTC, carte des contacts (grand cercle depuis le QTH),
    distances max par bande, corrélation avec SFI/K.
 4. Recherche / filtres dans le carnet (indicatif, bande, mode, période).

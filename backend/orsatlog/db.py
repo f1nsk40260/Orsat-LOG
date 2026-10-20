@@ -245,6 +245,16 @@ class Database:
             ).fetchall()
         return [dict(r) for r in rows]
 
+    def update_qso(self, qso_id, qso):
+        cols = [f for f in QSO_FIELDS if f in qso]
+        with self._lock:
+            cur = self._con.execute(
+                f"UPDATE qso SET {', '.join(f'{c} = ?' for c in cols)} WHERE id = ?",
+                [qso[c] for c in cols] + [qso_id],
+            )
+            self._con.commit()
+            return self.get_qso(qso_id, _locked=True) if cur.rowcount else None
+
     def delete_qso(self, qso_id):
         with self._lock:
             cur = self._con.execute("DELETE FROM qso WHERE id = ?", (qso_id,))

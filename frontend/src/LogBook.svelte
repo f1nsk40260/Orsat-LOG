@@ -41,7 +41,7 @@
         <option value="">QSO + SWL</option><option value="QSO">QSO</option><option value="SWL">SWL</option>
       </select>
     </div>
-    <EntriesTable entries={shown} ondelete={removeEntry} ondate={onopenday} empty="Aucune entrée dans le carnet." />
+    <EntriesTable entries={shown} ondelete={removeEntry} ondate={onopenday} onchanged={load} empty="Aucune entrée dans le carnet." />
     <p class="hint">Cliquez sur une date pour ouvrir la page du jour correspondante.</p>
   </section>
 </div>

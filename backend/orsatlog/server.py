@@ -304,6 +304,67 @@ async def add_qso(q: QsoIn):
     return db.add_qso(rec)
 
 
+class QsoEdit(BaseModel):
+    """Entrée complète, telle que corrigée dans le formulaire d'édition."""
+    kind: str = "QSO"
+    session_id: int | None = None
+    call: str
+    qso_date: str                 # AAAAMMJJ
+    time_on: str                  # HHMM ou HHMMSS (UTC)
+    freq: int | None = None
+    mode: str = ""
+    submode: str = ""
+    rst_sent: str = ""
+    rst_rcvd: str = ""
+    name: str = ""
+    qth: str = ""
+    gridsquare: str = ""
+    comment: str = ""
+    sfi: float | None = None
+    a_index: float | None = None
+    k_index: float | None = None
+
+
+@app.put("/api/qsos/{qso_id}")
+def update_qso(qso_id: int, q: QsoEdit):
+    """Corrige une entrée. Bande, distance et azimut sont recalculés."""
+    if not db.get_qso(qso_id):
+        raise HTTPException(404, "Entrée introuvable")
+    kind = "SWL" if q.kind.upper() == "SWL" else "QSO"
+    call = q.call.strip() if kind == "SWL" else q.call.strip().upper()
+    if not call:
+        raise HTTPException(400, "Station entendue obligatoire" if kind == "SWL" else "Indicatif obligatoire")
+    d = q.qso_date.replace("-", "").strip()
+    try:
+        datetime.strptime(d, "%Y%m%d")
+    except ValueError:
+        raise HTTPException(400, "Date invalide")
+    t = q.time_on.replace(":", "").strip()
+    if len(t) == 4:
+        t += "00"
+    if len(t) != 6 or not t.isdigit() or int(t[:2]) > 23 or int(t[2:4]) > 59 or int(t[4:]) > 59:
+        raise HTTPException(400, "Heure UTC invalide (HH:MM ou HH:MM:SS)")
+    grid = q.gridsquare.strip().upper()
+    if grid and not geo.valid_locator(grid):
+        raise HTTPException(400, "Locator invalide")
+    if q.freq is not None and q.freq <= 0:
+        raise HTTPException(400, "Fréquence invalide")
+    session_id = q.session_id if kind == "QSO" else None
+    if session_id is not None and not db.get_session(session_id):
+        session_id = None
+
+    rec = q.model_dump()
+    rec.update(kind=kind, call=call, qso_date=d, time_on=t, gridsquare=grid, session_id=session_id,
+               mode=q.mode.strip().upper(), submode=q.submode.strip().upper(),
+               band=geo.band_of(q.freq, swl=kind == "SWL"), distance_km=None, bearing=None)
+    if kind == "SWL":
+        rec["rst_sent"] = ""
+    my_loc = db.get_settings().get("locator", "")
+    if geo.valid_locator(my_loc) and geo.valid_locator(grid):
+        rec["distance_km"], rec["bearing"] = geo.distance_bearing(my_loc, grid)
+    return db.update_qso(qso_id, rec)
+
+
 # ---------- QSO de groupe ----------
 def _hhmm(v, field):
     v = (v or "").replace(":", "").strip()

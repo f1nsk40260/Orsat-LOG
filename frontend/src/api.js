@@ -19,6 +19,7 @@ export const api = {
   weather: () => req('GET', '/api/weather'),
   qsos: (limit = 200) => req('GET', `/api/qsos?limit=${limit}`),
   addQso: (q) => req('POST', '/api/qsos', q),
+  updateQso: (id, q) => req('PUT', `/api/qsos/${id}`, q),
   deleteQso: (id) => req('DELETE', `/api/qsos/${id}`),
   tune: (q) => req('POST', '/api/tune', { freq: q.freq, mode: q.mode || '', submode: q.submode || '', kind: q.kind || '' }),
   worked: (call) => req('GET', `/api/worked/${encodeURIComponent(call)}`),

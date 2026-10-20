@@ -145,7 +145,7 @@
           {/each}
         </div>
       {/if}
-      <EntriesTable entries={page?.entries ?? []} showDate={false} ondelete={removeEntry}
+      <EntriesTable entries={page?.entries ?? []} showDate={false} ondelete={removeEntry} onchanged={() => load(day)}
                     empty={isToday ? 'Aucune activité pour l’instant aujourd’hui.' : 'Aucune activité ce jour-là.'} />
     </section>
   </div>

@@ -1,9 +1,12 @@
 <script>
   import { fmtDate, fmtTime } from './util.js';
   import { api } from './api.js';
+  import EditEntry from './EditEntry.svelte';
 
   // showDate = false sur la page du jour (la date est déjà en tête de page)
-  let { entries, ondelete, ondate, showDate = true, empty = 'Aucune entrée.' } = $props();
+  // onchanged : appelé après une modification ou une suppression faite dans le formulaire d'édition
+  let { entries, ondelete, ondate, onchanged, showDate = true, empty = 'Aucune entrée.' } = $props();
+  let editing = $state(null);   // entrée ouverte dans le formulaire d'édition
 
   // Clic sur une fréquence : SWL = la page WebSDR se recale, QSO / groupe = le transceiver
   async function tune(q) {
@@ -27,7 +30,7 @@
     </thead>
     <tbody>
       {#each entries as q (q.id)}
-        <tr class:swl={q.kind === 'SWL'}>
+        <tr class:swl={q.kind === 'SWL'} ondblclick={() => (editing = q)} title="Double-clic : modifier">
           {#if showDate}
             <td>
               {#if ondate}
@@ -59,6 +62,7 @@
           <td>{q.sfi ?? ''}{q.k_index != null ? ` / ${q.k_index}` : ''}</td>
           <td>{q.kind === 'SWL' ? q.qth : q.name}</td>
           <td>
+            <button class="ghost edit" title="Modifier cette entrée" onclick={() => (editing = q)}>✎</button>
             {#if ondelete}
               <button class="ghost del" title="Supprimer cette entrée" onclick={() => ondelete(q)}>✕</button>
             {/if}
@@ -70,6 +74,12 @@
     </tbody>
   </table>
 </div>
+
+{#if editing}
+  <EditEntry entry={editing} onclose={() => (editing = null)}
+             onsaved={() => { editing = null; onchanged?.(); }}
+             ondeleted={() => { editing = null; onchanged?.(); }} />
+{/if}
 
 <style>
   .table-wrap { overflow: auto; flex: 1; min-height: 0; }
@@ -83,6 +93,8 @@
   tr.swl .call-cell { color: rgb(160, 200, 240); }
   .datelink { padding: 0; color: var(--text); text-decoration: underline dotted var(--gold-soft); }
   .datelink:hover { color: var(--gold); box-shadow: none; }
+  .edit { padding: 0 4px; color: var(--gold-soft); }
+  .edit:hover { color: var(--gold); box-shadow: none; }
   .freqlink { padding: 0; color: var(--text); font: inherit; }
   .freqlink:hover { color: var(--gold); box-shadow: none; text-decoration: underline dotted var(--gold-soft); }
   .del { padding: 0 6px; color: var(--muted); }
