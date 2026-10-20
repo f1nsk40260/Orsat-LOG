@@ -16,6 +16,19 @@ DESKTOP_FILE="$HOME/.local/share/applications/orsat-log.desktop"
 
 notify() { command -v notify-send >/dev/null && notify-send -a ORSAT-LOG -i "$DIR/assets/orsat-log.svg" "ORSAT-LOG" "$1"; echo "$1"; }
 
+# Node / npm : lancé par l'icône ou par le bouton des Réglages, le lanceur n'a pas le PATH
+# du terminal (nvm n'est chargé que par ~/.bashrc). On cherche npm aux endroits habituels.
+if ! command -v npm >/dev/null; then
+    export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+    [ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh" >/dev/null 2>&1
+fi
+if ! command -v npm >/dev/null; then
+    for d in "$HOME"/.nvm/versions/node/*/bin "$HOME"/.local/share/fnm/node-versions/*/installation/bin \
+             "$HOME/.volta/bin" "$HOME/.local/bin" "$HOME/.npm-global/bin" /usr/local/bin /snap/bin; do
+        [ -x "$d/npm" ] && export PATH="$d:$PATH"
+    done
+fi
+
 OFFLINE=0; REBUILD=0
 for a in "$@"; do
     case "$a" in --offline) OFFLINE=1 ;; --rebuild) REBUILD=1 ;; esac
@@ -52,6 +65,10 @@ stale_ui() {
     [ -n "$(find frontend/src frontend/index.html frontend/package.json -newer frontend/dist/index.html -print -quit 2>/dev/null)" ]
 }
 if [ "$REBUILD" = 1 ] || [ ! -f frontend/dist/index.html ] || changed frontend || stale_ui; then
+    if ! command -v npm >/dev/null; then
+        notify "npm introuvable : installez Node.js (sudo apt install nodejs npm) — voir $LOG"
+        exit 1
+    fi
     if [ "$REBUILD" = 1 ] || [ ! -d frontend/node_modules ] || changed frontend/package.json frontend/package-lock.json; then
         (cd frontend && npm install --silent)
     fi
