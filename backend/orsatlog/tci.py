@@ -41,6 +41,7 @@ class TciClient:
         self.port = 50001
         self.trx = "0"  # récepteur TCI suivi (slice A = 0, slice B = 1...)
         self.state = self._empty_state()
+        self._ws = None
 
     @staticmethod
     def _empty_state():
@@ -75,6 +76,7 @@ class TciClient:
             try:
                 async with websockets.connect(url, open_timeout=5, max_size=None) as ws:
                     log.info("TCI connecté à %s", url)
+                    self._ws = ws
                     self._set(connected=True, error="")
                     async for msg in ws:
                         if isinstance(msg, str):
@@ -87,8 +89,23 @@ class TciClient:
             except Exception as exc:  # serveur absent, coupure réseau...
                 log.info("TCI %s : %s", url, exc)
                 self._set(error=_explain(exc))
+            self._ws = None
             self._set(connected=False, ready=False)
             await asyncio.sleep(5)
+
+    async def tune(self, freq, modulation=None):
+        """Règle le transceiver (récepteur suivi, VFO A). False si non connecté."""
+        ws = self._ws
+        if not ws or not self.state["connected"]:
+            return False
+        text = f"vfo:{self.trx},0,{int(freq)};"
+        if modulation:
+            text += f"modulation:{self.trx},{modulation.lower()};"
+        try:
+            await ws.send(text)
+        except Exception:
+            return False
+        return True
 
     # --- décodage ---
     def _handle(self, cmd):

@@ -41,7 +41,22 @@ async def _safe_send(ws, msg):
         _clients.discard(ws)
 
 
-tci = TciClient(on_change=_broadcast)
+_last_radio = {"freq": None, "modulation": None}
+
+
+def _on_radio(state):
+    _broadcast(state)
+    # La page (CAT Sync) suit AetherSDR : on recopie seulement un vrai changement de
+    # fréquence ou de mode, pas un PTT ou une reconnexion.
+    freq, mod = state.get("freq"), state.get("modulation")
+    if freq != _last_radio["freq"]:
+        websdr.mirror(freq)
+    if mod != _last_radio["modulation"] and mod:
+        websdr.mirror(freq, mod)
+    _last_radio.update(freq=freq, modulation=mod)
+
+
+tci = TciClient(on_change=_on_radio)
 websdr = WebSdrServer(on_change=lambda st: _broadcast(st, "websdr"))
 
 
@@ -192,19 +207,24 @@ class TuneIn(BaseModel):
     freq: int
     mode: str = ""
     submode: str = ""
+    kind: str = ""
 
 
-@app.post("/api/websdr/tune")
-async def websdr_tune(t: TuneIn):
-    """Ramène la page du WebSDR sur la fréquence (et le mode) d'une entrée du carnet."""
+@app.post("/api/tune")
+async def tune(t: TuneIn):
+    """Recale sur une entrée du carnet : une écoute SWL règle la page du WebSDR,
+    un QSO (ou un QSO de groupe) règle le transceiver (AetherSDR)."""
     mode = (t.submode or t.mode).upper()
     tci_mode = _TUNE_MODES.get(mode)
     if not tci_mode and mode not in ("", "SSB"):
         tci_mode = "usb"        # modes numériques (FT8, RTTY...) : écoute en USB
     if mode == "SSB":
         tci_mode = "lsb" if t.freq < 10_000_000 else "usb"
-    if not await websdr.tune(t.freq, tci_mode):
-        raise HTTPException(409, "Aucune page WebSDR connectée (bouton CAT Sync de la page ORSAT)")
+    if t.kind == "SWL":
+        if not await websdr.tune(t.freq, tci_mode):
+            raise HTTPException(409, "Aucune page WebSDR connectée (bouton CAT Sync de la page ORSAT)")
+    elif not await tci.tune(t.freq, tci_mode):
+        raise HTTPException(409, "Transceiver TCI non connecté (AetherSDR)")
     return {"ok": True}
 
 

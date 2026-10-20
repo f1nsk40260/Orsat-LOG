@@ -110,8 +110,8 @@ class WebSdrServer:
                 await self._send_others(ws, f"modulation:0,{st['modulation']};")
             elif st["modulation"]:
                 await ws.send(f"modulation:0,{st['modulation']};")
-        elif name == "trx":
-            await ws.send("trx:0,false;")             # le carnet n'émet jamais
+        # trx (PTT) : jamais de réponse. Un « trx:0,false » rétablirait le son de
+        # la page si elle se connectait pendant une émission d'AetherSDR.
         # rx_filter_band et le reste : rien à faire pour un carnet
 
     def _set_modulation(self, mod):
@@ -144,6 +144,16 @@ class WebSdrServer:
         if modulation:
             self._set_modulation(modulation)
         return True
+
+    def mirror(self, freq, modulation=""):
+        """AetherSDR a changé de fréquence : la page (CAT Sync) l'a suivie sans nous
+        le relayer. On recopie, seulement si la page nous a déjà parlé (freq connue),
+        ce qui prouve que CAT Sync est activé."""
+        if not (self._pages and self.state["freq"] and freq):
+            return
+        self._set(freq=int(freq))
+        if modulation:
+            self._set_modulation(modulation)
 
     def _set(self, **changes):
         changed = {k: v for k, v in changes.items() if self.state.get(k) != v}

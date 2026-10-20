@@ -24,10 +24,10 @@
     };
   }
 
-  // Source suivie : en SWL, la page WebSDR si elle est connectée ; en QSO, le transceiver,
-  // et la page WebSDR à défaut.
-  const webOk = $derived(!!(websdr?.connected && websdr.freq));
-  const src = $derived(kind === 'SWL' ? (webOk ? websdr : radio) : (radio.connected || !webOk ? radio : websdr));
+  // Source suivie selon le mode d'exploitation : SWL = la page WebSDR ORSAT,
+  // QSO et groupe = le transceiver (AetherSDR). Pas de repli de l'un sur l'autre.
+  const offline = { connected: false, freq: 0, mode: '', submode: '' };
+  const src = $derived(kind === 'SWL' ? (websdr?.connected && websdr.freq ? websdr : offline) : radio);
 
   // Suivi de la radio : ne réagit qu'aux changements de la radio (un mode choisi à la main est respecté)
   $effect(() => {
@@ -117,7 +117,7 @@
               title="QSO de groupe / table ronde : nom, créneau horaire, stations participantes">Groupe</button>
     </div>
     <label class="follow" title="Fréquence et mode repris automatiquement de la radio (TCI)">
-      <input type="checkbox" bind:checked={followTci} /> Suivre {src === websdr ? 'le WebSDR' : 'la radio'}
+      <input type="checkbox" bind:checked={followTci} /> Suivre {kind === 'SWL' ? 'le WebSDR' : 'la radio'}
     </label>
   </div>
 

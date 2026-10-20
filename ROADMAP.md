@@ -94,9 +94,14 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
   s'y connecte : le carnet reçoit la fréquence et le mode **réellement écoutés dans le navigateur**.
   Aucune modification du serveur ni de la page ORSAT.
 - 50001 reste au transceiver (AetherSDR, ORSAT-LOG client) ; les deux liaisons coexistent.
-- Panneau « WebSDR ORSAT » sous le transceiver ; en **SWL**, la saisie suit le WebSDR s'il est connecté,
-  en QSO le transceiver (WebSDR à défaut).
-- Clic sur une fréquence d'une entrée du carnet = la page WebSDR s'y recale (`POST /api/websdr/tune`).
+- Panneau « WebSDR ORSAT » sous le transceiver.
+- **Règle F1NSK : le carnet suit selon le mode d'exploitation, sans repli.** SWL = page WebSDR ORSAT ;
+  QSO et Groupe = transceiver (AetherSDR).
+- Clic sur une fréquence du carnet (`POST /api/tune`) : entrée SWL = la page WebSDR se recale ;
+  QSO / groupe = le transceiver se règle (et la page le suit par CAT Sync).
+- v0.6.1 : la page suit AetherSDR sans le relayer au carnet → le carnet recopie les changements de
+  fréquence/mode d'AetherSDR dans le panneau WebSDR (si la page a déjà parlé). Pas de réponse à la
+  question PTT de la page (un « trx:0,false » pourrait rétablir son son pendant une émission).
 - Limite : la page n'envoie sa fréquence qu'au premier réglage après connexion (touchez la fréquence une fois).
 - Réglages → WebSDR ORSAT : activer / port (40001 par défaut).
 - Écarté : le pont `tci-bridge/orsat-tci-server.py` de PhantomSDR-ORSAT ouvre sa propre écoute,

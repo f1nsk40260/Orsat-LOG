@@ -20,7 +20,7 @@ export const api = {
   qsos: (limit = 200) => req('GET', `/api/qsos?limit=${limit}`),
   addQso: (q) => req('POST', '/api/qsos', q),
   deleteQso: (id) => req('DELETE', `/api/qsos/${id}`),
-  websdrTune: (q) => req('POST', '/api/websdr/tune', { freq: q.freq, mode: q.mode || '', submode: q.submode || '' }),
+  tune: (q) => req('POST', '/api/tune', { freq: q.freq, mode: q.mode || '', submode: q.submode || '', kind: q.kind || '' }),
   worked: (call) => req('GET', `/api/worked/${encodeURIComponent(call)}`),
   // mise à jour
   updateCheck: () => req('GET', '/api/update/check'),

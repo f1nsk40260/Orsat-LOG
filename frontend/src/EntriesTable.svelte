@@ -5,10 +5,10 @@
   // showDate = false sur la page du jour (la date est déjà en tête de page)
   let { entries, ondelete, ondate, showDate = true, empty = 'Aucune entrée.' } = $props();
 
-  // Clic sur une fréquence : la page WebSDR (CAT Sync) se recale dessus
+  // Clic sur une fréquence : SWL = la page WebSDR se recale, QSO / groupe = le transceiver
   async function tune(q) {
     try {
-      await api.websdrTune(q);
+      await api.tune(q);
     } catch (err) {
       alert(err.message);
     }
@@ -47,7 +47,7 @@
           <td>{q.band}</td>
           <td class="mono">
             {#if q.freq}
-              <button class="ghost freqlink" title="Ramener le WebSDR sur cette fréquence" onclick={() => tune(q)}>{(q.freq / 1e6).toFixed(3)}</button>
+              <button class="ghost freqlink" title={q.kind === 'SWL' ? 'Ramener le WebSDR sur cette fréquence' : 'Régler le transceiver sur cette fréquence'} onclick={() => tune(q)}>{(q.freq / 1e6).toFixed(3)}</button>
             {/if}
           </td>
           <td>{q.submode || q.mode}</td>
