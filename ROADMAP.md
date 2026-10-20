@@ -106,6 +106,9 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 - Réglages → WebSDR ORSAT : activer / port (40001 par défaut).
 - v0.6.2 : écoute sur 127.0.0.1 **et ::1** — la page cherche « localhost », résolu d'abord en IPv6
   sous Linux ; en IPv4 seule, la page ne trouvait pas le carnet (retour F1NSK).
+- v0.6.3 : listes déroulantes au style ORSAT (WebKitGTK les dessinait en thème clair : mode illisible,
+  blanc sur blanc) ; rendu DMA-BUF de WebKitGTK désactivé (plantage WebKitWebProcess) ; le lanceur
+  recompile l'interface si ses sources sont plus récentes que `dist`.
 - Écarté : le pont `tci-bridge/orsat-tci-server.py` de PhantomSDR-ORSAT ouvre sa propre écoute,
   indépendante du navigateur → gardé pour donner l'audio du WebSDR aux décodeurs, pas pour le carnet.
 
