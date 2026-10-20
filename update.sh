@@ -24,18 +24,46 @@ if ! command -v npm >/dev/null; then
 fi
 (cd frontend && npm install --silent && npm run build --silent)
 
-echo "== Raccourci menu =="
+echo "== Lanceur =="
+chmod +x "$DIR/orsat-log.sh"
+# commande « orsat-log » dans le terminal
+mkdir -p "$HOME/.local/bin"
+ln -sf "$DIR/orsat-log.sh" "$HOME/.local/bin/orsat-log"
+# icône dans le menu des applications
 mkdir -p "$HOME/.local/share/applications"
-cat > "$HOME/.local/share/applications/orsat-log.desktop" <<EOF
+DESKTOP_FILE="$HOME/.local/share/applications/orsat-log.desktop"
+cat > "$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Type=Application
 Name=ORSAT-LOG
 Comment=Carnet de trafic radioamateur avec TCI
-Exec=$DIR/.venv/bin/python $DIR/run.py
+Exec=$DIR/orsat-log.sh
 Icon=$DIR/assets/orsat-log.svg
 Terminal=false
 Categories=HamRadio;Network;
+Actions=offline;rebuild;journal;
+
+[Desktop Action offline]
+Name=Lancer sans mise à jour
+Exec=$DIR/orsat-log.sh --offline
+
+[Desktop Action rebuild]
+Name=Recompiler entièrement
+Exec=$DIR/orsat-log.sh --rebuild
+
+[Desktop Action journal]
+Name=Voir le journal
+Exec=xdg-open $HOME/.local/share/orsat-log/orsat-log.log
 EOF
+chmod +x "$DESKTOP_FILE"
+# icône sur le Bureau
+BUREAU="$(xdg-user-dir DESKTOP 2>/dev/null || echo "$HOME/Bureau")"
+if [ -d "$BUREAU" ]; then
+    cp "$DESKTOP_FILE" "$BUREAU/orsat-log.desktop"
+    chmod +x "$BUREAU/orsat-log.desktop"
+    gio set "$BUREAU/orsat-log.desktop" metadata::trusted true 2>/dev/null || true
+    echo "Icône ORSAT-LOG ajoutée sur le Bureau ($BUREAU)."
+fi
 
 # Vérifie le moteur de fenêtre native (pywebview a besoin de GTK/WebKit sous Linux)
 if ! .venv/bin/python -c "import gi; gi.require_version('WebKit2', '4.1')" 2>/dev/null \
@@ -49,5 +77,6 @@ fi
 
 echo "== OK =="
 if [ "$1" != "--no-run" ]; then
+    pkill -f "$DIR/run.py" && sleep 1
     exec .venv/bin/python run.py
 fi
