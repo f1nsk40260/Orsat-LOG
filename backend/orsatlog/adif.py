@@ -32,6 +32,9 @@ def export(qsos, my_call="", my_grid=""):
         "<EOH>\n",
     ]
     for q in qsos:
+        q = dict(q)
+        if q.get("session_name"):   # QSO de groupe : nom repris dans le commentaire
+            q["comment"] = f"[{q['session_name']}] {q.get('comment') or ''}".strip()
         rec = []
         for key, tag in _MAP:
             v = q.get(key)
@@ -39,6 +42,8 @@ def export(qsos, my_call="", my_grid=""):
                 continue  # bande de radiodiffusion : pas de valeur ADIF, FREQ suffit
             if v not in (None, ""):
                 rec.append(_field(tag, v))
+        if q.get("session_name"):
+            rec.append(_field("APP_ORSATLOG_SESSION", q["session_name"]))
         if q.get("kind") == "SWL":
             rec.append(_field("SWL", "Y"))  # écoute (Short Wave Listener), pas un contact
         if q.get("freq"):

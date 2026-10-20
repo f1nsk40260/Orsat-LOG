@@ -106,7 +106,7 @@
   <!-- colonne centrale : saisie + activité du jour -->
   <div class="col center">
     {#if isToday}
-      <EntryForm bind:this={form} {radio} onlogged={() => load(day)} />
+      <EntryForm bind:this={form} {radio} sessions={page?.sessions ?? []} onlogged={() => load(day)} />
     {:else}
       <div class="panel archived">Page archivée — la saisie se fait sur la page du jour.</div>
     {/if}
@@ -115,6 +115,17 @@
         Activité du jour
         {#if page}<span class="count">{page.stats.qso} QSO · {page.stats.swl} SWL</span>{/if}
       </h2>
+      {#if page?.sessions?.length}
+        <div class="sessions">
+          {#each page.sessions as s}
+            <span class="sess" title="QSO de groupe">
+              <b>{s.name}</b>
+              {s.time_start.slice(0, 2)}:{s.time_start.slice(2)}–{s.time_end ? `${s.time_end.slice(0, 2)}:${s.time_end.slice(2)}` : 'en cours'}
+              · {s.count} station{s.count > 1 ? 's' : ''}
+            </span>
+          {/each}
+        </div>
+      {/if}
       <EntriesTable entries={page?.entries ?? []} showDate={false} ondelete={removeEntry}
                     empty={isToday ? 'Aucune activité pour l’instant aujourd’hui.' : 'Aucune activité ce jour-là.'} />
     </section>
@@ -156,6 +167,9 @@
   .activity { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .count { color: var(--muted); font-weight: 400; margin-left: 8px; text-transform: none; letter-spacing: 0; }
   .archived { color: var(--muted); font-style: italic; }
+  .sessions { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .sess { font-size: 0.8rem; border: 1px solid rgba(95, 191, 107, 0.5); border-radius: 12px; padding: 2px 10px; }
+  .sess b { color: var(--ok); }
 
   .tci-status { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); }
   .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 6px var(--bad); }

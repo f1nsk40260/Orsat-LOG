@@ -22,7 +22,7 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 | Solaire | hamqsl.com (SFI, A, K, X-ray), cache 15 min, figé dans chaque QSO |
 | Météo | Weathercloud (station perso), relevé 15 min, table `weather` |
 | Échange | ADIF 3.1 (export fait, SWL = `SWL:Y`, import à faire) |
-| Jour | Une page par jour **UTC** (tables `qso`, `propagation`, `day_note`) |
+| Jour | Une page par jour **UTC** (tables `qso`, `session`, `propagation`, `weather`, `day_note`) |
 | Port local | 8740 |
 
 ## Fait — v0.1.0 (20/10/2026)
@@ -65,6 +65,18 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 - Panneau Météo de la page du jour : température, humidité, rosée, pression + tendance 3 h,
   vent (direction, rafales), pluie, soleil/UV, mini/maxi, courbes température + pression 24 h.
 - Constat 20/10 : la page Weathercloud de la station affichait « - » partout (station n'émettant plus ?).
+- **Retour F1NSK 20/10 : ne fonctionne pas chez lui → à reprendre plus tard** (cause non diagnostiquée).
+
+## Fait — v0.5.0 (20/10/2026) : QSO de groupe (tables rondes quotidiennes)
+- Onglet **Groupe** dans la saisie : nom du QSO (ex. « QSO des Copains »), début / fin UTC, fréquence, mode.
+- Nom déjà utilisé → créneau, fréquence et mode repris de la dernière session du même nom.
+- Fenêtre de session : saisie rapide d'une station par ligne (Entrée), **habitués absents** proposés
+  (présents dans les 10 dernières sessions du même nom) → ajout en un clic avec nom / QTH / locator.
+- Heure du passage : maintenant si la session est en cours, sinon heure de début (saisie après coup).
+- Clôturer (fin = maintenant), Modifier, Supprimer (avec ses QSO), Reprendre une session du jour.
+- Chaque station = un QSO normal (`qso.session_id` → table `session`), marqué **GRP** dans les listes ;
+  page du jour : pastilles des sessions (créneau, nombre de stations).
+- ADIF : nom de la session en tête du COMMENT + champ `APP_ORSATLOG_SESSION`.
 
 ## À faire (ordre proposé)
 1. Import ADIF (reprise de l'ancien carnet).

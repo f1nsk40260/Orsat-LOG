@@ -2,16 +2,17 @@
   import { untrack } from 'svelte';
   import { api } from './api.js';
   import { MODES, defaultRst, dayOf, timeOf, fmtDate } from './util.js';
+  import GroupSession from './GroupSession.svelte';
 
-  let { radio, onlogged } = $props();
+  let { radio, onlogged, sessions = [] } = $props();
 
-  let kind = $state('QSO');        // QSO = contact réalisé, SWL = écoute
+  let kind = $state('QSO');        // QSO = contact réalisé, SWL = écoute, GRP = QSO de groupe
   let followTci = $state(true);
   let form = $state(blank());
   let worked = $state([]);
   let error = $state('');
   let startTime = null;            // heure UTC figée dès la frappe de l'indicatif
-  let callInput;
+  let callInput = $state();
   let lastRadioMode = null;
 
   function blank(prev = {}) {
@@ -45,6 +46,7 @@
 
   function setKind(k) {
     kind = k;
+    if (k === 'GRP') return;
     form.rst_sent = defaultRst(form.modeLabel, k);
     form.rst_rcvd = defaultRst(form.modeLabel, k);
     worked = [];
@@ -87,6 +89,7 @@
   }
 
   export function clear() {
+    if (kind === 'GRP') return;
     form = blank(form);
     startTime = null;
     worked = [];
@@ -97,20 +100,27 @@
   export function focus() { callInput?.focus(); }
 </script>
 
-<section class="panel entry" class:swl={kind === 'SWL'}>
+<section class="panel entry" class:swl={kind === 'SWL'} class:grp={kind === 'GRP'}>
   <div class="head">
-    <h2 class="panel-title">{kind === 'SWL' ? 'Nouvelle écoute' : 'Nouveau QSO'}</h2>
+    <h2 class="panel-title">{kind === 'SWL' ? 'Nouvelle écoute' : kind === 'GRP' ? 'QSO de groupe' : 'Nouveau QSO'}</h2>
     <div class="kind" role="group" aria-label="Type d'entrée">
       <button type="button" class:active={kind === 'QSO'} onclick={() => setKind('QSO')}
               title="Contact bilatéral réalisé">QSO</button>
       <button type="button" class:active={kind === 'SWL'} onclick={() => setKind('SWL')}
               title="Écoute d'une station (Short Wave Listening)">SWL</button>
+      <button type="button" class:active={kind === 'GRP'} onclick={() => setKind('GRP')}
+              title="QSO de groupe / table ronde : nom, créneau horaire, stations participantes">Groupe</button>
     </div>
-    <label class="follow" title="Fréquence et mode repris automatiquement de la radio (TCI)">
-      <input type="checkbox" bind:checked={followTci} /> Suivre la radio
-    </label>
+    {#if kind !== 'GRP'}
+      <label class="follow" title="Fréquence et mode repris automatiquement de la radio (TCI)">
+        <input type="checkbox" bind:checked={followTci} /> Suivre la radio
+      </label>
+    {/if}
   </div>
 
+  {#if kind === 'GRP'}
+    <GroupSession {radio} {sessions} onchanged={() => onlogged?.()} />
+  {:else}
   <form onsubmit={submit}>
     <div class="grid">
       <div class="f-call">
@@ -180,6 +190,7 @@
       {/each}
     </div>
   {/if}
+  {/if}
 </section>
 
 <style>
@@ -193,6 +204,7 @@
   .follow { display: flex; align-items: center; gap: 6px; margin: 0 0 0 auto; text-transform: none; font-size: 0.82rem; }
   .follow input { width: auto; }
   .swl { border-color: rgba(120, 170, 220, 0.4); }
+  .grp { border-color: rgba(95, 191, 107, 0.45); }
 
   .grid { display: grid; grid-template-columns: 1.4fr 1fr 0.8fr 0.6fr 0.6fr 0.8fr; gap: 10px; }
   .span2 { grid-column: span 2; }

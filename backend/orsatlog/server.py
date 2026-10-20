@@ -144,6 +144,7 @@ async def get_solar():
 # ---------- QSO ----------
 class QsoIn(BaseModel):
     kind: str = "QSO"             # QSO = contact réalisé, SWL = écoute
+    session_id: int | None = None # rattachement à un QSO de groupe
     call: str
     qso_date: str | None = None   # AAAAMMJJ, défaut = maintenant UTC
     time_on: str | None = None    # HHMMSS
@@ -177,6 +178,10 @@ async def add_qso(q: QsoIn):
         raise HTTPException(400, "Station entendue obligatoire" if kind == "SWL" else "Indicatif obligatoire")
     now = datetime.now(timezone.utc)
     rec = q.model_dump()
+    if q.session_id is not None:
+        if not db.get_session(q.session_id):
+            raise HTTPException(404, "QSO de groupe introuvable")
+        kind = "QSO"
     rec["kind"] = kind
     rec["call"] = call
     if kind == "SWL":
@@ -197,6 +202,97 @@ async def add_qso(q: QsoIn):
         rec["sfi"], rec["a_index"], rec["k_index"] = sol["sfi"], sol["a_index"], sol["k_index"]
 
     return db.add_qso(rec)
+
+
+# ---------- QSO de groupe ----------
+def _hhmm(v, field):
+    v = (v or "").replace(":", "").strip()
+    if v == "":
+        return ""
+    if len(v) != 4 or not v.isdigit() or int(v[:2]) > 23 or int(v[2:]) > 59:
+        raise HTTPException(400, f"{field} : heure attendue au format HH:MM")
+    return v
+
+
+class SessionIn(BaseModel):
+    name: str | None = None
+    time_start: str | None = None   # HH:MM ou HHMM (UTC)
+    time_end: str | None = None
+    freq: int | None = None
+    mode: str | None = None
+    submode: str | None = None
+    comment: str | None = None
+
+
+def _clean_session(s: SessionIn):
+    data = {k: v for k, v in s.model_dump().items() if v is not None}
+    if "name" in data:
+        data["name"] = data["name"].strip()
+        if not data["name"]:
+            raise HTTPException(400, "Nom du QSO de groupe obligatoire")
+    if "time_start" in data:
+        data["time_start"] = _hhmm(data["time_start"], "Début")
+    if "time_end" in data:
+        data["time_end"] = _hhmm(data["time_end"], "Fin")
+    for k in ("mode", "submode"):
+        if k in data:
+            data[k] = data[k].strip().upper()
+    return data
+
+
+def _check_slot(start, end):
+    if start and end and end < start:
+        raise HTTPException(400, "L'heure de fin est avant l'heure de début")
+
+
+@app.get("/api/sessions/names")
+def session_names():
+    """Noms déjà utilisés (pour retrouver un QSO quotidien) avec les réglages de la dernière fois."""
+    return db.session_names()
+
+
+@app.get("/api/sessions/regulars")
+def session_regulars(name: str):
+    return db.regulars(name.strip())
+
+
+@app.post("/api/sessions")
+def create_session(s: SessionIn):
+    data = _clean_session(s)
+    if not data.get("name"):
+        raise HTTPException(400, "Nom du QSO de groupe obligatoire")
+    now = datetime.now(timezone.utc)
+    data.setdefault("time_start", now.strftime("%H%M"))
+    if not data["time_start"]:
+        data["time_start"] = now.strftime("%H%M")
+    _check_slot(data["time_start"], data.get("time_end"))
+    return db.create_session(utc_day(now), data)
+
+
+@app.get("/api/sessions/{sid}")
+def get_session(sid: int):
+    s = db.get_session(sid)
+    if not s:
+        raise HTTPException(404, "QSO de groupe introuvable")
+    s["participants"] = db.session_qsos(sid)
+    return s
+
+
+@app.put("/api/sessions/{sid}")
+def update_session(sid: int, s: SessionIn):
+    cur = db.get_session(sid)
+    if not cur:
+        raise HTTPException(404, "QSO de groupe introuvable")
+    data = _clean_session(s)
+    _check_slot(data.get("time_start", cur["time_start"]), data.get("time_end", cur["time_end"]))
+    return db.update_session(sid, data)
+
+
+@app.delete("/api/sessions/{sid}")
+def delete_session(sid: int):
+    if not db.delete_session(sid):
+        raise HTTPException(404, "QSO de groupe introuvable")
+    return {"ok": True}
 
 
 # ---------- agenda ----------
@@ -225,6 +321,7 @@ def get_day(day: str):
         "propagation": db.day_snapshots(day),
         "weather": db.day_weather(day),
         "note": db.get_note(day),
+        "sessions": db.day_sessions(day),
         "stats": {
             "qso": sum(e["kind"] == "QSO" for e in entries),
             "swl": sum(e["kind"] == "SWL" for e in entries),

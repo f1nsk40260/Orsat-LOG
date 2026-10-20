@@ -21,6 +21,13 @@ export const api = {
   addQso: (q) => req('POST', '/api/qsos', q),
   deleteQso: (id) => req('DELETE', `/api/qsos/${id}`),
   worked: (call) => req('GET', `/api/worked/${encodeURIComponent(call)}`),
+  // QSO de groupe
+  sessionNames: () => req('GET', '/api/sessions/names'),
+  regulars: (name) => req('GET', `/api/sessions/regulars?name=${encodeURIComponent(name)}`),
+  createSession: (s) => req('POST', '/api/sessions', s),
+  session: (id) => req('GET', `/api/sessions/${id}`),
+  updateSession: (id, s) => req('PUT', `/api/sessions/${id}`, s),
+  deleteSession: (id) => req('DELETE', `/api/sessions/${id}`),
   // agenda
   today: () => req('GET', '/api/today'),
   day: (day) => req('GET', `/api/day/${day}`),

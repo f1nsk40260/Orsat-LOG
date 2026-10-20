@@ -26,7 +26,13 @@
             </td>
           {/if}
           <td class="mono">{fmtTime(q.time_on)}</td>
-          <td><span class="tag" class:tag-swl={q.kind === 'SWL'}>{q.kind}</span></td>
+          <td>
+            {#if q.session_name}
+              <span class="tag tag-grp" title={q.session_name}>GRP</span>
+            {:else}
+              <span class="tag" class:tag-swl={q.kind === 'SWL'}>{q.kind}</span>
+            {/if}
+          </td>
           <td class="mono call-cell" title={q.comment}>{q.call}</td>
           <td>{q.band}</td>
           <td class="mono">{q.freq ? (q.freq / 1e6).toFixed(3) : ''}</td>
@@ -58,6 +64,7 @@
   td.call-cell { white-space: normal; min-width: 90px; }
   .call-cell { color: var(--gold); font-weight: 600; }
   .tag { font-size: 0.7rem; border: 1px solid var(--gold-soft); color: var(--gold); border-radius: 4px; padding: 0 5px; }
+  .tag-grp { border-color: rgba(95, 191, 107, 0.6); color: var(--ok); cursor: help; }
   .tag-swl { border-color: rgba(120, 170, 220, 0.6); color: rgb(140, 185, 230); }
   tr.swl .call-cell { color: rgb(160, 200, 240); }
   .datelink { padding: 0; color: var(--text); text-decoration: underline dotted var(--gold-soft); }
