@@ -79,6 +79,10 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 - ADIF : nom de la session en tête du COMMENT + champ `APP_ORSATLOG_SESSION`.
 - v0.5.1 : **animateur** de la session (indicatif, repris de la dernière session du même nom) ;
   marqué ★, proposé en premier tant qu'il n'est pas contacté ; ADIF `APP_ORSATLOG_ANIMATOR`.
+- v0.5.2 : la fenêtre de groupe **suit le TCI** (case « Suivre la radio ») à l'ouverture comme pour chaque
+  station ajoutée (QSY en cours de ronde) ; **liste déroulante des noms préenregistrés** (table
+  `group_template` : créneau, fréquence, mode, animateur habituels), « + Nouveau nom… », Préenregistrer
+  sans ouvrir de session, ✕ pour retirer un nom (les QSO restent).
 
 ## Fait — mise à jour depuis l'interface (20/10/2026)
 - Réglages → Mise à jour : version installée, liste des modifications disponibles sur GitHub,

@@ -1,10 +1,11 @@
 <script>
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { api } from './api.js';
   import { MODES, pad, dayOf, timeOf, fmtTime } from './util.js';
 
   // sessions = QSO de groupe déjà ouverts aujourd'hui (pour les reprendre)
-  let { radio, sessions = [], onchanged } = $props();
+  // follow = case « Suivre la radio » : fréquence et mode repris du TCI
+  let { radio, follow = true, sessions = [], onchanged } = $props();
 
   const hhmm = (d = new Date()) => `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`;
   const showHHMM = (v) => (v ? `${v.slice(0, 2)}:${v.slice(2, 4)}` : '');
@@ -17,7 +18,9 @@
   let regulars = $state([]);
   let editing = $state(false);
   let error = $state('');
-  let lastTime = $state(null);     // réglages repris d'une session précédente
+  let lastTime = $state(null);     // réglages repris d'un nom préenregistré
+  let pick = $state('');           // nom choisi dans la liste ('__new' = saisie d'un nouveau nom)
+  let lastRadioMode = null;
 
   // formulaire d'ouverture / de modification
   let setup = $state(blankSetup());
@@ -42,7 +45,53 @@
     return l === 'CW' ? '599' : ['FT8', 'FT4', 'JS8'].includes(l) ? '' : '59';
   }
 
-  onMount(async () => { names = await api.sessionNames().catch(() => []); });
+  onMount(async () => {
+    names = await api.sessionNames().catch(() => []);
+    if (!names.length) pick = '__new';
+  });
+
+  const tracking = $derived(follow && radio?.connected);
+
+  // suivi de la radio dans le formulaire d'ouverture / de modification
+  $effect(() => {
+    const { freq, mode, submode } = radio ?? {};
+    if (!tracking) return;
+    untrack(() => {
+      if (active && !editing) return;
+      if (freq) setup.freqMHz = (freq / 1e6).toFixed(6);
+      if (mode !== lastRadioMode) {
+        lastRadioMode = mode;
+        if (mode && MODES.some((m) => m.label === mode)) setup.modeLabel = mode;
+      }
+      setup.submode = submode || '';
+    });
+  });
+
+  // choix dans la liste des noms préenregistrés
+  function onPick() {
+    if (pick === '__new') { setup.name = ''; lastTime = null; return; }
+    setup.name = pick;
+    onNameChange();
+  }
+
+  async function saveTemplate() {
+    error = '';
+    if (!setup.name.trim()) { error = 'Indiquer le nom à préenregistrer'; return; }
+    try {
+      names = await api.saveTemplate(setupPayload());
+      pick = names.find((n) => n.name.toLowerCase() === setup.name.trim().toLowerCase())?.name ?? '';
+      lastTime = names.find((n) => n.name === pick) ?? null;
+    } catch (err) { error = err.message; }
+  }
+
+  async function removeTemplate() {
+    if (!pick || pick === '__new') return;
+    if (!confirm(`Retirer « ${pick} » de la liste ? (les QSO déjà enregistrés sont conservés)`)) return;
+    names = await api.deleteTemplate(pick).catch(() => names);
+    pick = names.length ? '' : '__new';
+    setup.name = '';
+    lastTime = null;
+  }
 
   // nom déjà connu -> on reprend l'horaire, la fréquence et le mode de la dernière fois
   function onNameChange() {
@@ -54,8 +103,9 @@
     setup.end = n.time_end ? showHHMM(n.time_end) : '';
     setup.animator = n.animator || '';
     lastTime = n;
+    if (tracking) return;   // la radio donne déjà la fréquence et le mode
     if (n.freq) setup.freqMHz = (n.freq / 1e6).toFixed(6);
-    setup.modeLabel = modeLabel(n.mode, n.submode);
+    if (n.mode) setup.modeLabel = modeLabel(n.mode, n.submode);
     setup.submode = n.mode === 'SSB' ? n.submode : '';
   }
 
@@ -94,6 +144,7 @@
   }
 
   function startEdit() {
+    pick = '__new';
     setup = {
       name: active.name, start: showHHMM(active.time_start), end: showHHMM(active.time_end),
       animator: active.animator || '',
@@ -132,7 +183,10 @@
     active = null;
     editing = false;
     setup = blankSetup();
+    pick = names.length ? '' : '__new';
+    lastTime = null;
     error = '';
+    api.sessionNames().then((n) => (names = n)).catch(() => {});
   }
 
   // heure du passage : maintenant si la session est en cours, sinon l'heure de début (saisie après coup)
@@ -146,6 +200,16 @@
     return { qso_date: active.day, time_on: `${active.time_start}00` };
   }
 
+  // fréquence / mode du passage : radio suivie (QSY en cours de ronde possible), sinon ceux de la session
+  function passFreqMode() {
+    if (tracking && radio.freq) {
+      const label = radio.mode && MODES.some((m) => m.label === radio.mode) ? radio.mode : modeLabel(active.mode, active.submode);
+      const m = MODES.find((x) => x.label === label);
+      return { freq: radio.freq, mode: m.mode, submode: m.sub || (m.mode === 'SSB' ? radio.submode : '') };
+    }
+    return { freq: active.freq, mode: active.mode, submode: active.submode };
+  }
+
   async function addParticipant(data) {
     error = '';
     const call = (data.call || '').trim().toUpperCase();
@@ -155,7 +219,7 @@
     try {
       await api.addQso({
         session_id: active.id, ...passTime(), call,
-        freq: active.freq, mode: active.mode, submode: active.submode,
+        ...passFreqMode(),
         rst_sent: data.rst_sent ?? '', rst_rcvd: data.rst_rcvd ?? '',
         name: data.name || '', qth: data.qth || '', gridsquare: (data.gridsquare || '').toUpperCase(),
         comment: data.comment || '',
@@ -210,10 +274,26 @@
   <form class="setup" onsubmit={editing ? saveEdit : openSession}>
     <div class="grid">
       <div class="f-name">
-        <label for="g-name">Nom du QSO de groupe</label>
-        <input id="g-name" bind:value={setup.name} list="g-names" onchange={onNameChange}
-               placeholder="ex. QSO des Copains" autocomplete="off" />
-        <datalist id="g-names">{#each names as n}<option value={n.name}></option>{/each}</datalist>
+        <label for="g-pick">Nom du QSO de groupe</label>
+        {#if editing}
+          <input id="g-name" bind:value={setup.name} autocomplete="off" />
+        {:else}
+          <div class="pick">
+            <select id="g-pick" bind:value={pick} onchange={onPick}>
+              <option value="" disabled>— choisir —</option>
+              {#each names as n}
+                <option value={n.name}>{n.name}</option>
+              {/each}
+              <option value="__new">+ Nouveau nom…</option>
+            </select>
+            {#if pick && pick !== '__new'}
+              <button type="button" class="ghost rm" onclick={removeTemplate} title="Retirer ce nom de la liste">✕</button>
+            {/if}
+          </div>
+          {#if pick === '__new'}
+            <input id="g-name" class="newname" bind:value={setup.name} placeholder="ex. QSO des Copains" autocomplete="off" />
+          {/if}
+        {/if}
       </div>
       <div>
         <label for="g-start">Début (UTC)</label>
@@ -230,18 +310,22 @@
       </div>
       <div>
         <label for="g-freq">Fréquence (MHz)</label>
-        <input id="g-freq" class="mono" bind:value={setup.freqMHz} />
+        <input id="g-freq" class="mono" bind:value={setup.freqMHz} disabled={tracking}
+               title={tracking ? 'Suivi de la radio (TCI)' : ''} />
       </div>
       <div>
         <label for="g-mode">Mode</label>
-        <select id="g-mode" bind:value={setup.modeLabel}>
+        <select id="g-mode" bind:value={setup.modeLabel} disabled={tracking}>
           {#each MODES as m}<option value={m.label}>{m.label}</option>{/each}
         </select>
       </div>
     </div>
     {#if lastTime && !editing}
-      <p class="hint">Créneau, fréquence et mode repris du {lastTime.day.slice(6)}/{lastTime.day.slice(4, 6)}
-        ({lastTime.cnt} session{lastTime.cnt > 1 ? 's' : ''} sous ce nom) — modifiables.</p>
+        <p class="hint">
+        Créneau{tracking ? '' : ', fréquence, mode'}{lastTime.animator ? ' et animateur' : ''} habituels repris
+        {#if lastTime.cnt}— {lastTime.cnt} session{lastTime.cnt > 1 ? 's' : ''} tenue{lastTime.cnt > 1 ? 's' : ''}, dernière le {lastTime.day.slice(6)}/{lastTime.day.slice(4, 6)}{/if}
+        — modifiables.{tracking ? ' Fréquence et mode : radio.' : ''}
+      </p>
     {/if}
     <div class="actions">
       {#if error}<span class="error">{error}</span>{/if}
@@ -257,7 +341,11 @@
         </span>
       {/if}
       <span class="spacer"></span>
-      {#if radio?.connected}<button type="button" onclick={takeRadio} title="Reprendre fréquence et mode de la radio">← Radio</button>{/if}
+      {#if radio?.connected && !tracking}<button type="button" onclick={takeRadio} title="Reprendre fréquence et mode de la radio">← Radio</button>{/if}
+      {#if !editing && pick === '__new'}
+        <button type="button" onclick={saveTemplate}
+                title="Ajouter ce nom (et son créneau, sa fréquence, son animateur) à la liste, sans ouvrir de session">Préenregistrer</button>
+      {/if}
       {#if editing}
         <button type="button" class="danger" onclick={deleteSession}>Supprimer</button>
         <button type="button" onclick={() => (editing = false)}>Annuler</button>
@@ -275,6 +363,9 @@
       {showHHMM(active.time_start)} – {active.time_end ? showHHMM(active.time_end) : '…'} UTC
       · {active.freq ? (active.freq / 1e6).toFixed(3) : '—'} MHz · {modeLabel(active.mode, active.submode)}
     </span>
+    {#if tracking && radio.freq && Math.abs(radio.freq - (active.freq || 0)) > 500}
+      <span class="qsy" title="Les stations ajoutées prennent la fréquence de la radio">radio : {(radio.freq / 1e6).toFixed(3)}</span>
+    {/if}
     {#if active.animator}<span class="anim" title="Animateur du QSO de groupe">★ {active.animator}</span>{/if}
     {#if running}<span class="live">en cours</span>{/if}
     <span class="spacer"></span>
@@ -332,6 +423,11 @@
   .spacer { flex: 1; }
   .resume { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); }
   .chip-btn { padding: 2px 10px; border-radius: 12px; font-size: 0.8rem; }
+  .pick { display: flex; gap: 4px; }
+  .rm { padding: 0 8px; color: var(--muted); }
+  .rm:hover { color: var(--bad); }
+  .newname { margin-top: 6px; }
+  .qsy { color: var(--warn); font-size: 0.8rem; }
   .hint { color: var(--muted); font-size: 0.78rem; margin: 8px 0 0; }
   .danger { color: var(--bad); border-color: rgba(214, 80, 80, 0.6); }
   .error { color: var(--bad); font-weight: 600; font-size: 0.85rem; margin-top: 6px; }

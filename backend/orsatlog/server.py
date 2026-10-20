@@ -307,7 +307,10 @@ def create_session(s: SessionIn):
     if not data["time_start"]:
         data["time_start"] = now.strftime("%H%M")
     _check_slot(data["time_start"], data.get("time_end"))
-    return db.create_session(utc_day(now), data)
+    sess = db.create_session(utc_day(now), data)
+    # le nom et ses réglages restent dans la liste (sans effacer un horaire habituel par un champ vide)
+    db.upsert_template(sess["name"], {k: v for k, v in sess.items() if v not in (None, "")})
+    return sess
 
 
 @app.get("/api/sessions/{sid}")
@@ -326,7 +329,29 @@ def update_session(sid: int, s: SessionIn):
         raise HTTPException(404, "QSO de groupe introuvable")
     data = _clean_session(s)
     _check_slot(data.get("time_start", cur["time_start"]), data.get("time_end", cur["time_end"]))
-    return db.update_session(sid, data)
+    sess = db.update_session(sid, data)
+    if any(k in data for k in ("name", "time_start", "freq", "mode", "animator")):
+        db.upsert_template(sess["name"], {k: v for k, v in sess.items() if k != "time_end" or v})
+    return sess
+
+
+@app.post("/api/templates")
+def save_template(s: SessionIn):
+    """Préenregistre un nom de QSO de groupe (sans ouvrir de session)."""
+    data = _clean_session(s)
+    if not data.get("name"):
+        raise HTTPException(400, "Nom du QSO de groupe obligatoire")
+    _check_slot(data.get("time_start"), data.get("time_end"))
+    db.upsert_template(data.pop("name"), data)
+    return db.session_names()
+
+
+@app.delete("/api/templates/{name}")
+def delete_template(name: str):
+    """Retire un nom de la liste (les sessions déjà tenues sont conservées)."""
+    if not db.delete_template(name):
+        raise HTTPException(404, "Nom introuvable")
+    return db.session_names()
 
 
 @app.delete("/api/sessions/{sid}")

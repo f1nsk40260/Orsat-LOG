@@ -106,6 +106,17 @@ CREATE TABLE IF NOT EXISTS session (
 );
 CREATE INDEX IF NOT EXISTS idx_session_day ON session(day, time_start);
 CREATE INDEX IF NOT EXISTS idx_session_name ON session(name);
+-- noms de QSO de groupe préenregistrés, avec leurs réglages habituels
+CREATE TABLE IF NOT EXISTS group_template (
+    name        TEXT PRIMARY KEY COLLATE NOCASE,
+    time_start  TEXT,
+    time_end    TEXT,
+    freq        INTEGER,
+    mode        TEXT,
+    submode     TEXT,
+    animator    TEXT,
+    updated_at  TEXT DEFAULT (datetime('now'))
+);
 -- page d'agenda : notes libres du jour
 CREATE TABLE IF NOT EXISTS day_note (
     day        TEXT PRIMARY KEY,
@@ -134,6 +145,12 @@ class Database:
         scols = [r["name"] for r in self._con.execute("PRAGMA table_info(session)")]
         if "animator" not in scols:
             self._con.execute("ALTER TABLE session ADD COLUMN animator TEXT")
+        # migration v0.5 -> v0.6 : noms préenregistrés repris des sessions existantes
+        if self._con.execute("SELECT COUNT(*) FROM group_template").fetchone()[0] == 0:
+            self._con.execute(
+                "INSERT OR IGNORE INTO group_template(name, time_start, time_end, freq, mode, submode, animator) "
+                "SELECT s.name, s.time_start, s.time_end, s.freq, s.mode, s.submode, s.animator FROM session s "
+                "WHERE s.id IN (SELECT MAX(id) FROM session GROUP BY name)")
         # migration v0.1 -> v0.2 : port TCI par défaut 40001 -> 50001 (AetherSDR)
         if self._con.execute("SELECT 1 FROM settings WHERE key = 'tci_trx'").fetchone() is None:
             self._con.execute("UPDATE settings SET value = '50001' WHERE key = 'tci_port' AND value = '40001'")
@@ -345,14 +362,32 @@ class Database:
             self._con.commit()
             return cur.rowcount > 0
 
+    TEMPLATE_FIELDS = ["time_start", "time_end", "freq", "mode", "submode", "animator"]
+
     def session_names(self):
-        """Noms de QSO de groupe déjà utilisés, avec les réglages de la dernière session."""
+        """Noms de QSO de groupe préenregistrés + réglages habituels + nombre de sessions tenues."""
         with self._lock:
             rows = self._con.execute(
-                "SELECT s.name, s.time_start, s.time_end, s.freq, s.mode, s.submode, s.animator, s.day, n.cnt "
-                "FROM session s JOIN (SELECT name, MAX(id) AS last_id, COUNT(*) AS cnt FROM session "
-                "GROUP BY name) n ON n.last_id = s.id ORDER BY s.day DESC, s.time_start DESC").fetchall()
+                "SELECT t.*, (SELECT COUNT(*) FROM session s WHERE s.name = t.name COLLATE NOCASE) AS cnt, "
+                "(SELECT MAX(day) FROM session s WHERE s.name = t.name COLLATE NOCASE) AS day "
+                "FROM group_template t ORDER BY t.time_start, t.name").fetchall()
         return [dict(r) for r in rows]
+
+    def upsert_template(self, name, data):
+        cols = [f for f in self.TEMPLATE_FIELDS if f in data]
+        with self._lock:
+            self._con.execute("INSERT OR IGNORE INTO group_template(name) VALUES (?)", (name,))
+            if cols:
+                self._con.execute(
+                    f"UPDATE group_template SET {', '.join(c + ' = ?' for c in cols)}, updated_at = datetime('now') "
+                    "WHERE name = ?", [data[c] for c in cols] + [name])
+            self._con.commit()
+
+    def delete_template(self, name):
+        with self._lock:
+            cur = self._con.execute("DELETE FROM group_template WHERE name = ?", (name,))
+            self._con.commit()
+            return cur.rowcount > 0
 
     def regulars(self, name, last_sessions=10):
         """Habitués d'un QSO de groupe : stations présentes dans les dernières sessions du même nom,

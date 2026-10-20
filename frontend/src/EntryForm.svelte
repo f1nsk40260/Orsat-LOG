@@ -111,15 +111,13 @@
       <button type="button" class:active={kind === 'GRP'} onclick={() => setKind('GRP')}
               title="QSO de groupe / table ronde : nom, créneau horaire, stations participantes">Groupe</button>
     </div>
-    {#if kind !== 'GRP'}
-      <label class="follow" title="Fréquence et mode repris automatiquement de la radio (TCI)">
-        <input type="checkbox" bind:checked={followTci} /> Suivre la radio
-      </label>
-    {/if}
+    <label class="follow" title="Fréquence et mode repris automatiquement de la radio (TCI)">
+      <input type="checkbox" bind:checked={followTci} /> Suivre la radio
+    </label>
   </div>
 
   {#if kind === 'GRP'}
-    <GroupSession {radio} {sessions} onchanged={() => onlogged?.()} />
+    <GroupSession {radio} follow={followTci} {sessions} onchanged={() => onlogged?.()} />
   {:else}
   <form onsubmit={submit}>
     <div class="grid">

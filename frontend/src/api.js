@@ -28,6 +28,8 @@ export const api = {
   sessionNames: () => req('GET', '/api/sessions/names'),
   regulars: (name) => req('GET', `/api/sessions/regulars?name=${encodeURIComponent(name)}`),
   createSession: (s) => req('POST', '/api/sessions', s),
+  saveTemplate: (s) => req('POST', '/api/templates', s),
+  deleteTemplate: (name) => req('DELETE', `/api/templates/${encodeURIComponent(name)}`),
   session: (id) => req('GET', `/api/sessions/${id}`),
   updateSession: (id, s) => req('PUT', `/api/sessions/${id}`, s),
   deleteSession: (id) => req('DELETE', `/api/sessions/${id}`),
