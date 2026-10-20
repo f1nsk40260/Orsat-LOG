@@ -7,6 +7,27 @@
   let s = $state(untrack(() => ({ ...settings })));
   let error = $state('');
 
+  // mise à jour depuis GitHub
+  let upd = $state(null);         // { current, changes }
+  let updState = $state('');      // '', 'check', 'run', message d'erreur
+  async function checkUpdate() {
+    updState = 'check';
+    try { upd = await api.updateCheck(); updState = ''; }
+    catch (err) { updState = err.message; }
+  }
+  async function runUpdate() {
+    updState = 'run';
+    try {
+      await api.updateRun();
+      // l'application redémarre : on attend le nouveau serveur puis on recharge la page
+      await new Promise((r) => setTimeout(r, 4000));
+      for (let i = 0; i < 90; i++) {
+        try { await api.settings(); location.reload(); return; } catch { await new Promise((r) => setTimeout(r, 2000)); }
+      }
+      updState = 'Redémarrage trop long : relancer ORSAT-LOG depuis son icône.';
+    } catch (err) { updState = err.message; }
+  }
+
   async function save(e) {
     e.preventDefault();
     error = '';
@@ -83,6 +104,34 @@
     <p class="note">Ex. https://app.weathercloud.net/d9224966553 — relevé toutes les 15 min.</p>
   </fieldset>
 
+  <fieldset>
+    <legend>Mise à jour</legend>
+    {#if upd}
+      <div class="ver">Version installée : <b>{upd.current.version}</b>
+        <span class="muted">({upd.current.commit} du {upd.current.date})</span></div>
+      {#if upd.changes.length}
+        <div class="news">{upd.changes.length} modification{upd.changes.length > 1 ? 's' : ''} disponible{upd.changes.length > 1 ? 's' : ''} :</div>
+        <ul>{#each upd.changes.slice(0, 8) as c}<li>{c}</li>{/each}</ul>
+      {:else}
+        <div class="ok">ORSAT-LOG est à jour.</div>
+      {/if}
+    {/if}
+    {#if updState === 'run'}
+      <p class="note">Mise à jour en cours… l'application va se fermer puis se rouvrir (une minute environ).</p>
+    {:else if updState && updState !== 'check'}
+      <p class="error">{updState}</p>
+    {/if}
+    <div class="upd-btns">
+      <button type="button" onclick={checkUpdate} disabled={updState === 'check' || updState === 'run'}>
+        {updState === 'check' ? 'Vérification…' : 'Vérifier'}
+      </button>
+      <button type="button" class:primary={upd?.changes.length} onclick={runUpdate}
+              disabled={updState === 'run'} title="Récupère les modifications, recompile et redémarre">
+        Mettre à jour et redémarrer
+      </button>
+    </div>
+  </fieldset>
+
   <div class="actions">
     {#if error}<span class="error">{error}</span>{/if}
     <button type="button" onclick={onclose}>Annuler</button>
@@ -105,4 +154,11 @@
   .check input { width: auto; }
   .actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
   .error { color: var(--bad); margin-right: auto; }
+  .ver { font-size: 0.85rem; }
+  .muted { color: var(--muted); }
+  .news { color: var(--gold); font-size: 0.85rem; margin-top: 6px; }
+  ul { margin: 4px 0 0; padding-left: 18px; font-size: 0.8rem; max-height: 120px; overflow: auto; }
+  .ok { color: var(--ok); font-size: 0.85rem; margin-top: 4px; }
+  .upd-btns { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+  .dialog { max-height: calc(100vh - 32px); overflow: auto; }
 </style>

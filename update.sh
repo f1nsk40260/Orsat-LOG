@@ -78,5 +78,5 @@ fi
 echo "== OK =="
 if [ "$1" != "--no-run" ]; then
     pkill -f "$DIR/run.py" && sleep 1
-    exec .venv/bin/python run.py
+    exec .venv/bin/python "$DIR/run.py"
 fi

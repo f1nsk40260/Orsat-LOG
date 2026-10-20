@@ -21,6 +21,9 @@ export const api = {
   addQso: (q) => req('POST', '/api/qsos', q),
   deleteQso: (id) => req('DELETE', `/api/qsos/${id}`),
   worked: (call) => req('GET', `/api/worked/${encodeURIComponent(call)}`),
+  // mise à jour
+  updateCheck: () => req('GET', '/api/update/check'),
+  updateRun: () => req('POST', '/api/update'),
   // QSO de groupe
   sessionNames: () => req('GET', '/api/sessions/names'),
   regulars: (name) => req('GET', `/api/sessions/regulars?name=${encodeURIComponent(name)}`),

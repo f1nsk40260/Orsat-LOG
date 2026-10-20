@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import subprocess
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -18,7 +19,9 @@ from .tci import TciClient
 
 log = logging.getLogger("orsatlog")
 
-FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+ROOT = Path(__file__).resolve().parents[2]          # dossier du dépôt (~/Orsat-LOG)
+FRONTEND_DIST = ROOT / "frontend" / "dist"
+LAUNCHER = ROOT / "orsat-log.sh"
 
 db = Database()
 _clients: set[WebSocket] = set()
@@ -122,6 +125,43 @@ async def put_settings(values: dict):
     if before.get("weathercloud") != after.get("weathercloud"):
         asyncio.create_task(_record_weather())
     return after
+
+
+# ---------- mise à jour depuis GitHub ----------
+def _git(*args, timeout=30):
+    r = subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, timeout=timeout)
+    if r.returncode != 0:
+        raise RuntimeError((r.stderr or r.stdout).strip()[:300] or "erreur git")
+    return r.stdout.strip()
+
+
+def _check_update():
+    current = {"version": __version__, "commit": _git("rev-parse", "--short", "HEAD"),
+               "date": _git("log", "-1", "--format=%cd", "--date=format:%d/%m/%Y %H:%M")}
+    _git("fetch", "-q", "origin", timeout=60)
+    upstream = _git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
+    changes = _git("log", "--format=%s", f"HEAD..{upstream}")
+    return {"current": current, "changes": [c for c in changes.splitlines() if c]}
+
+
+@app.get("/api/update/check")
+async def update_check():
+    """Version installée + modifications disponibles sur GitHub."""
+    try:
+        return await asyncio.to_thread(_check_update)
+    except Exception as exc:
+        raise HTTPException(502, f"Vérification impossible : {exc}")
+
+
+@app.post("/api/update")
+def update_run():
+    """Lance le lanceur (mise à jour + recompilation + redémarrage) dans un processus détaché :
+    il ferme cette instance et rouvre l'application à jour."""
+    if not LAUNCHER.exists():
+        raise HTTPException(500, "Lanceur orsat-log.sh introuvable")
+    subprocess.Popen(["bash", str(LAUNCHER)], cwd=str(ROOT), start_new_session=True,
+                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return {"ok": True}
 
 
 # ---------- radio / solaire ----------
