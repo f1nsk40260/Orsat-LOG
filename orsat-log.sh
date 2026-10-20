@@ -43,7 +43,12 @@ if [ "$REBUILD" = 1 ] || changed requirements.txt; then
 fi
 
 # 3. Interface (si frontend modifié ou jamais compilée)
-if [ "$REBUILD" = 1 ] || [ ! -f frontend/dist/index.html ] || changed frontend; then
+# Aussi si les sources sont plus récentes que la compilation (code récupéré par un
+# « git pull » fait à la main : le lanceur ne voit alors aucun changement).
+stale_ui() {
+    [ -n "$(find frontend/src frontend/index.html frontend/package.json -newer frontend/dist/index.html -print -quit 2>/dev/null)" ]
+}
+if [ "$REBUILD" = 1 ] || [ ! -f frontend/dist/index.html ] || changed frontend || stale_ui; then
     if [ "$REBUILD" = 1 ] || [ ! -d frontend/node_modules ] || changed frontend/package.json frontend/package-lock.json; then
         (cd frontend && npm install --silent)
     fi
