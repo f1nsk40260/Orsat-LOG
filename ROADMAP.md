@@ -134,6 +134,27 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
   → « Passer en SWL » ; PTT d'AetherSDR ou WebSDR absent en SWL → « Passer en QSO » ; ✕ pour ignorer.
 - **Préférence F1NSK : pas de raccourcis clavier, tout à la souris (molette quand utile).**
 
+## Décidé (20/10/2026) : ORSAT-LOG serveur central sur le PC ORSAT
+Motifs : une seule base (Main-PC à distance par fibre, saint paul sur le réseau d'ORSAT, usage nomade),
+relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
+- **Adresse** : `https://orsat.ddns.net/log`. ORSAT-LOG en interne (`127.0.0.1:8740`), exposé par
+  `proxy.py` de PhantomSDR-ORSAT (règle `/log*`, distincte de `/logs/…`), comme `/admin`.
+- **Accès** : compte unique, **mot de passe commun avec le panneau admin ORSAT** : le carnet lit
+  `admin_config.json` (lecture seule) et vérifie avec la même méthode PBKDF2 que `admin_server.py`.
+  Protection anti-rafale de `proxy.py` étendue à la connexion de `/log`.
+- **Seul fichier d'ORSAT 1.0 modifié** : `proxy.py` (routage + protection) → redémarrage du proxy,
+  coupure de quelques secondes du WebSDR. Le reste est à côté : service systemd dédié, plafonds
+  mémoire/CPU, dossier et base propres.
+- **Postes d'exploitation = un navigateur** : SWL → la page WebSDR (même adresse) envoie sa fréquence
+  au carnet central (retouche de la page ORSAT, future 1.1) ; QSO → l'interface du carnet ouverte dans
+  le navigateur du PC d'AetherSDR se connecte elle-même à `ws://localhost:50001`. Fin de pywebview.
+- **Sauvegardes** : copie quotidienne automatique sur le serveur + bouton « Télécharger une sauvegarde ».
+- **Ordre** : 1) socle (carnet central, connexion, accès navigateur, sauvegardes) ; 2) liaison directe
+  page WebSDR ↔ carnet ; 3) mutualisations une par une (propagation/météo collectées une seule fois,
+  DX cluster croisé avec le carnet, historique d'une station dans la page WebSDR, décodages FT8/WSPR
+  des navigateurs → écoutes SWL automatiques ; **pas de décodage côté serveur** : charge CPU).
+- Charge estimée (ordre de grandeur, non mesuré) : 60–100 Mo RAM, CPU quasi nul.
+
 ## Deux PC (question F1NSK 20/10)
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
