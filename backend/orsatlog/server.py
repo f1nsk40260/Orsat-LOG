@@ -1,0 +1,179 @@
+"""Serveur local ORSAT-LOG (FastAPI) : API REST + WebSocket temps réel + frontend."""
+
+import asyncio
+import json
+import logging
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import PlainTextResponse
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+from . import __version__, adif, geo, solar
+from .db import Database
+from .tci import TciClient
+
+log = logging.getLogger("orsatlog")
+
+FRONTEND_DIST = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+
+db = Database()
+_clients: set[WebSocket] = set()
+
+
+def _broadcast(state):
+    msg = json.dumps({"type": "radio", "data": state})
+    for ws in list(_clients):
+        asyncio.create_task(_safe_send(ws, msg))
+
+
+async def _safe_send(ws, msg):
+    try:
+        await ws.send_text(msg)
+    except Exception:
+        _clients.discard(ws)
+
+
+tci = TciClient(on_change=_broadcast)
+
+
+def _restart_tci():
+    s = db.get_settings()
+    if s.get("tci_enabled") == "1":
+        tci.start(s.get("tci_host") or "127.0.0.1", s.get("tci_port") or 40001)
+    else:
+        tci.stop()
+
+
+@asynccontextmanager
+async def lifespan(app):
+    _restart_tci()
+    asyncio.create_task(asyncio.to_thread(solar.get_solar))  # préchargement
+    yield
+    tci.stop()
+
+
+app = FastAPI(title="ORSAT-LOG", version=__version__, lifespan=lifespan)
+
+
+# ---------- réglages ----------
+@app.get("/api/settings")
+def get_settings():
+    return db.get_settings()
+
+
+@app.put("/api/settings")
+def put_settings(values: dict):
+    before = db.get_settings()
+    if values.get("locator") and not geo.valid_locator(values["locator"]):
+        raise HTTPException(400, "Locator invalide")
+    if "callsign" in values:
+        values["callsign"] = values["callsign"].strip().upper()
+    if "locator" in values:
+        values["locator"] = values["locator"].strip().upper()
+    db.set_settings(values)
+    after = db.get_settings()
+    if any(before.get(k) != after.get(k) for k in ("tci_host", "tci_port", "tci_enabled")):
+        _restart_tci()
+    return after
+
+
+# ---------- radio / solaire ----------
+@app.get("/api/radio")
+def get_radio():
+    return tci.state
+
+
+@app.get("/api/solar")
+async def get_solar():
+    return await asyncio.to_thread(solar.get_solar)
+
+
+# ---------- QSO ----------
+class QsoIn(BaseModel):
+    call: str
+    qso_date: str | None = None   # AAAAMMJJ, défaut = maintenant UTC
+    time_on: str | None = None    # HHMMSS
+    freq: int | None = None       # Hz
+    mode: str = ""
+    submode: str = ""
+    rst_sent: str = ""
+    rst_rcvd: str = ""
+    name: str = ""
+    qth: str = ""
+    gridsquare: str = ""
+    comment: str = ""
+
+
+@app.get("/api/qsos")
+def list_qsos(limit: int = 200):
+    return db.list_qsos(limit)
+
+
+@app.get("/api/worked/{call}")
+def worked(call: str):
+    return db.worked_before(call)
+
+
+@app.post("/api/qsos")
+async def add_qso(q: QsoIn):
+    call = q.call.strip().upper()
+    if not call:
+        raise HTTPException(400, "Indicatif obligatoire")
+    now = datetime.now(timezone.utc)
+    rec = q.model_dump()
+    rec["call"] = call
+    rec["qso_date"] = q.qso_date or now.strftime("%Y%m%d")
+    rec["time_on"] = q.time_on or now.strftime("%H%M%S")
+    rec["mode"] = q.mode.strip().upper()
+    rec["submode"] = q.submode.strip().upper()
+    rec["gridsquare"] = q.gridsquare.strip().upper()
+    rec["band"] = geo.band_of(q.freq)
+
+    my_loc = db.get_settings().get("locator", "")
+    if geo.valid_locator(my_loc) and geo.valid_locator(rec["gridsquare"]):
+        rec["distance_km"], rec["bearing"] = geo.distance_bearing(my_loc, rec["gridsquare"])
+
+    sol = await asyncio.to_thread(solar.get_solar)
+    if sol:
+        rec["sfi"], rec["a_index"], rec["k_index"] = sol["sfi"], sol["a_index"], sol["k_index"]
+
+    return db.add_qso(rec)
+
+
+@app.delete("/api/qsos/{qso_id}")
+def delete_qso(qso_id: int):
+    if not db.delete_qso(qso_id):
+        raise HTTPException(404, "QSO introuvable")
+    return {"ok": True}
+
+
+@app.get("/api/export/adif", response_class=PlainTextResponse)
+def export_adif():
+    s = db.get_settings()
+    text = adif.export(db.all_qsos(), s.get("callsign", ""), s.get("locator", ""))
+    name = f"orsat-log_{datetime.now(timezone.utc):%Y%m%d}.adi"
+    return PlainTextResponse(text, headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+# ---------- temps réel ----------
+@app.websocket("/ws")
+async def ws_endpoint(ws: WebSocket):
+    await ws.accept()
+    _clients.add(ws)
+    await ws.send_text(json.dumps({"type": "radio", "data": tci.state}))
+    try:
+        while True:
+            await ws.receive_text()  # le client n'envoie rien pour l'instant
+    except WebSocketDisconnect:
+        pass
+    finally:
+        _clients.discard(ws)
+
+
+# ---------- frontend compilé ----------
+if FRONTEND_DIST.is_dir():
+    app.mount("/", StaticFiles(directory=FRONTEND_DIST, html=True), name="frontend")

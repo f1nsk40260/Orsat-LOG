@@ -1,0 +1,46 @@
+"""Export ADIF 3.1."""
+
+from datetime import datetime, timezone
+
+from . import __version__
+
+# champ base -> champ ADIF
+_MAP = [
+    ("call", "CALL"), ("qso_date", "QSO_DATE"), ("time_on", "TIME_ON"),
+    ("band", "BAND"), ("mode", "MODE"), ("submode", "SUBMODE"),
+    ("rst_sent", "RST_SENT"), ("rst_rcvd", "RST_RCVD"), ("name", "NAME"),
+    ("qth", "QTH"), ("gridsquare", "GRIDSQUARE"), ("comment", "COMMENT"),
+    ("distance_km", "DISTANCE"), ("sfi", "SFI"), ("a_index", "A_INDEX"),
+    ("k_index", "K_INDEX"),
+]
+
+
+def _field(tag, value):
+    value = str(value)
+    return f"<{tag}:{len(value.encode('utf-8'))}>{value} "
+
+
+def export(qsos, my_call="", my_grid=""):
+    now = datetime.now(timezone.utc).strftime("%Y%m%d %H%M%S")
+    out = [
+        "Export ORSAT-LOG\n",
+        _field("ADIF_VER", "3.1.4"),
+        _field("PROGRAMID", "ORSAT-LOG"),
+        _field("PROGRAMVERSION", __version__),
+        _field("CREATED_TIMESTAMP", now),
+        "<EOH>\n",
+    ]
+    for q in qsos:
+        rec = []
+        for key, tag in _MAP:
+            v = q.get(key)
+            if v not in (None, ""):
+                rec.append(_field(tag, v))
+        if q.get("freq"):
+            rec.append(_field("FREQ", f"{q['freq'] / 1e6:.6f}"))
+        if my_call:
+            rec.append(_field("STATION_CALLSIGN", my_call))
+        if my_grid:
+            rec.append(_field("MY_GRIDSQUARE", my_grid))
+        out.append("".join(rec) + "<EOR>\n")
+    return "".join(out)

@@ -1,0 +1,112 @@
+/* Thème ORSAT — vieil or sur fond sombre */
+:root {
+  --gold: rgb(207, 181, 59);
+  --gold-soft: rgba(207, 181, 59, 0.55);
+  --gold-faint: rgba(207, 181, 59, 0.15);
+  --bg: #0d0d0f;
+  --panel: rgba(28, 28, 32, 0.85);
+  --panel-edge: rgba(207, 181, 59, 0.25);
+  --text: #e6e2d3;
+  --muted: #8f8a78;
+  --ok: #5fbf6b;
+  --warn: #e0a030;
+  --bad: #d65050;
+  --radius: 8px;
+  font-family: 'Segoe UI', 'Ubuntu', 'DejaVu Sans', sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: radial-gradient(ellipse at top, #1d1b14 0%, var(--bg) 60%);
+}
+
+.panel {
+  background: linear-gradient(180deg, rgba(40, 38, 32, 0.9), var(--panel));
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+.panel-title {
+  color: var(--gold);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  margin: 0 0 10px;
+}
+
+button, .btn {
+  font: inherit;
+  color: var(--gold);
+  background: linear-gradient(180deg, rgba(207, 181, 59, 0.18), rgba(207, 181, 59, 0.05));
+  border: 1px solid var(--gold-soft);
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+button:hover, .btn:hover {
+  background: linear-gradient(180deg, rgba(207, 181, 59, 0.32), rgba(207, 181, 59, 0.1));
+  box-shadow: 0 0 8px rgba(207, 181, 59, 0.3);
+}
+button.primary {
+  color: #1a1606;
+  background: linear-gradient(180deg, #e2c95a, var(--gold));
+  border-color: var(--gold);
+  font-weight: 600;
+}
+button.ghost { border-color: transparent; background: transparent; }
+button:disabled { opacity: 0.4; cursor: default; }
+
+label {
+  display: block;
+  color: var(--gold-soft);
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 3px;
+}
+
+input[type="checkbox"] { accent-color: var(--gold); }
+
+input, select {
+  font: inherit;
+  width: 100%;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.45);
+  border: 1px solid rgba(207, 181, 59, 0.3);
+  border-radius: 5px;
+  padding: 6px 8px;
+}
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold-faint);
+}
+
+table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+th {
+  color: var(--gold);
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--panel-edge);
+  position: sticky;
+  top: 0;
+  background: #1c1b17;
+}
+td { padding: 5px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
+tr:hover td { background: var(--gold-faint); }
+
+.mono { font-family: 'DejaVu Sans Mono', 'Ubuntu Mono', monospace; }
