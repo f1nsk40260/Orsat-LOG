@@ -100,6 +100,7 @@ CREATE TABLE IF NOT EXISTS session (
     freq        INTEGER,
     mode        TEXT,
     submode     TEXT,
+    animator    TEXT,               -- indicatif de l'animateur (station qui mène la ronde)
     comment     TEXT,
     created_at  TEXT DEFAULT (datetime('now'))
 );
@@ -129,6 +130,10 @@ class Database:
         if "session_id" not in cols:
             self._con.execute("ALTER TABLE qso ADD COLUMN session_id INTEGER")
         self._con.execute("CREATE INDEX IF NOT EXISTS idx_qso_session ON qso(session_id)")
+        # migration v0.5 -> v0.6 : animateur du QSO de groupe
+        scols = [r["name"] for r in self._con.execute("PRAGMA table_info(session)")]
+        if "animator" not in scols:
+            self._con.execute("ALTER TABLE session ADD COLUMN animator TEXT")
         # migration v0.1 -> v0.2 : port TCI par défaut 40001 -> 50001 (AetherSDR)
         if self._con.execute("SELECT 1 FROM settings WHERE key = 'tci_trx'").fetchone() is None:
             self._con.execute("UPDATE settings SET value = '50001' WHERE key = 'tci_port' AND value = '40001'")
@@ -165,7 +170,7 @@ class Database:
             return self.get_qso(cur.lastrowid, _locked=True)
 
     def get_qso(self, qso_id, _locked=False):
-        sql = "SELECT q.*, s.name AS session_name FROM qso q LEFT JOIN session s ON s.id = q.session_id WHERE q.id = ?"
+        sql = "SELECT q.*, s.name AS session_name, s.animator AS session_animator FROM qso q LEFT JOIN session s ON s.id = q.session_id WHERE q.id = ?"
         if _locked:
             row = self._con.execute(sql, (qso_id,)).fetchone()
         else:
@@ -176,14 +181,14 @@ class Database:
     def list_qsos(self, limit=200):
         with self._lock:
             rows = self._con.execute(
-                "SELECT q.*, s.name AS session_name FROM qso q LEFT JOIN session s ON s.id = q.session_id ORDER BY q.qso_date DESC, q.time_on DESC, q.id DESC LIMIT ?",
+                "SELECT q.*, s.name AS session_name, s.animator AS session_animator FROM qso q LEFT JOIN session s ON s.id = q.session_id ORDER BY q.qso_date DESC, q.time_on DESC, q.id DESC LIMIT ?",
                 (limit,),
             ).fetchall()
         return [dict(r) for r in rows]
 
     def all_qsos(self):
         with self._lock:
-            rows = self._con.execute("SELECT q.*, s.name AS session_name FROM qso q LEFT JOIN session s ON s.id = q.session_id ORDER BY q.qso_date, q.time_on, q.id").fetchall()
+            rows = self._con.execute("SELECT q.*, s.name AS session_name, s.animator AS session_animator FROM qso q LEFT JOIN session s ON s.id = q.session_id ORDER BY q.qso_date, q.time_on, q.id").fetchall()
         return [dict(r) for r in rows]
 
     def worked_before(self, call):
@@ -205,7 +210,7 @@ class Database:
     def day_qsos(self, day):
         with self._lock:
             rows = self._con.execute(
-                "SELECT q.*, s.name AS session_name FROM qso q LEFT JOIN session s ON s.id = q.session_id WHERE q.qso_date = ? ORDER BY q.time_on DESC, q.id DESC", (day,)
+                "SELECT q.*, s.name AS session_name, s.animator AS session_animator FROM qso q LEFT JOIN session s ON s.id = q.session_id WHERE q.qso_date = ? ORDER BY q.time_on DESC, q.id DESC", (day,)
             ).fetchall()
         return [dict(r) for r in rows]
 
@@ -292,7 +297,7 @@ class Database:
         return [dict(r) for r in rows]
 
     # --- QSO de groupe ---
-    SESSION_FIELDS = ["name", "time_start", "time_end", "freq", "mode", "submode", "comment"]
+    SESSION_FIELDS = ["name", "time_start", "time_end", "freq", "mode", "submode", "animator", "comment"]
 
     def create_session(self, day, data):
         cols = ["day"] + [f for f in self.SESSION_FIELDS if f in data]
@@ -344,7 +349,7 @@ class Database:
         """Noms de QSO de groupe déjà utilisés, avec les réglages de la dernière session."""
         with self._lock:
             rows = self._con.execute(
-                "SELECT s.name, s.time_start, s.time_end, s.freq, s.mode, s.submode, s.day, n.cnt "
+                "SELECT s.name, s.time_start, s.time_end, s.freq, s.mode, s.submode, s.animator, s.day, n.cnt "
                 "FROM session s JOIN (SELECT name, MAX(id) AS last_id, COUNT(*) AS cnt FROM session "
                 "GROUP BY name) n ON n.last_id = s.id ORDER BY s.day DESC, s.time_start DESC").fetchall()
         return [dict(r) for r in rows]

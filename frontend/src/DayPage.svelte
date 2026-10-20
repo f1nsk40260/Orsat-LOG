@@ -121,7 +121,7 @@
             <span class="sess" title="QSO de groupe">
               <b>{s.name}</b>
               {s.time_start.slice(0, 2)}:{s.time_start.slice(2)}–{s.time_end ? `${s.time_end.slice(0, 2)}:${s.time_end.slice(2)}` : 'en cours'}
-              · {s.count} station{s.count > 1 ? 's' : ''}
+              · {s.count} station{s.count > 1 ? 's' : ''}{s.animator ? ` · anim. ${s.animator}` : ''}
             </span>
           {/each}
         </div>

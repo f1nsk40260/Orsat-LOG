@@ -44,6 +44,8 @@ def export(qsos, my_call="", my_grid=""):
                 rec.append(_field(tag, v))
         if q.get("session_name"):
             rec.append(_field("APP_ORSATLOG_SESSION", q["session_name"]))
+            if q.get("session_animator"):
+                rec.append(_field("APP_ORSATLOG_ANIMATOR", q["session_animator"]))
         if q.get("kind") == "SWL":
             rec.append(_field("SWL", "Y"))  # écoute (Short Wave Listener), pas un contact
         if q.get("freq"):

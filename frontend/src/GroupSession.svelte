@@ -27,7 +27,7 @@
 
   function blankSetup() {
     return {
-      name: '', start: hhmm(), end: '',
+      name: '', start: hhmm(), end: '', animator: '',
       freqMHz: radio?.freq ? (radio.freq / 1e6).toFixed(6) : '',
       modeLabel: radio?.mode && MODES.some((m) => m.label === radio.mode) ? radio.mode : 'SSB',
       submode: radio?.submode || '',
@@ -52,6 +52,7 @@
     // QSO quotidien : même créneau horaire que la dernière fois
     setup.start = showHHMM(n.time_start);
     setup.end = n.time_end ? showHHMM(n.time_end) : '';
+    setup.animator = n.animator || '';
     lastTime = n;
     if (n.freq) setup.freqMHz = (n.freq / 1e6).toFixed(6);
     setup.modeLabel = modeLabel(n.mode, n.submode);
@@ -68,7 +69,7 @@
     const m = MODES.find((x) => x.label === setup.modeLabel) ?? { mode: setup.modeLabel, sub: '' };
     const f = parseFloat(String(setup.freqMHz).replace(',', '.'));
     return {
-      name: setup.name, time_start: setup.start, time_end: setup.end,
+      name: setup.name, time_start: setup.start, time_end: setup.end, animator: setup.animator,
       freq: Number.isFinite(f) ? Math.round(f * 1e6) : null,
       mode: m.mode, submode: m.sub || (m.mode === 'SSB' ? setup.submode : ''),
     };
@@ -95,6 +96,7 @@
   function startEdit() {
     setup = {
       name: active.name, start: showHHMM(active.time_start), end: showHHMM(active.time_end),
+      animator: active.animator || '',
       freqMHz: active.freq ? (active.freq / 1e6).toFixed(6) : '',
       modeLabel: modeLabel(active.mode, active.submode), submode: active.submode || '',
     };
@@ -194,7 +196,12 @@
   }
 
   const present = $derived(new Set(active?.participants.map((x) => x.call) ?? []));
-  const missing = $derived(regulars.filter((r) => !present.has(r.call)));
+  const missing = $derived.by(() => {
+    const list = regulars.filter((r) => !present.has(r.call));
+    const a = active?.animator;
+    if (a && !present.has(a) && !list.some((r) => r.call === a)) list.unshift({ call: a, name: '', qth: '', gridsquare: '', times: 0 });
+    return list.sort((x, y) => (y.call === a) - (x.call === a));
+  });
   const running = $derived(active && !active.time_end);
 </script>
 
@@ -215,6 +222,11 @@
       <div>
         <label for="g-end">Fin (UTC)</label>
         <input id="g-end" class="mono" bind:value={setup.end} placeholder="en cours" maxlength="5" />
+      </div>
+      <div>
+        <label for="g-anim">Animateur</label>
+        <input id="g-anim" class="mono" bind:value={setup.animator} placeholder="indicatif"
+               oninput={() => (setup.animator = setup.animator.toUpperCase())} autocomplete="off" />
       </div>
       <div>
         <label for="g-freq">Fréquence (MHz)</label>
@@ -263,6 +275,7 @@
       {showHHMM(active.time_start)} – {active.time_end ? showHHMM(active.time_end) : '…'} UTC
       · {active.freq ? (active.freq / 1e6).toFixed(3) : '—'} MHz · {modeLabel(active.mode, active.submode)}
     </span>
+    {#if active.animator}<span class="anim" title="Animateur du QSO de groupe">★ {active.animator}</span>{/if}
     {#if running}<span class="live">en cours</span>{/if}
     <span class="spacer"></span>
     <button class="small" onclick={startEdit} title="Modifier nom, horaires, fréquence">Modifier</button>
@@ -293,7 +306,7 @@
       {#each missing as r}
         <button class="chip-btn" onclick={() => addRegular(r)}
                 title="{r.name || ''} {r.qth || ''} — présent {r.times} fois sur les dernières sessions">
-          {r.call}{r.name ? ` · ${r.name}` : ''}
+          {r.call === active.animator ? '★ ' : ''}{r.call}{r.name ? ` · ${r.name}` : ''}
         </button>
       {/each}
     </div>
@@ -302,8 +315,9 @@
   <div class="plist">
     <span class="lbl">{active.participants.length} station{active.participants.length > 1 ? 's' : ''} :</span>
     {#each active.participants as q (q.id)}
-      <span class="pchip" title="{fmtTime(q.time_on)} UTC · {q.rst_sent}/{q.rst_rcvd} {q.qth || ''}">
-        <b>{q.call}</b>{q.name ? ` ${q.name}` : ''}
+      <span class="pchip" class:is-anim={q.call === active.animator}
+            title="{q.call === active.animator ? 'Animateur · ' : ''}{fmtTime(q.time_on)} UTC · {q.rst_sent}/{q.rst_rcvd} {q.qth || ''}">
+        <b>{q.call === active.animator ? '★ ' : ''}{q.call}</b>{q.name ? ` ${q.name}` : ''}
         <button class="ghost x" onclick={() => removeParticipant(q)} title="Retirer">✕</button>
       </span>
     {:else}
@@ -313,7 +327,7 @@
 {/if}
 
 <style>
-  .grid { display: grid; grid-template-columns: 2fr 0.7fr 0.7fr 1fr 0.8fr; gap: 10px; }
+  .grid { display: grid; grid-template-columns: 1.8fr 0.65fr 0.65fr 0.9fr 0.9fr 0.8fr; gap: 10px; }
   .actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
   .spacer { flex: 1; }
   .resume { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.8rem; color: var(--muted); }
@@ -335,6 +349,8 @@
   .pchip { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--panel-edge);
            border-radius: 12px; padding: 1px 4px 1px 10px; background: rgba(207, 181, 59, 0.08); }
   .pchip b { color: var(--gold); }
+  .pchip.is-anim { border-color: var(--gold); background: rgba(207, 181, 59, 0.2); }
+  .anim { color: var(--gold); font-size: 0.85rem; border: 1px solid var(--gold-soft); border-radius: 12px; padding: 1px 10px; }
   .x { padding: 0 4px; font-size: 0.7rem; color: var(--muted); }
   .x:hover { color: var(--bad); }
   .muted { color: var(--muted); }

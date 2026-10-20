@@ -221,6 +221,7 @@ class SessionIn(BaseModel):
     freq: int | None = None
     mode: str | None = None
     submode: str | None = None
+    animator: str | None = None     # indicatif de l'animateur
     comment: str | None = None
 
 
@@ -234,7 +235,7 @@ def _clean_session(s: SessionIn):
         data["time_start"] = _hhmm(data["time_start"], "Début")
     if "time_end" in data:
         data["time_end"] = _hhmm(data["time_end"], "Fin")
-    for k in ("mode", "submode"):
+    for k in ("mode", "submode", "animator"):
         if k in data:
             data[k] = data[k].strip().upper()
     return data

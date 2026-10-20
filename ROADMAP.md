@@ -77,6 +77,8 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 - Chaque station = un QSO normal (`qso.session_id` → table `session`), marqué **GRP** dans les listes ;
   page du jour : pastilles des sessions (créneau, nombre de stations).
 - ADIF : nom de la session en tête du COMMENT + champ `APP_ORSATLOG_SESSION`.
+- v0.5.1 : **animateur** de la session (indicatif, repris de la dernière session du même nom) ;
+  marqué ★, proposé en premier tant qu'il n'est pas contacté ; ADIF `APP_ORSATLOG_ANIMATOR`.
 
 ## À faire (ordre proposé)
 1. Import ADIF (reprise de l'ancien carnet).
