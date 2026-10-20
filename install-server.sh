@@ -81,7 +81,9 @@ echo "Service actif sur 127.0.0.1:$PORT"
 say "admin_config.json : log_port"
 if python3 -c "import json,sys; sys.exit(0 if json.load(open('$CFG')).get('log_port') == $PORT else 1)"; then
     echo "déjà en place"
+    NEED_PROXY=0
 else
+    NEED_PROXY=1
     cp -p "$CFG" "$CFG.avant-orsat-log"
     python3 - "$CFG" "$PORT" <<'PY'
 import json, os, sys, tempfile
@@ -97,8 +99,11 @@ PY
     echo "ajouté (copie de sécurité : $CFG.avant-orsat-log)"
 fi
 
-say "Redémarrage du proxy du WebSDR (quelques secondes de coupure)"
-if systemctl is-active --quiet phantomsdr-proxy; then
+# Le proxy n'est relancé qu'au premier passage (simple mise à jour du carnet : WebSDR intact)
+if [ "${NEED_PROXY:-1}" = 0 ] && [ "${FORCE_PROXY:-0}" != 1 ]; then
+    say "Proxy du WebSDR : inchangé (déjà relié à /log)"
+elif systemctl is-active --quiet phantomsdr-proxy; then
+    say "Redémarrage du proxy du WebSDR (quelques secondes de coupure)"
     $SUDO systemctl restart phantomsdr-proxy
     sleep 2
     systemctl is-active --quiet phantomsdr-proxy && echo "proxy relancé" || die "le proxy ne repart pas : journalctl -u phantomsdr-proxy -n 30"

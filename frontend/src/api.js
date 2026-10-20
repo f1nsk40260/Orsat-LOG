@@ -20,6 +20,15 @@ async function req(method, url, body) {
 
 export const api = {
   info: () => req('GET', 'api/info'),
+  backups: () => req('GET', 'api/backups'),
+  restore: async (file) => {
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch('api/restore', { method: 'POST', body: fd });
+    if (r.status === 401) { location.href = 'login'; throw new Error('Connexion requise'); }
+    if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m; } catch {} throw new Error(m); }
+    return r.json();
+  },
   logout: () => req('POST', 'api/logout'),
   settings: () => req('GET', 'api/settings'),
   saveSettings: (s) => req('PUT', 'api/settings', s),

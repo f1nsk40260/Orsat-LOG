@@ -183,7 +183,15 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - Dépendance ajoutée : `python-multipart` (formulaire de connexion).
 - **En service le 20/10/2026 sur le PC ORSAT : https://orsat.ddns.net/log/** (retour F1NSK : aucune charge
   notable). Mise à jour serveur : `cd ~/Orsat-LOG && git pull && bash install-server.sh ~/PhantomSDR-Plus`.
-- Reste du socle : sauvegardes (automatique + bouton) et reprise de la base de Main-PC.
+- Reprise de la base de Main-PC : **abandonnée** (F1NSK : le serveur repart d'une base neuve).
+
+## Fait — v0.10.0 (20/10/2026) : sauvegardes
+- Copie automatique quotidienne `data/backups/orsatlog-AAAAMMJJ.db` (au démarrage si absente, contrôle
+  toutes les heures), API de sauvegarde SQLite (cohérente en cours d'utilisation), 30 copies gardées.
+- Réglages → Sauvegardes : 5 dernières copies téléchargeables, « Télécharger une sauvegarde » (copie fraîche),
+  « Restaurer… » (fichier .db vérifié : intégrité + table qso ; base actuelle sauvegardée d'abord en
+  `orsatlog-AAAAMMJJ-HHMM.db` ; migrations rejouées).
+- `install-server.sh` ne relance plus le proxy du WebSDR lors d'une simple mise à jour (`FORCE_PROXY=1` pour forcer).
 
 ## Deux PC (question F1NSK 20/10)
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.

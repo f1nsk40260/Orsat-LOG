@@ -8,12 +8,13 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, Form, HTTPException, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
+from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, geo, solar, weather
+from . import __version__, adif, auth, backup, geo, solar, weather
 from .db import Database
 from .tci import TciClient
 from .websdr import WebSdrServer
@@ -121,8 +122,10 @@ async def lifespan(app):
     _restart_tci()
     await _restart_websdr()
     recorder = asyncio.create_task(_propagation_recorder())
+    saver = asyncio.create_task(backup.daily_task(db))
     yield
     recorder.cancel()
+    saver.cancel()
     tci.stop()
     await websdr.stop()
 
@@ -637,6 +640,48 @@ def delete_qso(qso_id: int):
     if not db.delete_qso(qso_id):
         raise HTTPException(404, "QSO introuvable")
     return {"ok": True}
+
+
+# ---------- sauvegardes ----------
+@app.get("/api/backups")
+def list_backups():
+    return {"items": backup.list_backups(), "keep_days": backup.KEEP_DAYS}
+
+
+@app.get("/api/backup/download")
+def download_backup():
+    """Copie fraîche de la base, à garder chez soi."""
+    tmp = backup.snapshot_file(db)
+    name = f"orsat-log_{datetime.now(timezone.utc):%Y%m%d-%H%M}.db"
+    return FileResponse(tmp, filename=name, media_type="application/vnd.sqlite3",
+                        background=BackgroundTask(lambda: tmp.unlink(missing_ok=True)))
+
+
+@app.get("/api/backups/{name}")
+def get_backup(name: str):
+    path = backup.BACKUP_DIR / name
+    if not backup.valid_name(name) or not path.is_file():
+        raise HTTPException(404, "Sauvegarde introuvable")
+    return FileResponse(path, filename=name, media_type="application/vnd.sqlite3")
+
+
+@app.post("/api/restore")
+async def restore(file: UploadFile = File(...)):
+    """Remplace la base par une sauvegarde. La base actuelle est d'abord sauvegardée."""
+    tmp = backup.DATA_DIR / "restore-upload.tmp"
+    try:
+        with open(tmp, "wb") as f:
+            while chunk := await file.read(1 << 20):
+                f.write(chunk)
+        if not await asyncio.to_thread(backup.check_logbook_file, tmp):
+            raise HTTPException(400, "Ce fichier n'est pas une sauvegarde ORSAT-LOG valide")
+        before = f"orsatlog-{datetime.now(timezone.utc):%Y%m%d-%H%M}.db"
+        await asyncio.to_thread(backup.make_backup, db, before)
+        await asyncio.to_thread(db.restore_from, tmp)
+        log.info("Base restaurée depuis %s (ancienne base gardée : %s)", file.filename, before)
+        return {"ok": True, "previous": before}
+    finally:
+        tmp.unlink(missing_ok=True)
 
 
 @app.get("/api/export/adif", response_class=PlainTextResponse)

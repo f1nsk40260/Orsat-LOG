@@ -7,6 +7,26 @@
   let s = $state(untrack(() => ({ ...settings })));
   let error = $state('');
 
+  // sauvegardes de la base
+  let backups = $state(null);       // { items: [{name, size, time}], keep_days }
+  let bkMsg = $state('');
+  let restoreInput;
+  async function loadBackups() { backups = await api.backups().catch(() => null); }
+  loadBackups();
+  const kb = (n) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} ko` : `${(n / 1048576).toFixed(1)} Mo`);
+  async function restore(e) {
+    const file = e.currentTarget.files?.[0];
+    e.currentTarget.value = '';
+    if (!file) return;
+    if (!confirm(`Remplacer TOUT le carnet par la sauvegarde « ${file.name} » ?\n\nLe carnet actuel est d'abord sauvegardé.`)) return;
+    bkMsg = 'Restauration…';
+    try {
+      const r = await api.restore(file);
+      bkMsg = `Restauré. Ancien carnet gardé : ${r.previous}`;
+      setTimeout(() => location.reload(), 1500);
+    } catch (err) { bkMsg = err.message; }
+  }
+
   // mise à jour depuis GitHub
   let upd = $state(null);         // { current, changes }
   let updState = $state('');      // '', 'check', 'run', message d'erreur
@@ -120,6 +140,28 @@
   </fieldset>
 
   <fieldset>
+    <legend>Sauvegardes</legend>
+    <p class="note first">Une copie automatique par jour{backups ? `, gardée ${backups.keep_days} jours` : ''}.</p>
+    {#if backups?.items.length}
+      <ul class="bk">
+        {#each backups.items.slice(0, 5) as b}
+          <li><a href={`api/backups/${b.name}`} download title="Télécharger cette sauvegarde">{b.name}</a>
+              <span class="muted">{b.time} · {kb(b.size)}</span></li>
+        {/each}
+      </ul>
+      {#if backups.items.length > 5}<p class="note">… et {backups.items.length - 5} plus anciennes.</p>{/if}
+    {:else if backups}
+      <p class="note">Pas encore de copie automatique (la première se fait au démarrage).</p>
+    {/if}
+    <div class="upd-btns">
+      <a class="btn primary" href="api/backup/download" download title="Copie de tout le carnet, à garder chez soi">Télécharger une sauvegarde</a>
+      <button type="button" onclick={() => restoreInput.click()} title="Remplacer le carnet par une sauvegarde (en cas de panne)">Restaurer…</button>
+      <input bind:this={restoreInput} type="file" accept=".db" hidden onchange={restore} />
+    </div>
+    {#if bkMsg}<p class="note">{bkMsg}</p>{/if}
+  </fieldset>
+
+  <fieldset>
     <legend>Mise à jour</legend>
     {#if upd}
       <div class="ver">Version installée : <b>{upd.current.version}</b>
@@ -162,13 +204,19 @@
   .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); z-index: 10; }
   .dialog {
     position: fixed; z-index: 11; top: 50%; left: 50%; transform: translate(-50%, -50%);
-    width: 460px; max-width: calc(100vw - 32px);
+    width: 460px; max-width: calc(100vw - 32px); max-height: calc(100vh - 32px); overflow-y: auto;
   }
   fieldset { border: 1px solid var(--panel-edge); border-radius: 6px; margin: 0 0 12px; padding: 10px 12px; }
   legend { color: var(--gold); padding: 0 6px; font-size: 0.85rem; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .row3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
   .note { color: var(--muted); font-size: 0.78rem; margin: 8px 0 0; }
+  .note.first { margin: 0 0 6px; }
+  .bk { list-style: none; margin: 0 0 8px; padding: 0; font-size: 0.82rem; }
+  .bk li { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+  .bk a { color: var(--gold); text-decoration: none; }
+  .bk a:hover { text-decoration: underline; }
+  .muted { color: var(--muted); }
   .check { display: flex; align-items: center; gap: 8px; text-transform: none; font-size: 0.88rem; margin-bottom: 10px; }
   .check input { width: auto; }
   .actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }

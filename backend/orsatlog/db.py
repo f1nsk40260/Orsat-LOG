@@ -160,6 +160,10 @@ class Database:
         self._lock = threading.Lock()
         self._con = sqlite3.connect(str(path), check_same_thread=False)
         self._con.row_factory = sqlite3.Row
+        self._migrate()
+
+    def _migrate(self):
+        """Schéma et migrations ; rejoué après une restauration (sauvegarde d'une version antérieure)."""
         self._con.executescript(_SCHEMA)
         # migration v0.2 -> v0.3 : type d'entrée QSO / SWL
         cols = [r["name"] for r in self._con.execute("PRAGMA table_info(qso)")]
@@ -185,6 +189,26 @@ class Database:
         for k, v in DEFAULT_SETTINGS.items():
             self._con.execute("INSERT OR IGNORE INTO settings(key, value) VALUES (?, ?)", (k, v))
         self._con.commit()
+
+    # --- sauvegarde / restauration ---
+    def backup_to(self, path):
+        """Copie cohérente de la base (API de sauvegarde SQLite), même pendant l'utilisation."""
+        dst = sqlite3.connect(str(path))
+        try:
+            with self._lock:
+                self._con.backup(dst)
+        finally:
+            dst.close()
+
+    def restore_from(self, path):
+        """Remplace tout le contenu de la base par celui du fichier (déjà vérifié)."""
+        src = sqlite3.connect(str(path))
+        try:
+            with self._lock:
+                src.backup(self._con)
+                self._migrate()
+        finally:
+            src.close()
 
     # --- réglages ---
     def get_settings(self):

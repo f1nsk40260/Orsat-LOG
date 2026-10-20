@@ -57,7 +57,7 @@ button:hover, .btn:hover {
   background: linear-gradient(180deg, rgba(207, 181, 59, 0.32), rgba(207, 181, 59, 0.1));
   box-shadow: 0 0 8px rgba(207, 181, 59, 0.3);
 }
-button.primary {
+button.primary, .btn.primary {
   color: #1a1606;
   background: linear-gradient(180deg, #e2c95a, var(--gold));
   border-color: var(--gold);
