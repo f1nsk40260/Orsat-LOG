@@ -53,7 +53,7 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 
 ## Sources TCI visées
 - **AetherSDR** (serveur TCI v2.0 : CAT, audio, IQ, CW, spots, événements récepteur ; FlexRadio en priorité,
-  aussi récepteurs en réception seule). Port à régler dans les Réglages (pas de défaut documenté).
+  aussi récepteurs en réception seule). Port 50001 (applet « TCI Server » d’AetherSDR, à démarrer).
 - **Orsat-SDR** (plus tard) pour les logs SWL → nécessite d'ajouter un serveur TCI dans Orsat-SDR.
 
 ## Mode SWL (à concevoir)
