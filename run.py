@@ -4,6 +4,9 @@
     python3 run.py              fenêtre native (pywebview)
     python3 run.py --browser    ouvre dans le navigateur à la place
     python3 run.py --server     serveur seul (développement)
+    python3 run.py --central    serveur central (accès par mot de passe, navigateur seulement)
+    python3 run.py --central --host 0.0.0.0   idem, joignable depuis le réseau local (essai)
+    python3 run.py --set-password             mot de passe propre au carnet (PC sans WebSDR)
 """
 
 import argparse
@@ -60,16 +63,42 @@ def main():
     p.add_argument("--port", type=int, default=8740)
     p.add_argument("--browser", action="store_true", help="ouvrir dans le navigateur")
     p.add_argument("--server", action="store_true", help="serveur seul, sans fenêtre")
+    p.add_argument("--central", action="store_true",
+                   help="serveur central : mot de passe, pas de fenêtre, TCI fait par le navigateur")
+    p.add_argument("--host", default=HOST, help="adresse d'écoute (défaut 127.0.0.1, derrière proxy.py)")
+    p.add_argument("--set-password", action="store_true", help="définir le mot de passe propre au carnet")
     p.add_argument("--debug", action="store_true")
     args = p.parse_args()
+
+    if args.set_password:
+        import getpass
+        from orsatlog import auth
+        pw = getpass.getpass("Nouveau mot de passe du carnet : ")
+        if not pw or pw != getpass.getpass("Confirmer : "):
+            sys.exit("Mots de passe vides ou différents : rien n'a changé.")
+        auth.set_own_password(pw)
+        print(f"Mot de passe enregistré dans {auth.OWN_AUTH}")
+        if auth.ADMIN_CONFIG.exists():
+            print(f"Attention : celui du panneau admin ORSAT ({auth.ADMIN_CONFIG}) reste prioritaire.")
+        return
+    if args.central:
+        os.environ["ORSATLOG_MODE"] = "central"
 
     logging.basicConfig(level=logging.DEBUG if args.debug else logging.INFO,
                         format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
-    config = uvicorn.Config("orsatlog.server:app", host=HOST, port=args.port,
-                            log_level="debug" if args.debug else "warning")
+    config = uvicorn.Config("orsatlog.server:app", host=args.host, port=args.port,
+                            log_level="debug" if args.debug else "warning",
+                            proxy_headers=True, forwarded_allow_ips="127.0.0.1")
     server = uvicorn.Server(config)
 
+    if args.central:
+        from orsatlog import auth
+        origin = auth.password_origin()
+        print(f"ORSAT-LOG serveur central sur http://{args.host}:{args.port}/ — mot de passe : "
+              + (origin or "AUCUN (lancez run.py --set-password)"))
+        server.run()
+        return
     if args.server:
         server.run()
         return

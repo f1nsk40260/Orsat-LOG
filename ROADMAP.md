@@ -155,6 +155,23 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   des navigateurs → écoutes SWL automatiques ; **pas de décodage côté serveur** : charge CPU).
 - Charge estimée (ordre de grandeur, non mesuré) : 60–100 Mo RAM, CPU quasi nul.
 
+## Fait — v0.9.0 (20/10/2026) : socle serveur central, étape 1 (connexion + navigateur)
+- `run.py --central [--host 0.0.0.0] [--port 8740]` : serveur sans fenêtre, accès par mot de passe.
+- Mot de passe : `admin_config.json` du WebSDR (lecture seule, PBKDF2 ou ancien SHA-256),
+  chemin `ORSATLOG_PASSWORD_FILE` ou `~/PhantomSDR-Plus/admin_config.json` ; à défaut mot de passe
+  propre au carnet `data/auth.json` (`run.py --set-password`, pour l'essai sur saint paul).
+- Page de connexion au style ORSAT ; session = cookie signé 30 jours (`data/secret.key`), Secure en https ;
+  bouton **Déconnexion** ; anti-rafale 5 échecs / 10 min → 10 min de blocage (adresse réelle prise dans
+  X-Forwarded-For seulement si la requête vient de la boucle locale, c.-à-d. de proxy.py).
+- Interface en chemins relatifs (`base: './'`, `api/…`, `ws`) : marche à la racine comme derrière `/log/`
+  (le proxy devra rediriger `/log` → `/log/`).
+- En central, le serveur n'ouvre ni TCI AetherSDR ni port WebSDR : **le navigateur se connecte lui-même**
+  à AetherSDR (`frontend/src/tciBrowser.js`, réglages TCI = adresse vue depuis le PC de l'opérateur) ;
+  clic sur une fréquence d'un QSO = réglage par cette liaison.
+- Limite en central jusqu'à l'étape 2 : pas de suivi de la page WebSDR en SWL (saisie manuelle).
+- Mise à jour depuis les Réglages désactivée en central (se fera par le service, étape 3).
+- Mode bureau inchangé.
+
 ## Deux PC (question F1NSK 20/10)
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

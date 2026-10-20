@@ -2,6 +2,7 @@
   import { fmtDate, fmtTime } from './util.js';
   import { api } from './api.js';
   import EditEntry from './EditEntry.svelte';
+  import { tciActive, tciTune, tciModeFor } from './tciBrowser.js';
 
   // showDate = false sur la page du jour (la date est déjà en tête de page)
   // onchanged : appelé après une modification ou une suppression faite dans le formulaire d'édition
@@ -11,6 +12,11 @@
   // Clic sur une fréquence : SWL = la page WebSDR se recale, QSO / groupe = le transceiver
   async function tune(q) {
     try {
+      // Serveur central : le transceiver est piloté par la liaison TCI de ce navigateur
+      if (q.kind !== 'SWL' && tciActive()) {
+        if (!tciTune(q.freq, tciModeFor(q))) throw new Error('Transceiver TCI non connecté (AetherSDR, sur ce PC)');
+        return;
+      }
       await api.tune(q);
     } catch (err) {
       alert(err.message);

@@ -4,6 +4,7 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 // En développement (npm run dev), l'API est servie par `python3 run.py --server` sur le port 8740.
 export default defineConfig({
   plugins: [svelte()],
+  base: './',            // chemins relatifs : marche à la racine comme derrière /log/
   server: {
     proxy: {
       '/api': 'http://127.0.0.1:8740',

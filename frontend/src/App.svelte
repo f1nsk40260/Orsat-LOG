@@ -1,6 +1,7 @@
 <script>
   import { onMount } from 'svelte';
   import { api, liveSocket } from './api.js';
+  import { startTci, stopTci } from './tciBrowser.js';
   import { pad, dayOf, addDays, longDay, kClass } from './util.js';
   import Settings from './Settings.svelte';
   import DayPage from './DayPage.svelte';
@@ -11,6 +12,7 @@
   let radio = $state({ connected: false, freq: 0, mode: '', submode: '', ptt: false, device: '' });
   let websdr = $state({ listening: false, connected: false, freq: 0, mode: '', submode: '', ptt: false, device: 'WebSDR' });
   let solar = $state(null);
+  let central = $state(false);          // serveur central : le navigateur fait lui-même le TCI
   let showSettings = $state(false);
   let showCalendar = $state(false);
   let view = $state('day');              // 'day' = page d'agenda, 'log' = carnet complet
@@ -40,15 +42,32 @@
     if (e.altKey && (e.key === 'c' || e.key === 'C')) view = view === 'log' ? 'day' : 'log';
   }
 
+  // Serveur central : liaison TCI avec AetherSDR ouverte par ce navigateur (sur ce PC)
+  function browserTci(s) {
+    if (s.tci_enabled === '1') {
+      startTci({ host: s.tci_host || '127.0.0.1', port: s.tci_port || 50001, trx: s.tci_trx || 0 },
+               (st) => (radio = st));
+    } else {
+      stopTci();
+    }
+  }
+
+  async function logout() {
+    await api.logout().catch(() => {});
+    location.href = 'login';
+  }
+
   async function refreshSolar() { solar = await api.solar().catch(() => solar); }
 
   onMount(() => {
-    api.settings().then((s) => {
+    Promise.all([api.settings(), api.info().catch(() => ({}))]).then(([s, inf]) => {
       settings = s;
+      central = !!inf.central;
+      if (central) browserTci(s);
       if (!s.callsign || !s.locator) showSettings = true;
     });
     refreshSolar();
-    const stop = liveSocket((msg) => { if (msg.type === 'radio') radio = msg.data;
+    const stop = liveSocket((msg) => { if (msg.type === 'radio') { if (!central) radio = msg.data; }
       else if (msg.type === 'websdr') websdr = msg.data; });
     const clock = setInterval(() => {
       utc = new Date();
@@ -60,7 +79,7 @@
       }
     }, 1000);
     const sol = setInterval(refreshSolar, 15 * 60 * 1000);
-    return () => { stop(); clearInterval(clock); clearInterval(sol); };
+    return () => { stop(); stopTci(); clearInterval(clock); clearInterval(sol); };
   });
 </script>
 
@@ -101,8 +120,9 @@
             title="Ouvrir / fermer le carnet de trafic complet (Alt+C)">
       {view === 'log' ? 'Agenda' : 'Carnet'}
     </button>
-    <a class="btn" href="/api/export/adif" title="Exporter tout le carnet au format ADIF">ADIF</a>
+    <a class="btn" href="api/export/adif" title="Exporter tout le carnet au format ADIF">ADIF</a>
     <button onclick={() => (showSettings = true)} title="Réglages de la station et de la connexion TCI">Réglages</button>
+    {#if central}<button onclick={logout} title="Fermer la session du carnet sur ce navigateur">Déconnexion</button>{/if}
   </div>
 </header>
 
@@ -118,7 +138,7 @@
 
 {#if showSettings}
   <Settings {settings} onclose={() => (showSettings = false)}
-            onsaved={(s) => { settings = s; showSettings = false; }} />
+            onsaved={(s) => { settings = s; showSettings = false; if (central) browserTci(s); }} />
 {/if}
 
 <style>

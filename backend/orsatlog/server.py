@@ -8,12 +8,12 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
-from fastapi.responses import PlainTextResponse
+from fastapi import FastAPI, Form, HTTPException, Request, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, geo, solar, weather
+from . import __version__, adif, auth, geo, solar, weather
 from .db import Database
 from .tci import TciClient
 from .websdr import WebSdrServer
@@ -62,15 +62,17 @@ websdr = WebSdrServer(on_change=lambda st: _broadcast(st, "websdr"))
 
 async def _restart_websdr():
     s = db.get_settings()
-    if s.get("websdr_enabled") == "1":
+    if s.get("websdr_enabled") == "1" and not auth.central_mode():
         await websdr.start(s.get("websdr_port") or 40001)
     else:
         await websdr.stop()
 
 
 def _restart_tci():
+    # Serveur central : le TCI du transceiver est sur le PC de l'opérateur, c'est son
+    # navigateur qui s'y connecte (frontend/src/tciBrowser.js), pas ce serveur.
     s = db.get_settings()
-    if s.get("tci_enabled") == "1":
+    if s.get("tci_enabled") == "1" and not auth.central_mode():
         tci.start(s.get("tci_host") or "127.0.0.1", s.get("tci_port") or 50001, s.get("tci_trx") or 0)
     else:
         tci.stop()
@@ -126,6 +128,97 @@ async def lifespan(app):
 
 
 app = FastAPI(title="ORSAT-LOG", version=__version__, lifespan=lifespan)
+
+
+# ---------- accès protégé (mode serveur central) ----------
+# Pages et appels accessibles sans session : la connexion elle-même.
+_PUBLIC = {"/login", "/favicon.ico"}
+
+_LOGIN_HTML = """<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>ORSAT-LOG — connexion</title>
+<style>
+:root{color-scheme:dark}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0d0d0f;
+color:#e6e2d3;font-family:system-ui,sans-serif}
+form{width:min(340px,calc(100vw - 32px));padding:26px 24px;border:1px solid rgba(207,181,59,.35);border-radius:10px;
+background:rgba(28,28,32,.9);box-shadow:0 0 24px rgba(207,181,59,.12)}
+h1{margin:0 0 4px;color:rgb(207,181,59);letter-spacing:.12em;font-size:1.4rem}h1 small{color:#8f8a78;font-size:.9rem}
+p{color:#8f8a78;font-size:.85rem;margin:0 0 18px}label{display:block;font-size:.75rem;letter-spacing:.08em;
+text-transform:uppercase;color:#8f8a78;margin-bottom:6px}
+input{box-sizing:border-box;width:100%;font:inherit;color:#e6e2d3;background:rgba(0,0,0,.45);
+border:1px solid rgba(207,181,59,.3);border-radius:5px;padding:9px 10px}
+input:focus{outline:none;border-color:rgb(207,181,59)}
+button{margin-top:16px;width:100%;padding:10px;font:inherit;font-weight:600;border-radius:6px;cursor:pointer;
+border:1px solid rgb(207,181,59);color:#111;background:linear-gradient(180deg,#e2c95a,rgb(207,181,59))}
+.err{color:#d65050;font-size:.85rem;margin-top:12px;min-height:1em}
+</style></head><body>
+<form method="post" action="login">
+<h1>ORSAT<small>-LOG</small></h1><p>Carnet de trafic — accès réservé</p>
+<label for="pw">Mot de passe</label><input id="pw" name="password" type="password" autocomplete="current-password" autofocus>
+<button type="submit">Ouvrir le carnet</button><div class="err">__ERR__</div>
+</form></body></html>"""
+
+
+def _client_ip(request):
+    """Adresse du visiteur ; derrière proxy.py (boucle locale), celle qu'il transmet."""
+    ip = request.client.host if request.client else ""
+    if ip in ("127.0.0.1", "::1"):
+        fwd = request.headers.get("x-forwarded-for", "").split(",")[0].strip()
+        ip = fwd or request.headers.get("x-real-ip", "") or ip
+    return ip
+
+
+def _logged_in(cookies):
+    return auth.valid_token(cookies.get(auth.COOKIE, ""))
+
+
+@app.middleware("http")
+async def _require_login(request: Request, call_next):
+    if not auth.central_mode() or request.url.path in _PUBLIC or _logged_in(request.cookies):
+        return await call_next(request)
+    if request.url.path.startswith("/api/"):
+        return JSONResponse({"detail": "Connexion requise"}, status_code=401)
+    return RedirectResponse("login", status_code=303)   # relatif : marche aussi derrière /log
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page():
+    if not auth.central_mode():
+        return RedirectResponse("./", status_code=303)
+    err = "" if auth.password_origin() else "Aucun mot de passe défini sur le serveur."
+    return _LOGIN_HTML.replace("__ERR__", err)
+
+
+@app.post("/login")
+def login(request: Request, password: str = Form("")):
+    ip = _client_ip(request)
+    wait = auth.blocked_for(ip)
+    if wait:
+        return HTMLResponse(_LOGIN_HTML.replace("__ERR__", f"Trop d'essais : réessayez dans {wait // 60 + 1} min."),
+                            status_code=429)
+    if not auth.check_password(password):
+        auth.note_failure(ip)
+        log.warning("Connexion refusée depuis %s", ip)
+        return HTMLResponse(_LOGIN_HTML.replace("__ERR__", "Mot de passe incorrect."), status_code=401)
+    auth.note_success(ip)
+    log.info("Connexion depuis %s", ip)
+    resp = RedirectResponse("./", status_code=303)
+    https = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https"
+    resp.set_cookie(auth.COOKIE, auth.new_token(), max_age=auth.SESSION_DAYS * 86400,
+                    httponly=True, samesite="lax", secure=https)
+    return resp
+
+
+@app.post("/api/logout")
+def logout():
+    resp = JSONResponse({"ok": True})
+    resp.delete_cookie(auth.COOKIE)
+    return resp
+
+
+@app.get("/api/info")
+def info():
+    """Mode de fonctionnement, pour l'interface : en central, le navigateur fait lui-même le TCI."""
+    return {"version": __version__, "central": auth.central_mode()}
 
 
 # ---------- réglages ----------
@@ -184,6 +277,8 @@ async def update_check():
 
 @app.post("/api/update")
 def update_run(rebuild: bool = False):
+    if auth.central_mode():
+        raise HTTPException(400, "Serveur central : la mise à jour se fait sur le serveur (service ORSAT-LOG)")
     """Lance le lanceur (mise à jour + recompilation + redémarrage) dans un processus détaché :
     il ferme cette instance et rouvre l'application à jour."""
     if not LAUNCHER.exists():
@@ -555,6 +650,9 @@ def export_adif():
 # ---------- temps réel ----------
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
+    if auth.central_mode() and not _logged_in(ws.cookies):
+        await ws.close(code=4401)
+        return
     await ws.accept()
     _clients.add(ws)
     await ws.send_text(json.dumps({"type": "radio", "data": tci.state}))
