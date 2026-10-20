@@ -40,6 +40,8 @@
         tci_trx: String(s.tci_trx || '0'),
         tci_enabled: s.tci_enabled === '1' || s.tci_enabled === true ? '1' : '0',
         weathercloud: s.weathercloud || '',
+        websdr_port: String(s.websdr_port || '40001'),
+        websdr_enabled: s.websdr_enabled === '1' || s.websdr_enabled === true ? '1' : '0',
       });
       onsaved(saved);
     } catch (err) {
@@ -94,6 +96,19 @@
       </div>
     </div>
     <p class="note">AetherSDR : ouvrir l'applet « TCI Server », port 50001, et démarrer le serveur.</p>
+  </fieldset>
+
+  <fieldset>
+    <legend>WebSDR ORSAT</legend>
+    <label class="check">
+      <input type="checkbox" checked={s.websdr_enabled === '1'}
+             onchange={(e) => (s.websdr_enabled = e.currentTarget.checked ? '1' : '0')} />
+      Recevoir la fréquence de la page WebSDR
+    </label>
+    <label for="s-wport">Port TCI local</label>
+    <input id="s-wport" class="mono" bind:value={s.websdr_port}
+           title="La page ORSAT cherche 50001 et 40001 ; 50001 est pris par AetherSDR" />
+    <p class="note">Sur la page ORSAT (même PC), activer « CAT Sync » : le carnet suit la fréquence écoutée.</p>
   </fieldset>
 
   <fieldset>

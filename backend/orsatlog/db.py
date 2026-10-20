@@ -16,6 +16,8 @@ DEFAULT_SETTINGS = {
     "tci_port": "50001",
     "tci_trx": "0",
     "tci_enabled": "1",
+    "websdr_port": "40001",
+    "websdr_enabled": "1",
     "weathercloud": "9224966553",   # identifiant de la station Weathercloud (F1NSK - Castets)
 }
 

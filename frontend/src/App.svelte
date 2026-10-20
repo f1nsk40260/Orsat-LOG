@@ -9,6 +9,7 @@
 
   let settings = $state({});
   let radio = $state({ connected: false, freq: 0, mode: '', submode: '', ptt: false, device: '' });
+  let websdr = $state({ listening: false, connected: false, freq: 0, mode: '', submode: '', ptt: false, device: 'WebSDR' });
   let solar = $state(null);
   let showSettings = $state(false);
   let showCalendar = $state(false);
@@ -47,7 +48,8 @@
       if (!s.callsign || !s.locator) showSettings = true;
     });
     refreshSolar();
-    const stop = liveSocket((msg) => { if (msg.type === 'radio') radio = msg.data; });
+    const stop = liveSocket((msg) => { if (msg.type === 'radio') radio = msg.data;
+      else if (msg.type === 'websdr') websdr = msg.data; });
     const clock = setInterval(() => {
       utc = new Date();
       const t = dayOf(utc);
@@ -105,7 +107,7 @@
 </header>
 
 {#if view === 'day'}
-  <DayPage bind:this={dayPage} {day} {isToday} {radio} {settings} />
+  <DayPage bind:this={dayPage} {day} {isToday} {radio} {websdr} {settings} />
 {:else}
   <LogBook onopenday={openDay} />
 {/if}

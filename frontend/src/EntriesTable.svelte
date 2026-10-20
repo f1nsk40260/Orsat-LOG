@@ -1,8 +1,18 @@
 <script>
   import { fmtDate, fmtTime } from './util.js';
+  import { api } from './api.js';
 
   // showDate = false sur la page du jour (la date est déjà en tête de page)
   let { entries, ondelete, ondate, showDate = true, empty = 'Aucune entrée.' } = $props();
+
+  // Clic sur une fréquence : la page WebSDR (CAT Sync) se recale dessus
+  async function tune(q) {
+    try {
+      await api.websdrTune(q);
+    } catch (err) {
+      alert(err.message);
+    }
+  }
 </script>
 
 <div class="table-wrap">
@@ -35,7 +45,11 @@
           </td>
           <td class="mono call-cell" title={q.comment}>{q.call}</td>
           <td>{q.band}</td>
-          <td class="mono">{q.freq ? (q.freq / 1e6).toFixed(3) : ''}</td>
+          <td class="mono">
+            {#if q.freq}
+              <button class="ghost freqlink" title="Ramener le WebSDR sur cette fréquence" onclick={() => tune(q)}>{(q.freq / 1e6).toFixed(3)}</button>
+            {/if}
+          </td>
           <td>{q.submode || q.mode}</td>
           <td class="mono">{q.rst_sent}</td>
           <td class="mono">{q.rst_rcvd}</td>
@@ -69,6 +83,8 @@
   tr.swl .call-cell { color: rgb(160, 200, 240); }
   .datelink { padding: 0; color: var(--text); text-decoration: underline dotted var(--gold-soft); }
   .datelink:hover { color: var(--gold); box-shadow: none; }
+  .freqlink { padding: 0; color: var(--text); font: inherit; }
+  .freqlink:hover { color: var(--gold); box-shadow: none; text-decoration: underline dotted var(--gold-soft); }
   .del { padding: 0 6px; color: var(--muted); }
   .del:hover { color: var(--bad); }
   .empty { text-align: center; padding: 24px; }

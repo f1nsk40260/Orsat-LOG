@@ -16,6 +16,7 @@ from pydantic import BaseModel
 from . import __version__, adif, geo, solar, weather
 from .db import Database
 from .tci import TciClient
+from .websdr import WebSdrServer
 
 log = logging.getLogger("orsatlog")
 
@@ -27,8 +28,8 @@ db = Database()
 _clients: set[WebSocket] = set()
 
 
-def _broadcast(state):
-    msg = json.dumps({"type": "radio", "data": state})
+def _broadcast(state, kind="radio"):
+    msg = json.dumps({"type": kind, "data": state})
     for ws in list(_clients):
         asyncio.create_task(_safe_send(ws, msg))
 
@@ -41,6 +42,15 @@ async def _safe_send(ws, msg):
 
 
 tci = TciClient(on_change=_broadcast)
+websdr = WebSdrServer(on_change=lambda st: _broadcast(st, "websdr"))
+
+
+async def _restart_websdr():
+    s = db.get_settings()
+    if s.get("websdr_enabled") == "1":
+        await websdr.start(s.get("websdr_port") or 40001)
+    else:
+        await websdr.stop()
 
 
 def _restart_tci():
@@ -92,10 +102,12 @@ async def _record_weather():
 @asynccontextmanager
 async def lifespan(app):
     _restart_tci()
+    await _restart_websdr()
     recorder = asyncio.create_task(_propagation_recorder())
     yield
     recorder.cancel()
     tci.stop()
+    await websdr.stop()
 
 
 app = FastAPI(title="ORSAT-LOG", version=__version__, lifespan=lifespan)
@@ -122,6 +134,8 @@ async def put_settings(values: dict):
     after = db.get_settings()
     if any(before.get(k) != after.get(k) for k in ("tci_host", "tci_port", "tci_trx", "tci_enabled")):
         _restart_tci()
+    if any(before.get(k) != after.get(k) for k in ("websdr_port", "websdr_enabled")):
+        await _restart_websdr()
     if before.get("weathercloud") != after.get("weathercloud"):
         asyncio.create_task(_record_weather())
     return after
@@ -168,6 +182,30 @@ def update_run():
 @app.get("/api/radio")
 def get_radio():
     return tci.state
+
+
+# Mode du carnet (ADIF) -> modulation TCI pour recaler la page du WebSDR
+_TUNE_MODES = {"USB": "usb", "LSB": "lsb", "CW": "cw", "AM": "am", "FM": "nfm"}
+
+
+class TuneIn(BaseModel):
+    freq: int
+    mode: str = ""
+    submode: str = ""
+
+
+@app.post("/api/websdr/tune")
+async def websdr_tune(t: TuneIn):
+    """Ramène la page du WebSDR sur la fréquence (et le mode) d'une entrée du carnet."""
+    mode = (t.submode or t.mode).upper()
+    tci_mode = _TUNE_MODES.get(mode)
+    if not tci_mode and mode not in ("", "SSB"):
+        tci_mode = "usb"        # modes numériques (FT8, RTTY...) : écoute en USB
+    if mode == "SSB":
+        tci_mode = "lsb" if t.freq < 10_000_000 else "usb"
+    if not await websdr.tune(t.freq, tci_mode):
+        raise HTTPException(409, "Aucune page WebSDR connectée (bouton CAT Sync de la page ORSAT)")
+    return {"ok": True}
 
 
 @app.get("/api/weather")
@@ -437,6 +475,7 @@ async def ws_endpoint(ws: WebSocket):
     await ws.accept()
     _clients.add(ws)
     await ws.send_text(json.dumps({"type": "radio", "data": tci.state}))
+    await ws.send_text(json.dumps({"type": "websdr", "data": websdr.state}))
     try:
         while True:
             await ws.receive_text()  # le client n'envoie rien pour l'instant

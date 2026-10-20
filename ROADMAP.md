@@ -88,6 +88,20 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 - Réglages → Mise à jour : version installée, liste des modifications disponibles sur GitHub,
   bouton « Mettre à jour et redémarrer » (lance `orsat-log.sh` détaché : pull, recompilation, relance).
 
+## Fait — v0.6.0 (20/10/2026) : liaison avec la page du WebSDR ORSAT
+- ORSAT-LOG ouvre un **serveur TCI local** sur `127.0.0.1:40001` (`backend/orsatlog/websdr.py`).
+  La page ORSAT (bouton **CAT Sync**, `lib/catsync.js` de PhantomSDR-ORSAT, essaie 50001 et 40001)
+  s'y connecte : le carnet reçoit la fréquence et le mode **réellement écoutés dans le navigateur**.
+  Aucune modification du serveur ni de la page ORSAT.
+- 50001 reste au transceiver (AetherSDR, ORSAT-LOG client) ; les deux liaisons coexistent.
+- Panneau « WebSDR ORSAT » sous le transceiver ; en **SWL**, la saisie suit le WebSDR s'il est connecté,
+  en QSO le transceiver (WebSDR à défaut).
+- Clic sur une fréquence d'une entrée du carnet = la page WebSDR s'y recale (`POST /api/websdr/tune`).
+- Limite : la page n'envoie sa fréquence qu'au premier réglage après connexion (touchez la fréquence une fois).
+- Réglages → WebSDR ORSAT : activer / port (40001 par défaut).
+- Écarté : le pont `tci-bridge/orsat-tci-server.py` de PhantomSDR-ORSAT ouvre sa propre écoute,
+  indépendante du navigateur → gardé pour donner l'audio du WebSDR aux décodeurs, pas pour le carnet.
+
 ## Deux PC (question F1NSK 20/10)
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
@@ -108,6 +122,7 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 ## Sources TCI visées
 - **AetherSDR** (serveur TCI v2.0 : CAT, audio, IQ, CW, spots, événements récepteur ; FlexRadio en priorité,
   aussi récepteurs en réception seule). Port 50001 (applet « TCI Server » d’AetherSDR, à démarrer).
+- **WebSDR ORSAT** (page du navigateur, CAT Sync) : fait en v0.6.0, ORSAT-LOG = serveur TCI sur 40001.
 - **Orsat-SDR** (plus tard) pour les logs SWL → nécessite d'ajouter un serveur TCI dans Orsat-SDR.
 
 ## Mode SWL — suite

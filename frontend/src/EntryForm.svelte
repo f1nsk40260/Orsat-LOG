@@ -4,7 +4,7 @@
   import { MODES, defaultRst, dayOf, timeOf, fmtDate } from './util.js';
   import GroupSession from './GroupSession.svelte';
 
-  let { radio, onlogged, sessions = [] } = $props();
+  let { radio, websdr = null, onlogged, sessions = [] } = $props();
 
   let kind = $state('QSO');        // QSO = contact réalisé, SWL = écoute, GRP = QSO de groupe
   let followTci = $state(true);
@@ -24,9 +24,14 @@
     };
   }
 
+  // Source suivie : en SWL, la page WebSDR si elle est connectée ; en QSO, le transceiver,
+  // et la page WebSDR à défaut.
+  const webOk = $derived(!!(websdr?.connected && websdr.freq));
+  const src = $derived(kind === 'SWL' ? (webOk ? websdr : radio) : (radio.connected || !webOk ? radio : websdr));
+
   // Suivi de la radio : ne réagit qu'aux changements de la radio (un mode choisi à la main est respecté)
   $effect(() => {
-    const { freq, mode, submode, connected } = radio;
+    const { freq, mode, submode, connected } = src;
     if (!followTci || !connected) return;
     untrack(() => {
       if (freq) form.freqMHz = (freq / 1e6).toFixed(6);
@@ -112,12 +117,12 @@
               title="QSO de groupe / table ronde : nom, créneau horaire, stations participantes">Groupe</button>
     </div>
     <label class="follow" title="Fréquence et mode repris automatiquement de la radio (TCI)">
-      <input type="checkbox" bind:checked={followTci} /> Suivre la radio
+      <input type="checkbox" bind:checked={followTci} /> Suivre {src === websdr ? 'le WebSDR' : 'la radio'}
     </label>
   </div>
 
   {#if kind === 'GRP'}
-    <GroupSession {radio} follow={followTci} {sessions} onchanged={() => onlogged?.()} />
+    <GroupSession radio={src} follow={followTci} {sessions} onchanged={() => onlogged?.()} />
   {:else}
   <form onsubmit={submit}>
     <div class="grid">
@@ -128,7 +133,7 @@
       </div>
       <div>
         <label for="freq">Fréquence (MHz)</label>
-        <input id="freq" class="mono" bind:value={form.freqMHz} disabled={followTci && radio.connected} />
+        <input id="freq" class="mono" bind:value={form.freqMHz} disabled={followTci && src.connected} />
       </div>
       <div>
         <label for="mode">Mode</label>

@@ -7,7 +7,7 @@
   import PropagationPanel from './PropagationPanel.svelte';
   import WeatherPanel from './WeatherPanel.svelte';
 
-  let { day, isToday, radio, settings } = $props();
+  let { day, isToday, radio, websdr, settings } = $props();
 
   let page = $state(null);
   let note = $state('');
@@ -99,6 +99,25 @@
         <div class="freq mono">{fmtFreq(radio.freq)}<small> MHz</small></div>
         <div class="radio-mode">{radio.modulation ? radio.modulation.toUpperCase() : '—'}</div>
       </section>
+      {#if websdr?.listening || websdr?.error}
+        <section class="panel radio">
+          <h2 class="panel-title">WebSDR ORSAT</h2>
+          <div class="tci-status">
+            <span class="dot" class:on={websdr.connected}></span>
+            {#if websdr.connected}
+              Page connectée
+            {:else}
+              En attente de la page (CAT Sync)
+            {/if}
+          </div>
+          {#if websdr.error}<div class="tci-error">{websdr.error}</div>{/if}
+          {#if websdr.connected && !websdr.freq}
+            <div class="tci-error">Touchez la fréquence sur la page pour synchroniser.</div>
+          {/if}
+          <div class="freq mono">{fmtFreq(websdr.freq)}<small> MHz</small></div>
+          <div class="radio-mode">{websdr.modulation ? websdr.modulation.toUpperCase() : '—'}</div>
+        </section>
+      {/if}
     {/if}
     <PropagationPanel snapshots={page?.propagation ?? []} {isToday} />
   </div>
@@ -106,7 +125,7 @@
   <!-- colonne centrale : saisie + activité du jour -->
   <div class="col center">
     {#if isToday}
-      <EntryForm bind:this={form} {radio} sessions={page?.sessions ?? []} onlogged={() => load(day)} />
+      <EntryForm bind:this={form} {radio} {websdr} sessions={page?.sessions ?? []} onlogged={() => load(day)} />
     {:else}
       <div class="panel archived">Page archivée — la saisie se fait sur la page du jour.</div>
     {/if}
