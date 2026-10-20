@@ -5,7 +5,8 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 
 ## Méthode de travail
 - Claude écrit et pousse le code dans ce dépôt (`f1nsk40260/Orsat-LOG`, privé).
-- Sur Main-PC : `~/Orsat-LOG`, mise à jour + lancement par `./update.sh`.
+- Sur Main-PC : `~/Orsat-LOG`. Usage courant : icône ORSAT-LOG (Bureau/menu) ou commande `orsat-log`
+  = récupère les modifs, recompile ce qui a changé, relance. `./update.sh` = installation complète.
 - Retours de test : messages du terminal ou capture d'écran → correction → nouveau push.
 - Petites livraisons : une fonction = un commit qui tourne.
 - **Ce fichier est la mémoire du projet** : à mettre à jour à chaque livraison.
