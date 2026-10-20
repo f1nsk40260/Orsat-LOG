@@ -36,10 +36,13 @@ if ! command -v npm >/dev/null; then
 fi
 command -v npm >/dev/null || die "npm introuvable (sudo apt install nodejs npm)"
 echo "npm : $(command -v npm)"
-python3 -m venv --help >/dev/null 2>&1 || die "python3-venv manquant (sudo apt install python3-venv)"
+PYV="$(python3 -c 'import sys; print(f"{sys.version_info[0]}.{sys.version_info[1]}")')"
+python3 -c "import ensurepip" 2>/dev/null \
+    || die "module venv absent : sudo apt install -y python${PYV}-venv   puis relancez ce script"
 
 say "Environnement Python"
-[ -x .venv/bin/python ] || python3 -m venv .venv
+# Un environnement incomplet (essai précédent sans venv) est refait de zéro
+[ -x .venv/bin/pip ] || { rm -rf .venv; python3 -m venv .venv; }
 # Serveur seulement : pas de fenêtre pywebview sur le serveur
 .venv/bin/pip install -q "fastapi>=0.110" "uvicorn>=0.29" "websockets>=12" python-multipart
 
