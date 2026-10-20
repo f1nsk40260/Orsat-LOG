@@ -31,6 +31,25 @@ def wait_port(port, timeout=10):
     return False
 
 
+def native_window_available():
+    """Vrai si pywebview peut ouvrir une fenêtre (GTK + WebKit2, ou Qt) — testé sans bruit."""
+    try:
+        import gi
+        for ver in ("4.1", "4.0"):
+            try:
+                gi.require_version("WebKit2", ver)
+                return True
+            except ValueError:
+                pass
+    except ImportError:
+        pass
+    try:
+        import qtpy  # noqa: F401
+        return True
+    except ImportError:
+        return False
+
+
 def main():
     p = argparse.ArgumentParser(description="ORSAT-LOG")
     p.add_argument("--port", type=int, default=8740)
@@ -55,6 +74,11 @@ def main():
     if not wait_port(args.port):
         sys.exit("Le serveur ORSAT-LOG n'a pas démarré.")
     url = f"http://{HOST}:{args.port}/"
+
+    if not args.browser and not native_window_available():
+        print("Fenêtre native indisponible (WebKit GTK absent) : ouverture dans le navigateur.\n"
+              "  Pour l'activer : sudo apt install gir1.2-webkit2-4.1")
+        args.browser = True
 
     if not args.browser:
         try:

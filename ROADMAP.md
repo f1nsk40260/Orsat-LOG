@@ -31,6 +31,7 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 - Contexte solaire (SFI/A/K) enregistré avec chaque QSO.
 - Liste des QSO, suppression, export ADIF.
 - Réglages : indicatif, locator, hôte/port TCI.
+- Repli silencieux sur le navigateur si WebKit GTK absent (Main-PC : `sudo apt install gir1.2-webkit2-4.1`).
 
 ## À faire (ordre proposé)
 1. Import ADIF (reprise de l'ancien carnet).
