@@ -7,6 +7,27 @@
   let { radio, websdr = null, onlogged, sessions = [] } = $props();
 
   let kind = $state('QSO');        // QSO = contact réalisé, SWL = écoute, GRP = QSO de groupe
+
+  const KINDS = [
+    { id: 'QSO', label: 'QSO', sub: 'contact réalisé', icon: '⇄', help: 'Contact bilatéral réalisé avec le transceiver' },
+    { id: 'SWL', label: 'SWL', sub: 'écoute', icon: '◉', help: "Écoute d'une station (Short Wave Listening), avec le WebSDR ORSAT" },
+    { id: 'GRP', label: 'Groupe', sub: 'table ronde', icon: '⁂', help: 'QSO de groupe / table ronde : nom, créneau horaire, stations participantes' },
+  ];
+
+  // Bandeau de suggestion quand le contexte contredit le mode choisi (jamais de bascule automatique)
+  let hintDismissed = $state('');
+  const hint = $derived.by(() => {
+    const webOn = !!(websdr?.connected && websdr.freq);
+    let h = null;
+    if (kind === 'SWL' && radio.ptt) {
+      h = { key: 'ptt', to: 'QSO', text: 'AetherSDR est en émission.', action: 'Passer en QSO' };
+    } else if (kind === 'SWL' && !webOn && radio.connected) {
+      h = { key: 'noweb', to: 'QSO', text: "Le WebSDR n'est pas relié, le transceiver l'est.", action: 'Passer en QSO' };
+    } else if (kind !== 'SWL' && !radio.connected && webOn) {
+      h = { key: 'notx', to: 'SWL', text: "L'émetteur est éteint, le WebSDR écoute.", action: 'Passer en SWL' };
+    }
+    return h && h.key !== hintDismissed ? h : null;
+  });
   let followTci = $state(true);
   let form = $state(blank());
   let worked = $state([]);
@@ -119,20 +140,31 @@
 </script>
 
 <section class="panel entry" class:swl={kind === 'SWL'} class:grp={kind === 'GRP'}>
+  <!-- Mode d'exploitation : trois grands onglets, le formulaire entier prend la couleur du mode -->
+  <div class="kinds" role="tablist" aria-label="Mode d'exploitation">
+    {#each KINDS as k}
+      <button type="button" role="tab" class="ktab k-{k.id}" class:active={kind === k.id}
+              aria-selected={kind === k.id} onclick={() => setKind(k.id)} title={k.help}>
+        <span class="kicon">{k.icon}</span>
+        <span class="ktext"><b>{k.label}</b><small>{k.sub}</small></span>
+      </button>
+    {/each}
+  </div>
+
   <div class="head">
-    <h2 class="panel-title">{kind === 'SWL' ? 'Nouvelle écoute' : kind === 'GRP' ? 'QSO de groupe' : 'Nouveau QSO'}</h2>
-    <div class="kind" role="group" aria-label="Type d'entrée">
-      <button type="button" class:active={kind === 'QSO'} onclick={() => setKind('QSO')}
-              title="Contact bilatéral réalisé">QSO</button>
-      <button type="button" class:active={kind === 'SWL'} onclick={() => setKind('SWL')}
-              title="Écoute d'une station (Short Wave Listening)">SWL</button>
-      <button type="button" class:active={kind === 'GRP'} onclick={() => setKind('GRP')}
-              title="QSO de groupe / table ronde : nom, créneau horaire, stations participantes">Groupe</button>
-    </div>
-    <label class="follow" title="Fréquence et mode repris automatiquement de la radio (TCI)">
+    <h2 class="ktitle">{kind === 'SWL' ? 'Nouvelle écoute' : kind === 'GRP' ? 'QSO de groupe' : 'Nouveau QSO'}</h2>
+    <label class="follow" title={kind === 'SWL' ? 'Fréquence et mode repris de la page WebSDR ORSAT (CAT Sync)' : 'Fréquence et mode repris du transceiver (AetherSDR, TCI)'}>
       <input type="checkbox" bind:checked={followTci} /> Suivre {kind === 'SWL' ? 'le WebSDR' : 'la radio'}
     </label>
   </div>
+
+  {#if hint}
+    <div class="hint-bar">
+      <span>{hint.text}</span>
+      <button type="button" class="hint-go k-{hint.to}" onclick={() => setKind(hint.to)}>{hint.action}</button>
+      <button type="button" class="ghost hint-x" title="Ignorer" onclick={() => (hintDismissed = hint.key)}>✕</button>
+    </div>
+  {/if}
 
   {#if kind === 'GRP'}
     <GroupSession bind:this={group} radio={src} follow={followTci} {sessions} onchanged={() => onlogged?.()} />
@@ -194,7 +226,7 @@
       {#if error}<span class="error">{error}</span>{/if}
       <span class="hint">Entrée = enregistrer · Échap = effacer</span>
       <button type="button" onclick={clear}>Effacer</button>
-      <button type="submit" class="primary">Enregistrer</button>
+      <button type="submit" class="primary">{kind === 'SWL' ? "Enregistrer l'écoute" : 'Enregistrer le QSO'}</button>
     </div>
   </form>
 
@@ -210,17 +242,45 @@
 </section>
 
 <style>
+  /* Couleur du mode d'exploitation : QSO = vieil or, SWL = bleu, Groupe = vert */
+  .entry { --kc: 207, 181, 59; border: 2px solid rgba(var(--kc), 0.55); box-shadow: 0 0 18px rgba(var(--kc), 0.12); }
+  .entry.swl { --kc: 110, 170, 230; }
+  .entry.grp { --kc: 95, 191, 107; }
+  .k-QSO { --tc: 207, 181, 59; }
+  .k-SWL { --tc: 110, 170, 230; }
+  .k-GRP { --tc: 95, 191, 107; }
+
+  .kinds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 12px; }
+  .ktab {
+    display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px;
+    background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(var(--tc), 0.35); color: rgba(var(--tc), 0.75);
+    text-align: left; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+  }
+  .ktab:hover { border-color: rgba(var(--tc), 0.8); color: rgb(var(--tc)); box-shadow: none; }
+  .ktab.active {
+    background: linear-gradient(180deg, rgba(var(--tc), 0.95), rgba(var(--tc), 0.7));
+    border-color: rgb(var(--tc)); color: #111; box-shadow: 0 0 12px rgba(var(--tc), 0.45);
+  }
+  .kicon { font-size: 1.5rem; line-height: 1; width: 1.6rem; text-align: center; }
+  .ktext { display: flex; flex-direction: column; line-height: 1.15; }
+  .ktext b { font-size: 1.05rem; letter-spacing: 0.06em; }
+  .ktext small { font-size: 0.72rem; opacity: 0.85; text-transform: none; }
+
   .head { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
-  .head .panel-title { margin: 0; }
-  .kind { display: flex; }
-  .kind button { border-radius: 0; padding: 3px 14px; font-size: 0.82rem; }
-  .kind button:first-child { border-radius: 6px 0 0 6px; }
-  .kind button:last-child { border-radius: 0 6px 6px 0; border-left: none; }
-  .kind button.active { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); font-weight: 600; }
+  .ktitle { margin: 0; font-size: 1.15rem; letter-spacing: 0.12em; text-transform: uppercase; color: rgb(var(--kc)); }
   .follow { display: flex; align-items: center; gap: 6px; margin: 0 0 0 auto; text-transform: none; font-size: 0.82rem; }
   .follow input { width: auto; }
-  .swl { border-color: rgba(120, 170, 220, 0.4); }
-  .grp { border-color: rgba(95, 191, 107, 0.45); }
+
+  .hint-bar {
+    display: flex; align-items: center; gap: 10px; margin: 0 0 10px; padding: 6px 10px; border-radius: 6px;
+    border: 1px solid rgba(224, 160, 48, 0.55); background: rgba(224, 160, 48, 0.1); color: var(--warn); font-size: 0.86rem;
+  }
+  .hint-go { margin-left: auto; padding: 3px 12px; border-color: rgb(var(--tc)); color: rgb(var(--tc)); }
+  .hint-x { padding: 0 4px; color: var(--muted); }
+  /* bouton d'enregistrement à la couleur du mode (y compris dans l'onglet Groupe) */
+  .entry :global(button.primary) {
+    background: linear-gradient(180deg, rgba(var(--kc), 1), rgba(var(--kc), 0.75)); border-color: rgb(var(--kc)); color: #111;
+  }
 
   .grid { display: grid; grid-template-columns: 1.4fr 1fr 0.8fr 0.6fr 0.6fr 0.8fr; gap: 10px; }
   .span2 { grid-column: span 2; }

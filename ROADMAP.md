@@ -126,6 +126,14 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 - v0.7.1 : pastilles des QSO de groupe de la page du jour : ✎ = ouvrir la session dans l'onglet Groupe
   (Modifier / Clôturer / Supprimer), ✕ = supprimer la session et ses QSO.
 
+## Fait — v0.8.0 (20/10/2026) : mode d'exploitation impossible à rater
+- Trois grands onglets (icône + libellé + sous-titre) : **QSO** vieil or, **SWL** bleu, **Groupe** vert ;
+  cadre, titre et bouton d'enregistrement du formulaire à la couleur du mode.
+- Bouton explicite : « Enregistrer le QSO », « Enregistrer l'écoute », « Ajouter au groupe ».
+- Bandeau de suggestion (jamais de bascule automatique) : émetteur éteint + WebSDR relié en QSO/Groupe
+  → « Passer en SWL » ; PTT d'AetherSDR ou WebSDR absent en SWL → « Passer en QSO » ; ✕ pour ignorer.
+- **Préférence F1NSK : pas de raccourcis clavier, tout à la souris (molette quand utile).**
+
 ## Deux PC (question F1NSK 20/10)
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

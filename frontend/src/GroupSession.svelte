@@ -389,7 +389,7 @@
       <div><label for="p-loc">Locator</label>
         <input id="p-loc" class="mono" bind:value={p.gridsquare} maxlength="8"
                oninput={() => (p.gridsquare = p.gridsquare.toUpperCase())} /></div>
-      <div class="qbtn"><button type="submit" class="primary">Ajouter</button></div>
+      <div class="qbtn"><button type="submit" class="primary">Ajouter au groupe</button></div>
     </div>
     {#if error}<div class="error">{error}</div>{/if}
   </form>
