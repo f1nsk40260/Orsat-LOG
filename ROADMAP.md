@@ -43,5 +43,14 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 7. Envoi de commandes TCI (cliquer un spot = changer de fréquence).
 8. Upload LoTW / QRZ / eQSL.
 
-## Questions ouvertes
-- Modèle exact de la radio TCI (SunSDR2 Pro ? autre) pour valider le protocole sur le vrai matériel.
+## Sources TCI visées
+- **AetherSDR** (serveur TCI v2.0 : CAT, audio, IQ, CW, spots, événements récepteur ; FlexRadio en priorité,
+  aussi récepteurs en réception seule). Port à régler dans les Réglages (pas de défaut documenté).
+  → prévoir le choix du récepteur/slice suivi (aujourd'hui : récepteur 0 seulement).
+- **Orsat-SDR** (plus tard) pour les logs SWL → nécessite d'ajouter un serveur TCI dans Orsat-SDR.
+
+## Mode SWL (à concevoir)
+- Écoute sans QSO : station entendue, report SINPO/SIO, langue, émetteur, pas de RST envoyé.
+- Export ADIF avec marquage SWL.
+- Identification automatique de la station par fréquence + heure via une grille de diffusion (EiBi)
+  → émetteur et distance connus sans saisie : très utile pour l'analyse de propagation.
