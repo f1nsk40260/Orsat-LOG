@@ -2,7 +2,7 @@
   // Formulaire d'édition complet d'une entrée du carnet (QSO, écoute SWL, passage de QSO de groupe).
   // Bande, distance et azimut sont recalculés par le serveur à l'enregistrement.
   import { onMount, untrack } from 'svelte';
-  import { api } from './api.js';
+  import { api, deleteEntry } from './api.js';
   import { MODES } from './util.js';
 
   let { entry, onclose, onsaved, ondeleted } = $props();
@@ -86,9 +86,8 @@
   }
 
   async function remove() {
-    if (!confirm(`Supprimer définitivement l'entrée ${e.call} ?`)) return;
     try {
-      await api.deleteQso(e.id);
+      if (!(await deleteEntry(e, `Supprimer définitivement l'entrée ${e.call} ?`))) return;
       ondeleted?.(e);
     } catch (err) {
       error = err.message;

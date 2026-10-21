@@ -264,6 +264,28 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   désormais 60 Mo sous `/log` seulement. Testé avec l'export QRZ réel de F1NSK (4,6 Mo, 4 603 QSO :
   4 596 importés, 7 doublons QRZ, < 1 s).
 
+## Fait — v1.3.0 (21/10/2026) : synchronisation automatique avec le logbook QRZ.com
+- Décision F1NSK : remplace l'import ADIF (qui sera **retiré** une fois la synchro validée chez lui).
+- `backend/orsatlog/qrz.py` (QRZ Logbook API, https://logbook.qrz.com/api ; abonnement QRZ requis) :
+  - 1er passage : tout le logbook QRZ (FETCH par pages de 250, AFTERLOGID) ; ensuite MODSINCE toutes les
+    15 min (`PERIOD`) ; les contacts du carnet absents de QRZ partent (INSERT).
+  - Saisie / correction d'un QSO dans le carnet → `qrz_state = 'pending'` → envoi ~5 s après.
+    Correction d'un QSO déjà chez QRZ : relecture QRZ (LOGIDS) puis INSERT OPTION=REPLACE ; si QRZ crée
+    un nouveau numéro (indicatif / date / heure changés), l'ancien est supprimé.
+  - Champs QRZ non gérés par le carnet (QSL, LoTW, pays, zones…) gardés dans `qso.adif_extra` et renvoyés
+    tels quels : une correction ne fait rien perdre chez QRZ.
+  - Correspondance carnet ↔ QRZ : `qso.qrz_logid`, sinon indicatif + date + HHMM + bande (bande vide = compatible).
+  - **SWL jamais envoyées** (`db.qrz_pending` : kind = 'QSO'). Un QSO passé en SWL reste chez QRZ (noté au journal).
+  - **Suppressions jamais automatiques** : le carnet demande à chaque suppression d'un QSO synchronisé
+    « aussi chez QRZ ? » (définitif). Gardé chez QRZ → table `qrz_ignored`, la synchro ne le reprend plus
+    (idem pour les QSO d'une session de groupe supprimée).
+  - User-Agent `ORSAT-LOG/<version> (F1NSK)` ; réponse découpée sur les clés connues (l'ADIF contient des &).
+- Panneau admin → Carnet ORSAT-LOG → carte **Synchronisation QRZ.com** : clé (vérifiée par STATUS avant
+  enregistrement, jamais renvoyée ; `qrz_api_key` retirée de `/api/settings` hors panneau), synchro auto,
+  « Synchroniser maintenant », « Relire tout QRZ », compteurs (synchronisés / en attente / refusés), journal.
+- Carnet : repère sur chaque QSO (✓ synchronisé, ⏳ en attente, ⚠ refusé + motif).
+- Testé contre un faux QRZ (API documentée) chargé de 600 QSO du vrai logbook QRZ de F1NSK.
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
@@ -279,7 +301,7 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 5. Préfixes → pays DXCC (cty.dat) et entité dans chaque QSO.
 6. Spots TCI / DX cluster, croisement RBN / PSKReporter.
 7. Envoi de commandes TCI (cliquer un spot = changer de fréquence).
-8. Upload LoTW / QRZ / eQSL — **uniquement depuis `db.traffic_qsos()`** (jamais les SWL).
+8. ~~QRZ~~ (fait v1.3.0). LoTW / eQSL — **uniquement des contacts** (jamais les SWL).
 
 ## Sources TCI visées
 - **AetherSDR** (serveur TCI v2.0 : CAT, audio, IQ, CW, spots, événements récepteur ; FlexRadio en priorité,

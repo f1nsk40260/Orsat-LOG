@@ -1,6 +1,6 @@
 <script>
   import { onMount, untrack } from 'svelte';
-  import { api } from './api.js';
+  import { api, deleteEntry } from './api.js';
   import { MODES, pad, dayOf, timeOf, fmtTime } from './util.js';
 
   // sessions = QSO de groupe déjà ouverts aujourd'hui (pour les reprendre)
@@ -256,8 +256,9 @@
   }
 
   async function removeParticipant(q) {
-    if (!confirm(`Retirer ${q.call} de ce QSO de groupe ?`)) return;
-    await api.deleteQso(q.id);
+    try {
+      if (!(await deleteEntry(q, `Retirer ${q.call} de ce QSO de groupe ?`))) return;
+    } catch (err) { alert(err.message); return; }
     active = await api.session(active.id);
     onchanged?.();
   }

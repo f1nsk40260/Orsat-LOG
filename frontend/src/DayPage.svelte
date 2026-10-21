@@ -1,6 +1,6 @@
 <script>
   import { untrack } from 'svelte';
-  import { api } from './api.js';
+  import { api, deleteEntry } from './api.js';
   import { fmtFreq } from './util.js';
   import EntryForm from './EntryForm.svelte';
   import EntriesTable from './EntriesTable.svelte';
@@ -66,9 +66,7 @@
   }
 
   async function removeEntry(q) {
-    if (!confirm(`Supprimer l'entrée ${q.call} ?`)) return;
-    await api.deleteQso(q.id);
-    load(day);
+    try { if (await deleteEntry(q)) load(day); } catch (err) { alert(err.message); }
   }
 
   async function removeSession(s) {

@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, geo, solar, weather
+from . import __version__, adif, auth, backup, geo, qrz, solar, weather
 from .db import Database
 from .websdr import Page, WebSdrLink
 
@@ -45,6 +45,7 @@ async def _safe_send(ws, msg):
 
 
 websdr = WebSdrLink(on_change=lambda st: _broadcast(st, "websdr"))
+qrz_sync = qrz.QrzSync(db)
 
 
 def utc_day(dt=None):
@@ -88,10 +89,12 @@ async def _record_weather():
 @asynccontextmanager
 async def lifespan(app):
     recorder = asyncio.create_task(_propagation_recorder())
+    syncer = asyncio.create_task(qrz_sync.loop())
     saver = asyncio.create_task(backup.daily_task(db))
     yield
     recorder.cancel()
     saver.cancel()
+    syncer.cancel()
 
 
 app = FastAPI(title="ORSAT-LOG", version=__version__, lifespan=lifespan)
@@ -210,6 +213,62 @@ def admin_status(request: Request):
             "websdr_pages": websdr.state["pages"], "clients": len(_clients)}
 
 
+# ---------- synchronisation QRZ.com (panneau admin) ----------
+def _qrz_status():
+    s = db.get_settings()
+    key = s.get("qrz_api_key", "")
+    return {"enabled": s.get("qrz_sync") == "1", "key_set": bool(key),
+            "key_hint": ("…" + key[-4:]) if len(key) >= 4 else "",
+            "full_done": s.get("qrz_full_done") == "1", "last_pull": s.get("qrz_last_pull", ""),
+            **qrz_sync.state, **db.qrz_counts(), "journal": list(qrz_sync.journal)[-80:]}
+
+
+@app.get("/api/admin/qrz")
+def admin_qrz(request: Request):
+    _require_admin(request)
+    return _qrz_status()
+
+
+class QrzIn(BaseModel):
+    api_key: str | None = None     # None = inchangée ; "" = effacer
+    enabled: bool | None = None
+
+
+@app.post("/api/admin/qrz")
+async def admin_qrz_set(cfg: QrzIn, request: Request):
+    _require_admin(request)
+    values = {}
+    if cfg.api_key is not None:
+        key = cfg.api_key.strip()
+        if key:
+            try:      # la clé est essayée avant d'être enregistrée
+                await asyncio.to_thread(qrz_sync.test_key, key)
+            except qrz.QrzError as exc:
+                raise HTTPException(400, f"Clé QRZ refusée : {exc}")
+            qrz_sync.note("Clé QRZ vérifiée et enregistrée.")
+        if key != db.get_settings().get("qrz_api_key", ""):
+            values.update(qrz_api_key=key, qrz_full_done="0", qrz_last_pull="")
+    if cfg.enabled is not None:
+        values["qrz_sync"] = "1" if cfg.enabled else "0"
+        qrz_sync.note("Synchronisation automatique " + ("activée." if cfg.enabled else "désactivée."))
+    if values:
+        db.set_settings(values)
+    if qrz_sync.enabled():
+        qrz_sync.poke()
+    return _qrz_status()
+
+
+@app.post("/api/admin/qrz/run")
+async def admin_qrz_run(request: Request, full: bool = False):
+    """Synchroniser maintenant (full=true : relire tout le logbook QRZ)."""
+    _require_admin(request)
+    if not db.get_settings().get("qrz_api_key"):
+        raise HTTPException(400, "Aucune clé QRZ enregistrée")
+    asyncio.create_task(qrz_sync.run(full=full))
+    await asyncio.sleep(0.2)
+    return _qrz_status()
+
+
 @app.post("/api/admin/restart")
 def admin_restart(request: Request):
     """Redémarrage par systemd (Restart=always), après une mise à jour."""
@@ -220,8 +279,11 @@ def admin_restart(request: Request):
 
 # ---------- réglages ----------
 @app.get("/api/settings")
-def get_settings():
-    return db.get_settings()
+def get_settings(request: Request):
+    s = db.get_settings()
+    if not auth.is_admin(request.headers):
+        s.pop("qrz_api_key", None)        # la clé QRZ ne sort jamais vers les navigateurs
+    return s
 
 
 @app.put("/api/settings")
@@ -382,7 +444,12 @@ async def add_qso(q: QsoIn):
     if sol:
         rec["sfi"], rec["a_index"], rec["k_index"] = sol["sfi"], sol["a_index"], sol["k_index"]
 
-    return db.add_qso(rec)
+    if kind == "QSO":
+        rec["qrz_state"] = "pending"           # à envoyer vers QRZ.com
+    saved = db.add_qso(rec)
+    if kind == "QSO":
+        qrz_sync.poke()
+    return saved
 
 
 class QsoEdit(BaseModel):
@@ -443,7 +510,18 @@ def update_qso(qso_id: int, q: QsoEdit):
     my_loc = _origin_locator(kind)
     if geo.valid_locator(my_loc) and geo.valid_locator(grid):
         rec["distance_km"], rec["bearing"] = geo.distance_bearing(my_loc, grid)
-    return db.update_qso(qso_id, rec)
+    old = db.get_qso(qso_id)
+    if kind == "QSO":
+        rec["qrz_state"] = "pending"           # correction à renvoyer vers QRZ.com
+    elif old.get("qrz_logid"):
+        # Devenu une écoute : jamais envoyé ; il reste chez QRZ (pas de suppression automatique)
+        rec["qrz_state"] = ""
+        qrz_sync.note(f"{old['call']} {old['qso_date']} passé en SWL : il reste dans le logbook QRZ "
+                      f"(n° {old['qrz_logid']}), à supprimer à la main si besoin.")
+    saved = db.update_qso(qso_id, rec)
+    if kind == "QSO":
+        qrz_sync.poke()
+    return saved
 
 
 # ---------- QSO de groupe ----------
@@ -619,9 +697,20 @@ def get_month(month: str):
 
 
 @app.delete("/api/qsos/{qso_id}")
-def delete_qso(qso_id: int):
-    if not db.delete_qso(qso_id):
+async def delete_qso(qso_id: int, qrz_too: bool = False):
+    """Supprime une entrée. qrz_too=true : aussi dans le logbook QRZ.com (définitif),
+    seulement si l'opérateur l'a confirmé."""
+    q = db.get_qso(qso_id)
+    if not q:
         raise HTTPException(404, "QSO introuvable")
+    if qrz_too and q.get("kind") == "QSO" and q.get("qrz_logid"):
+        try:
+            await asyncio.to_thread(qrz_sync.delete_remote, q["qrz_logid"])
+        except qrz.QrzError as exc:
+            raise HTTPException(502, f"Suppression chez QRZ impossible ({exc}) : rien n'a été supprimé")
+    elif q.get("kind") == "QSO" and q.get("qrz_logid"):
+        db.qrz_ignore(q)          # gardé chez QRZ : la synchronisation ne le reprendra plus
+    db.delete_qso(qso_id)
     return {"ok": True}
 
 

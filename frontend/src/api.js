@@ -37,7 +37,7 @@ export const api = {
   qsos: (limit = 200) => req('GET', `api/qsos?limit=${limit}`),
   addQso: (q) => req('POST', 'api/qsos', q),
   updateQso: (id, q) => req('PUT', `api/qsos/${id}`, q),
-  deleteQso: (id) => req('DELETE', `api/qsos/${id}`),
+  deleteQso: (id, qrzToo = false) => req('DELETE', `api/qsos/${id}${qrzToo ? '?qrz_too=true' : ''}`),
   tune: (q) => req('POST', 'api/tune', { freq: q.freq, mode: q.mode || '', submode: q.submode || '', kind: q.kind || '' }),
   worked: (call) => req('GET', `api/worked/${encodeURIComponent(call)}`),
   // QSO de groupe
@@ -73,4 +73,20 @@ export function liveSocket(onMessage) {
   };
   open();
   return () => { closed = true; ws?.close(); };
+}
+
+/**
+ * Supprime une entrée après confirmation. Pour un contact présent dans le logbook QRZ.com,
+ * l'opérateur choisit s'il faut aussi l'y supprimer (définitif chez QRZ). Renvoie vrai si supprimée.
+ */
+export async function deleteEntry(q, message) {
+  if (!confirm(message || `Supprimer l'entrée ${q.call} ?`)) return false;
+  let qrzToo = false;
+  if (q.kind !== 'SWL' && q.qrz_logid) {
+    qrzToo = confirm(`${q.call} est aussi dans ton logbook QRZ.com.\n\n` +
+      'OK : le supprimer AUSSI chez QRZ (définitif)\n' +
+      'Annuler : le garder chez QRZ (il ne reviendra pas dans le carnet)');
+  }
+  await api.deleteQso(q.id, qrzToo);
+  return true;
 }

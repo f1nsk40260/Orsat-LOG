@@ -1,6 +1,6 @@
 <script>
   import { onMount } from 'svelte';
-  import { api } from './api.js';
+  import { api, deleteEntry } from './api.js';
   import EntriesTable from './EntriesTable.svelte';
 
   let { onopenday } = $props();
@@ -23,9 +23,9 @@
   async function load() { entries = await api.qsos(100000).catch(() => []); }
 
   async function removeEntry(q) {
-    if (!confirm(`Supprimer l'entrée ${q.call} ?`)) return;
-    await api.deleteQso(q.id);
-    entries = entries.filter((x) => x.id !== q.id);
+    try {
+      if (await deleteEntry(q)) entries = entries.filter((x) => x.id !== q.id);
+    } catch (err) { alert(err.message); }
   }
 
   // Import ADIF : carnet de trafic uniquement (les écoutes SWL:Y sont écartées par le serveur)

@@ -52,7 +52,10 @@
               <span class="tag" class:tag-swl={q.kind === 'SWL'}>{q.kind}</span>
             {/if}
           </td>
-          <td class="mono call-cell" title={q.comment}>{q.call}</td>
+          <td class="mono call-cell" title={q.comment}>{q.call}{#if q.kind !== 'SWL' && q.qrz_state}<span
+              class="qrz q-{q.qrz_state}"
+              title={q.qrz_state === 'synced' ? 'Synchronisé avec QRZ.com' : q.qrz_state === 'pending' ? 'En attente d\'envoi vers QRZ.com' : `Refusé par QRZ.com : ${q.qrz_error || ''}`}
+              >{q.qrz_state === 'synced' ? '✓' : q.qrz_state === 'pending' ? '⏳' : '⚠'}</span>{/if}</td>
           <td>{q.band}</td>
           <td class="mono">
             {#if q.freq}
@@ -97,6 +100,10 @@
   .tag-grp { border-color: rgba(95, 191, 107, 0.6); color: var(--ok); cursor: help; }
   .tag-swl { border-color: rgba(120, 170, 220, 0.6); color: rgb(140, 185, 230); }
   tr.swl .call-cell { color: rgb(160, 200, 240); }
+  .qrz { margin-left: 5px; font-size: 0.72rem; font-weight: 400; cursor: help; }
+  .q-synced { color: var(--ok); opacity: 0.7; }
+  .q-pending { color: var(--muted); }
+  .q-error { color: var(--bad); }
   .datelink { padding: 0; color: var(--text); text-decoration: underline dotted var(--gold-soft); }
   .datelink:hover { color: var(--gold); box-shadow: none; }
   .edit { padding: 0 4px; color: var(--gold-soft); }

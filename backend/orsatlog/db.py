@@ -19,13 +19,19 @@ DEFAULT_SETTINGS = {
     "tci_port": "50001",
     "tci_trx": "0",
     "tci_enabled": "1",
-    "weathercloud": "9224966553",   # identifiant de la station Weathercloud (F1NSK - Castets)
+    "weathercloud": "9224966553",
+    # Synchronisation avec le logbook QRZ.com (réglée dans le panneau admin)
+    "qrz_api_key": "",
+    "qrz_sync": "0",               # 1 = synchronisation automatique
+    "qrz_full_done": "0",          # 1 = logbook QRZ rapatrié en entier une première fois
+    "qrz_last_pull": "",           # AAAA-MM-JJ de la dernière lecture des modifications   # identifiant de la station Weathercloud (F1NSK - Castets)
 }
 
 QSO_FIELDS = [
     "kind", "session_id", "call", "qso_date", "time_on", "freq", "band", "mode", "submode",
     "rst_sent", "rst_rcvd", "name", "qth", "gridsquare", "comment",
     "distance_km", "bearing", "sfi", "a_index", "k_index",
+    "qrz_logid", "qrz_state", "qrz_error", "adif_extra",
 ]
 
 _SCHEMA = """
@@ -144,6 +150,20 @@ class Database:
         cols = [r["name"] for r in self._con.execute("PRAGMA table_info(qso)")]
         if "kind" not in cols:
             self._con.execute("ALTER TABLE qso ADD COLUMN kind TEXT NOT NULL DEFAULT 'QSO'")
+        # migration v1.2 -> v1.3 : synchronisation QRZ.com
+        #   qrz_logid  : numéro du QSO dans le logbook QRZ (app_qrzlog_logid)
+        #   qrz_state  : '' (jamais envoyé / non concerné), 'pending' (à envoyer), 'synced', 'error'
+        #   qrz_error  : dernier message d'erreur de QRZ
+        #   adif_extra : champs ADIF de QRZ que le carnet n'affiche pas (QSL, pays, zones...),
+        #                gardés pour ne rien perdre quand une correction repart vers QRZ
+        for col, ddl in (("qrz_logid", "INTEGER"), ("qrz_state", "TEXT NOT NULL DEFAULT ''"),
+                         ("qrz_error", "TEXT"), ("adif_extra", "TEXT")):
+            if col not in cols:
+                self._con.execute(f"ALTER TABLE qso ADD COLUMN {col} {ddl}")
+        self._con.execute("CREATE INDEX IF NOT EXISTS idx_qso_qrz ON qso(qrz_logid)")
+        # QSO retirés du carnet mais laissés chez QRZ : la synchronisation ne les reprend plus
+        self._con.execute("CREATE TABLE IF NOT EXISTS qrz_ignored (logid INTEGER PRIMARY KEY, "
+                          "call TEXT, qso_date TEXT, at TEXT DEFAULT (datetime('now')))")
         # migration v0.4 -> v0.5 : rattachement à un QSO de groupe
         if "session_id" not in cols:
             self._con.execute("ALTER TABLE qso ADD COLUMN session_id INTEGER")
@@ -272,6 +292,61 @@ class Database:
                     f"INSERT INTO qso({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})",
                     [q[c] for c in cols])
                 n += 1
+            self._con.commit()
+        return n
+
+    # --- synchronisation QRZ.com ---
+    def qrz_pending(self, limit=50):
+        """Contacts à envoyer vers QRZ (jamais d'écoute SWL)."""
+        with self._lock:
+            rows = self._con.execute(
+                "SELECT * FROM qso WHERE kind = 'QSO' AND qrz_state = 'pending' ORDER BY id LIMIT ?",
+                (limit,)).fetchall()
+        return [dict(r) for r in rows if r["kind"] == "QSO"]
+
+    def qrz_find(self, logid=None, key=None):
+        """QSO du carnet de trafic par numéro QRZ, ou par clé (indicatif, date, HHMM, bande)
+        parmi ceux qui n'ont pas encore de numéro QRZ."""
+        with self._lock:
+            if logid:
+                r = self._con.execute("SELECT * FROM qso WHERE kind = 'QSO' AND qrz_logid = ?", (logid,)).fetchone()
+                if r:
+                    return dict(r)
+            if key:
+                call, date, hhmm, band = key
+                r = self._con.execute(
+                    "SELECT * FROM qso WHERE kind = 'QSO' AND qrz_logid IS NULL AND upper(call) = ? "
+                    "AND qso_date = ? AND substr(time_on, 1, 4) = ? "
+                    "AND lower(coalesce(band, '')) IN (?, '') LIMIT 1",     # bande inconnue = compatible
+                    (call, date, hhmm, band)).fetchone()
+                if r:
+                    return dict(r)
+        return None
+
+    def qrz_ignore(self, q):
+        with self._lock:
+            self._con.execute("INSERT OR IGNORE INTO qrz_ignored(logid, call, qso_date) VALUES (?, ?, ?)",
+                              (q["qrz_logid"], q["call"], q["qso_date"]))
+            self._con.commit()
+
+    def qrz_ignored(self):
+        with self._lock:
+            return {r[0] for r in self._con.execute("SELECT logid FROM qrz_ignored")}
+
+    def qrz_counts(self):
+        with self._lock:
+            r = self._con.execute(
+                "SELECT SUM(qrz_state = 'synced') AS synced, SUM(qrz_state = 'pending') AS pending, "
+                "SUM(qrz_state = 'error') AS errors, SUM(qrz_state = '') AS never "
+                "FROM qso WHERE kind = 'QSO'").fetchone()
+        return {k: r[k] or 0 for k in ("synced", "pending", "errors", "never")}
+
+    def qrz_mark_all_pending(self):
+        """Première activation : tous les contacts sans numéro QRZ partent vers QRZ."""
+        with self._lock:
+            n = self._con.execute(
+                "UPDATE qso SET qrz_state = 'pending' WHERE kind = 'QSO' AND qrz_logid IS NULL "
+                "AND qrz_state IN ('', 'error')").rowcount
             self._con.commit()
         return n
 
@@ -445,6 +520,10 @@ class Database:
     def delete_session(self, sid):
         """Supprime la session et les QSO qui lui sont rattachés."""
         with self._lock:
+            # contacts déjà chez QRZ : gardés chez QRZ, la synchronisation ne les reprend plus
+            self._con.execute(
+                "INSERT OR IGNORE INTO qrz_ignored(logid, call, qso_date) SELECT qrz_logid, call, qso_date "
+                "FROM qso WHERE session_id = ? AND qrz_logid IS NOT NULL", (sid,))
             self._con.execute("DELETE FROM qso WHERE session_id = ?", (sid,))
             cur = self._con.execute("DELETE FROM session WHERE id = ?", (sid,))
             self._con.commit()
