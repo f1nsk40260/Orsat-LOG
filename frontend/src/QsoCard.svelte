@@ -218,12 +218,6 @@
     </div>
   </div>
 
-  {#if bigPhoto && who?.image}
-    <button type="button" class="photo-big" onclick={() => (bigPhoto = false)} title="Fermer">
-      <img src={who.image} alt={`Photo de ${entry.call}`} referrerpolicy="no-referrer" />
-      <span>{entry.call} · {[who.fname, who.name].filter(Boolean).join(' ')} — photo QRZ.com</span>
-    </button>
-  {/if}
 
   {#if error}
     <p class="err">{error}</p>
@@ -414,6 +408,15 @@
   {/if}
 </div>
 
+
+<!-- Photo agrandie : hors du panneau, au-dessus de tout (carte comprise) -->
+{#if bigPhoto && who?.image}
+    <button type="button" class="photo-big" onclick={() => (bigPhoto = false)} title="Fermer">
+      <img src={who.image} alt={`Photo de ${entry.call}`} referrerpolicy="no-referrer" />
+      <span>{entry.call} · {[who.fname, who.name].filter(Boolean).join(' ')} — photo QRZ.com</span>
+    </button>
+{/if}
+
 <style>
   .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.65); z-index: 40; }
   .card {
@@ -433,7 +436,7 @@
   .who { color: var(--gold-soft); font-size: 0.95rem; margin-top: 1px; }
   .photo { padding: 0; border: 1px solid var(--panel-edge); border-radius: 6px; overflow: hidden; background: #000; height: 76px; cursor: zoom-in; }
   .photo img { height: 100%; width: auto; max-width: 130px; object-fit: cover; display: block; }
-  .photo-big { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.85); border: 0; border-radius: 0;
+  .photo-big { position: fixed; inset: 0; z-index: 3000; background: rgba(0, 0, 0, 0.85); border: 0; border-radius: 0;
                display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: zoom-out; }
   .photo-big img { max-width: 90vw; max-height: 82vh; border-radius: 6px; box-shadow: 0 6px 30px rgba(0, 0, 0, 0.8); }
   .photo-big span { color: var(--gold-soft); font-size: 0.9rem; }
