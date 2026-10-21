@@ -6,6 +6,7 @@
   import L from 'leaflet';
   import 'leaflet/dist/leaflet.css';
   import { api } from './api.js';
+  import EibiPick from './EibiPick.svelte';
   import { qsoInstant, sunElevation, daylight, shadeImage, greatCircle, MERCATOR_LAT } from './sun.js';
 
   let { entry, onclose, onedit } = $props();
@@ -162,6 +163,25 @@
     }
   }
 
+  // Écoute SWL : ligne de la grille EiBi retenue -> site et locator de l'émetteur, puis la fiche
+  // est recalculée (trajet, point de réflexion, ionosphère)
+  let eibiMsg = $state('');
+  async function applyEibi(c) {
+    if (!c.locator) { eibiMsg = 'Site d’émission inconnu de la grille : rien à appliquer.'; return; }
+    const q = ctx.qso;
+    try {
+      const upd = await api.updateQso(q.id, { ...q, gridsquare: c.locator, qth: `${c.site} (${c.site_country})`,
+        comment: q.comment || [c.lang, c.target ? `→ ${c.target}` : ''].filter(Boolean).join(' ') });
+      Object.assign(entry, upd || {});
+      map?.remove(); map = null; ionoLayer = null; iono = null;
+      ctx = await api.qsoContext(q.id);
+      eibiMsg = `Émetteur retenu : ${c.site} (${c.locator}).`;
+      setTimeout(() => { drawMap(); loadIono(); }, 0);
+    } catch (err) {
+      eibiMsg = err.message;
+    }
+  }
+
   onMount(async () => {
     try {
       ctx = await api.qsoContext(entry.id);
@@ -269,6 +289,15 @@
           {/if}
           <p class="src">{ctx.solar.source === 'GFZ' ? 'Indices : archive GFZ Potsdam (CC BY 4.0).' : entry.solar_src === 'hamqsl' ? 'Indices relevés à la saisie (hamqsl.com).' : 'Pas d’indices pour cette date.'}</p>
         </section>
+
+        {#if entry.kind === 'SWL' && entry.freq}
+          <section>
+            <h3>Qui émettait ? <span class="n">grille EiBi</span></h3>
+            {#if !ctx.target_ll}<p class="muted small">Site de l’émetteur inconnu : choisis la station entendue pour tracer le trajet et lire l’ionosphère.</p>{/if}
+            <EibiPick freq={entry.freq} date={entry.qso_date} time={(entry.time_on || '').slice(0, 4)} onpick={applyEibi} compact />
+            {#if eibiMsg}<p class="small" style="margin-top:4px">{eibiMsg}</p>{/if}
+          </section>
+        {/if}
 
         <section>
           <h3>Ionosphère mesurée

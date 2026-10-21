@@ -1,4 +1,5 @@
 <script>
+  import EibiPick from './EibiPick.svelte';
   import { untrack, tick } from 'svelte';
   import { api } from './api.js';
   import { MODES, defaultRst, dayOf, timeOf, fmtDate } from './util.js';
@@ -92,6 +93,20 @@
 
   async function onCallBlur() {
     worked = kind === 'QSO' && form.call.length >= 3 ? await api.worked(form.call).catch(() => []) : [];
+  }
+
+  // Écoute SWL : fréquence notée (Hz) pour la grille EiBi, et ligne de la grille retenue
+  const swlFreqHz = $derived.by(() => {
+    const f = parseFloat(String(form.freqMHz).replace(',', '.'));
+    return Number.isFinite(f) && f > 0 ? Math.round(f * 1e6) : null;
+  });
+  function pickEibi(c) {
+    if (!form.call.trim()) form.call = c.station;
+    if (c.site) form.qth = `${c.site} (${c.site_country})`;
+    if (c.locator) form.gridsquare = c.locator;
+    const info = [c.lang, c.target ? `→ ${c.target}` : ''].filter(Boolean).join(' ');
+    if (!form.comment.trim() && info) form.comment = `EiBi : ${info}`;
+    if (!startTime) startTime = new Date();
   }
 
   async function submit(e) {
@@ -222,6 +237,9 @@
         <input id="comment" bind:value={form.comment} />
       </div>
     </div>
+    {#if kind === 'SWL'}
+      <EibiPick freq={swlFreqHz} onpick={pickEibi} />
+    {/if}
     <div class="actions">
       {#if error}<span class="error">{error}</span>{/if}
       <span class="hint">Entrée = enregistrer · Échap = effacer</span>

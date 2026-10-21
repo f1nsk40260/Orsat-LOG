@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, enrich, geo, ionosonde, qrz, solar, weather
+from . import __version__, adif, auth, backup, eibi, enrich, geo, ionosonde, qrz, solar, weather
 from .db import Database
 from .websdr import Page, WebSdrLink
 
@@ -494,6 +494,14 @@ def qso_iono(qso_id: int, refresh: bool = False):
     if res.get("ok") and not recent and not any(p.get("net_error") for p in res["points"]):
         db.iono_put(qso_id, key, res)
     return res
+
+
+@app.get("/api/eibi")
+def eibi_lookup(freq: int, date: str = "", time: str = ""):
+    """Stations de la grille EiBi sur cette fréquence (Hz) à cette date / heure UTC (maintenant
+    par défaut) : identification des écoutes SWL et position de l'émetteur."""
+    now = datetime.now(timezone.utc)
+    return eibi.lookup(freq, date or now.strftime("%Y%m%d"), time or now.strftime("%H%M"))
 
 
 @app.get("/api/worked/{call}")

@@ -338,6 +338,18 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - Archive GFZ relue chaque jour (au lieu de chaque semaine) : Kp de la veille disponible pour les QSO récents.
 - Ionosphère d'un QSO de moins de 6 h : non mémorisée (« provisoire »), réinterrogée à chaque ouverture.
 
+## Fait — v1.7.0 (21/10/2026) : identification des écoutes SWL par la grille EiBi
+- `eibi.py` : grille `sked-a26.csv` / `sked-b26.csv` (saison A = dernier dim. de mars → dernier dim.
+  d'octobre) et `README.TXT` (partie IV, sites d'émission avec coordonnées) de www.eibispace.de, gardés
+  dans `data/eibi/`, relus chaque semaine ; saison absente (B26 en 404 le 21/10) → saison précédente.
+  Filtres : fréquence ±1,5 kHz, heure, jours (vide, « 1245 », « Mo-Fr », « 24Oct »), validité jjmm.
+  Site : « t » = site du pays de la station, « /D-r » = site r en Allemagne, vide = site unique du pays.
+  Classement : écart de fréquence, horaire certain, site connu, cible Europe / mondiale.
+- `GET api/eibi?freq=Hz[&date=AAAAMMJJ&time=HHMM]`. Formulaire SWL : suggestions sous la saisie, un clic
+  remplit station (si vide), site, locator, commentaire (langue → cible). Fiche d'une écoute : rubrique
+  « Qui émettait ? » ; un clic enregistre site + locator et recalcule trajet et ionosphère.
+- Formats relevés sur le serveur ORSAT ; testé sur des extraits (eibispace.de injoignable d'ici).
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

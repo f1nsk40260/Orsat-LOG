@@ -40,6 +40,9 @@ I. A. Galkin, *Global ionospheric radio observatory (GIRO)*, Earth Planets Space
 http://spase.info/SMWG/Observatory/GIRO), licence CC BY-NC-SA 4.0, usage non commercial ; l'observatoire
 fournisseur est cité dans chaque fiche.
 
+Identification des écoutes SWL : grille des émissions en ondes courtes EiBi (Eike Bierwirth),
+http://www.eibispace.de/.
+
 
 `~/Orsat-LOG/data/` (jamais envoyé sur GitHub) : base `orsatlog.db`, copies quotidiennes
 `backups/`, clé de session `secret.key`.
