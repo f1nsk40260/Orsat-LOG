@@ -282,6 +282,7 @@
             <p class="muted small">{iono.msg}</p>
           {:else if iono}
             {#if verdict}<p class="verdict {verdict.cls}">{verdict.txt}</p>{/if}
+            {#if iono.provisional}<p class="src">QSO récent : mesures encore en cours de publication, la fiche se complétera d’elle-même.</p>{/if}
             {#each iono.points as p}
               <div class="ipt">
                 <div class="lbl">{p.label} · saut de {p.hop_km} km

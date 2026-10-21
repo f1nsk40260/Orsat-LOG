@@ -24,7 +24,7 @@ log = logging.getLogger("orsatlog.enrich")
 GFZ_URLS = ("https://kp.gfz.de/app/files/Kp_ap_Ap_SN_F107_since_1932.txt",
             "https://kp.gfz-potsdam.de/app/files/Kp_ap_Ap_SN_F107_since_1932.txt")
 GFZ_FILE = DATA_DIR / "gfz_kp_ap_f107.txt"
-GFZ_MAX_AGE = 7 * 86400          # archive relue chaque semaine
+GFZ_MAX_AGE = 20 * 3600         # archive relue chaque jour (Kp de la veille pour les nouveaux QSO)
 
 
 # ---------- 1. données QRZ ----------

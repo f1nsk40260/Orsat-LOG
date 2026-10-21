@@ -486,7 +486,12 @@ def qso_iono(qso_id: int, refresh: bool = False):
         if hit:
             return hit
     res = ionosonde.for_qso(q, origin_ll, target_ll)
-    if res.get("ok") and not any(p.get("net_error") for p in res["points"]):
+    # QSO de moins de 6 h : les ionosondes n'ont pas encore tout publié (courbe +2 h incomplète),
+    # on ne fige pas le résultat, la fiche réinterrogera GIRO à la prochaine ouverture.
+    recent = (datetime.now(timezone.utc) - datetime.strptime(res.get("when", "2000-01-01T00:00:00Z"),
+              "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)).total_seconds() < 6 * 3600
+    res["provisional"] = recent
+    if res.get("ok") and not recent and not any(p.get("net_error") for p in res["points"]):
         db.iono_put(qso_id, key, res)
     return res
 

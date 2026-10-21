@@ -334,6 +334,10 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 ## Fait — v1.6.1 / v1.6.2 (21/10/2026) : fond de carte sans clé, au choix (Nuit, Satellite, Plan OSM sombre)
 - CARTO répondait « API key required » : fond Esri World Dark Gray (sans clé), repli OSM assombri.
 
+## Fait — v1.6.3 (21/10/2026) : nouveaux QSO
+- Archive GFZ relue chaque jour (au lieu de chaque semaine) : Kp de la veille disponible pour les QSO récents.
+- Ionosphère d'un QSO de moins de 6 h : non mémorisée (« provisoire »), réinterrogée à chaque ouverture.
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
