@@ -121,19 +121,22 @@
   function drawMap() {
     if (!mapEl || !ctx) return;
     map = L.map(mapEl, { worldCopyJump: false, minZoom: 1, attributionControl: true, zoomControl: true });
-    // Fond sombre sans clé d'API (Esri World Dark Gray) ; si ses tuiles ne viennent pas,
-    // repli sur OpenStreetMap assombri. (CARTO demande désormais une clé.)
-    const base = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
-      maxZoom: 8, noWrap: true, attribution: 'Fond © Esri, HERE, Garmin, © OpenStreetMap',
-    }).addTo(map);
-    let errs = 0;
-    base.on('tileerror', () => {
-      if (++errs !== 4) return;
-      base.remove();
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 8, noWrap: true, className: 'osm-dark', attribution: '© OpenStreetMap',
-      }).addTo(map).bringToBack();
-    });
+    // Fonds sans clé d'API (CARTO en demande une désormais), au choix à la souris en haut à droite ;
+    // le choix est retenu par le navigateur.
+    const ESRI = 'https://server.arcgisonline.com/ArcGIS/rest/services/';
+    const fonds = {
+      'Nuit': L.tileLayer(ESRI + 'Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 8, noWrap: true, className: 'fond-nuit', attribution: 'Fond © Esri, HERE, Garmin, © OpenStreetMap' }),
+      'Satellite': L.tileLayer(ESRI + 'World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 8, noWrap: true, className: 'fond-sat', attribution: 'Imagerie © Esri, Maxar, Earthstar Geographics' }),
+      'Plan OSM sombre': L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 8, noWrap: true, className: 'osm-dark', attribution: '© OpenStreetMap' }),
+    };
+    let choix = 'Nuit';
+    try { if (fonds[localStorage.getItem('orsatlog.fond')]) choix = localStorage.getItem('orsatlog.fond'); } catch {}
+    fonds[choix].addTo(map);
+    L.control.layers(fonds, null, { position: 'topright' }).addTo(map);
+    map.on('baselayerchange', (e) => { try { localStorage.setItem('orsatlog.fond', e.name); } catch {} });
     L.imageOverlay(shadeImage(instant), [[-MERCATOR_LAT, -180], [MERCATOR_LAT, 180]], { opacity: 1 }).addTo(map);
     const gold = '#cfb53b';
     const pts = [];
@@ -360,6 +363,8 @@
   .swl { margin-left: 8px; color: rgb(110, 170, 230); }
   .head-btns { display: flex; gap: 8px; }
   .body { display: grid; grid-template-columns: 1.55fr 1fr; gap: 16px; }
+  .map :global(.fond-nuit) { filter: brightness(0.55) contrast(1.15); }
+  .map :global(.fond-sat) { filter: brightness(0.7) saturate(0.8); }
   .map :global(.osm-dark) { filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(0.9); }
   .map { height: 430px; border: 1px solid var(--panel-edge); border-radius: 6px; background: #0b0d12; }
   .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.75rem; color: var(--muted); margin: 6px 0 8px; }

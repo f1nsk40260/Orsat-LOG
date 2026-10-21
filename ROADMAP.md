@@ -331,7 +331,7 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - Licence CC BY-NC-SA 4.0 : crédit GIRO (Reinisch & Galkin 2011) et observatoire affichés dans la fiche.
 - Testé hors ligne (GIRO injoignable depuis le bac à sable) : à valider sur le serveur.
 
-## Fait — v1.6.1 (21/10/2026) : fond de carte sans clé
+## Fait — v1.6.1 / v1.6.2 (21/10/2026) : fond de carte sans clé, au choix (Nuit, Satellite, Plan OSM sombre)
 - CARTO répondait « API key required » : fond Esri World Dark Gray (sans clé), repli OSM assombri.
 
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
