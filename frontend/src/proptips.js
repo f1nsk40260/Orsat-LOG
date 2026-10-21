@@ -12,10 +12,10 @@ export function tipSfi(v) {
       : x < 120 ? 'moyen : 20-17 m bons, 15 m ouvert en journée'
       : x < 150 ? 'bon : 15-12 m ouverts, 10 m par moments'
       : x < 200 ? 'très bon : 10 m ouvert en journée, DX facile sur les bandes hautes'
-      : 'exceptionnel : toutes les bandes HF ouvertes, MUF élevées';
+      : 'exceptionnel : toutes les bandes HF ouvertes, fréquences maximales utilisables élevées';
   }
   return `SFI — flux solaire à 10,7 cm (F10.7), en unités de flux solaire.\n`
-    + `Mesure l'activité du Soleil qui ionise la couche F2 : plus il est haut, plus la MUF monte.`
+    + `Mesure l'activité du Soleil qui ionise la couche F2 : plus il est haut, plus la fréquence maximale utilisable (MUF) monte.`
     + (w ? `\n\n${Math.round(x)} : ${w}.` : '');
 }
 
@@ -37,7 +37,7 @@ export function tipK(v) {
   if (x != null) {
     w = x < 2 ? 'calme : conditions stables'
       : x < 4 ? 'peu agité : légère dégradation possible sur les trajets polaires'
-      : x < 5 ? 'actif : absorption accrue, fading, MUF en baisse'
+      : x < 5 ? 'actif : absorption accrue, fading, fréquence maximale utilisable en baisse'
       : `tempête géomagnétique G${Math.min(5, Math.floor(x) - 4)} : HF dégradées, trajets polaires coupés, aurores possibles (VHF)`;
   }
   return `Indice K (Kp) — agitation du champ magnétique terrestre sur 3 h (0 à 9, échelle logarithmique).\n`
@@ -74,11 +74,11 @@ export function tipGeomag(v) {
 }
 
 export const TIP_BANDS = `État des bandes calculé par hamqsl.com (N0NBH) à partir du SFI et de l'indice K, de jour et de nuit.\n`
-  + `C'est une estimation générale, pas une mesure : la fiche d'un QSO donne la MUF mesurée par les ionosondes.`;
+  + `C'est une estimation générale, pas une mesure : la fiche d'un QSO donne la fréquence maximale utilisable (MUF) mesurée par les ionosondes.`;
 
 export const TIP_FOF2 = `foF2 — fréquence critique de la couche F2, en MHz.\n`
   + `Plus haute fréquence renvoyée par l'ionosphère pour un signal tiré à la verticale (NVIS).\n`
-  + `Pour un trajet oblique, la MUF vaut environ 3 à 4 fois foF2.`;
+  + `Pour un trajet oblique, la fréquence maximale utilisable (MUF) vaut environ 3 à 4 fois foF2.`;
 export const TIP_MUF3000 = `MUF(3000) — fréquence maximale utilisable pour un saut de 3000 km, en MHz.\n`
   + `Mesurée par l'ionosonde au point indiqué : au-dessus, le signal traverse la couche F2 et part dans l'espace.`;
 export const TIP_MUFHOP = `MUF du saut — la MUF(3000) mesurée ramenée à la longueur réelle de ton saut (loi de la sécante).\n`
