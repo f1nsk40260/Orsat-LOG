@@ -21,6 +21,7 @@ import math
 import re
 import threading
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -203,16 +204,27 @@ def for_qso(q, origin_ll, target_ll):
     freq = (q.get("freq") or 0) / 1e6 or None
     sts = stations()
     points = []
+    # Fenêtre de mesures : ±2 h, sans dépasser l'instant présent (une fenêtre dans le futur fait
+    # répondre « 504 Gateway Time-out » au serveur GIRO pour un QSO récent)
+    now = datetime.now(timezone.utc) - timedelta(minutes=1)
+    start, end = when - timedelta(hours=WINDOW_H), min(when + timedelta(hours=WINDOW_H), now)
+    down = None          # serveur GIRO injoignable : inutile d'essayer les autres stations
     for label, pt, hop in reflection_points(origin_ll, target_ll, dist):
         cands = sorted(((_km(pt, (s[2], s[3])), s) for s in sts), key=lambda x: x[0])
         cands = [c for c in cands if c[0] <= MAX_KM][:3]
         res = {"label": label, "point": pt, "hop_km": round(hop), "station": None}
         tried = []
         for km, (code, name, la, lo) in cands:
+            if down:
+                break
             try:
-                series = fetch(code, when - timedelta(hours=WINDOW_H), when + timedelta(hours=WINDOW_H))
+                series = fetch(code, start, end)
             except Exception as exc:
                 tried.append(f"{name} : injoignable ({exc})")
+                if (isinstance(exc, urllib.error.HTTPError) and exc.code >= 500) or \
+                        isinstance(exc, (urllib.error.URLError, TimeoutError, OSError)) and \
+                        not isinstance(exc, urllib.error.HTTPError):
+                    down = str(exc)
                 continue
             m, dt_min = nearest(series, when)
             if not m:
@@ -225,8 +237,13 @@ def for_qso(q, origin_ll, target_ll):
             break
         if not res["station"]:
             res["net_error"] = bool(tried) and all("injoignable" in x for x in tried)
-            res["msg"] = ("Aucune ionosonde à moins de %d km de ce point." % MAX_KM if not cands
-                          else "Ionosondes proches sans mesure exploitable : " + " ; ".join(tried))
+            if not cands:
+                res["msg"] = "Aucune ionosonde à moins de %d km de ce point." % MAX_KM
+            elif res["net_error"]:
+                res["msg"] = ("Serveur des ionosondes (GIRO, Lowell) momentanément indisponible. "
+                              "Nouvel essai à la prochaine ouverture de la fiche (bouton ↻).")
+            else:
+                res["msg"] = "Ionosondes proches sans mesure exploitable : " + " ; ".join(tried)
         points.append(res)
     return {"ok": True, "freq_mhz": freq, "when": when.strftime("%Y-%m-%dT%H:%M:%SZ"), "points": points,
             "credit": "GIRO / DIDBase, Lowell GIRO Data Center (Reinisch & Galkin, 2011), CC BY-NC-SA 4.0"}

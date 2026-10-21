@@ -422,6 +422,10 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - Formulaire d'édition : bouton « 📇 QRZ » (locator, nom, QTH vides) pour un QSO isolé.
 - Limite : le locator QRZ est l'adresse actuelle de la station, pas forcément celle du jour du QSO.
 
+## Fait — v1.12.1 (21/10/2026) : ionosphère d'un QSO récent
+- La fenêtre ±2 h ne dépasse plus l'instant présent (fenêtre dans le futur → GIRO répondait 504).
+- Serveur GIRO en panne (5xx, délai, réseau) : arrêt après la 1re station, message clair, réessai au ↻.
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
