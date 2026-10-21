@@ -121,10 +121,19 @@
   function drawMap() {
     if (!mapEl || !ctx) return;
     map = L.map(mapEl, { worldCopyJump: false, minZoom: 1, attributionControl: true, zoomControl: true });
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      subdomains: 'abcd', maxZoom: 8, noWrap: true,
-      attribution: '© OpenStreetMap · © CARTO',
+    // Fond sombre sans clé d'API (Esri World Dark Gray) ; si ses tuiles ne viennent pas,
+    // repli sur OpenStreetMap assombri. (CARTO demande désormais une clé.)
+    const base = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
+      maxZoom: 8, noWrap: true, attribution: 'Fond © Esri, HERE, Garmin, © OpenStreetMap',
     }).addTo(map);
+    let errs = 0;
+    base.on('tileerror', () => {
+      if (++errs !== 4) return;
+      base.remove();
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 8, noWrap: true, className: 'osm-dark', attribution: '© OpenStreetMap',
+      }).addTo(map).bringToBack();
+    });
     L.imageOverlay(shadeImage(instant), [[-MERCATOR_LAT, -180], [MERCATOR_LAT, 180]], { opacity: 1 }).addTo(map);
     const gold = '#cfb53b';
     const pts = [];
@@ -351,6 +360,7 @@
   .swl { margin-left: 8px; color: rgb(110, 170, 230); }
   .head-btns { display: flex; gap: 8px; }
   .body { display: grid; grid-template-columns: 1.55fr 1fr; gap: 16px; }
+  .map :global(.osm-dark) { filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(0.9); }
   .map { height: 430px; border: 1px solid var(--panel-edge); border-radius: 6px; background: #0b0d12; }
   .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.75rem; color: var(--muted); margin: 6px 0 8px; }
   .sw { display: inline-block; width: 18px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
