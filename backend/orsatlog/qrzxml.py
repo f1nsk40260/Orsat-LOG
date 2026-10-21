@@ -89,7 +89,9 @@ class QrzXml:
         with self.db._lock:
             r = self.db._con.execute("SELECT data, at FROM qrz_lookup WHERE call = ?", (call,)).fetchone()
         if r and time.time() - r["at"] < CACHE_S:
-            return json.loads(r["data"])
+            cached = json.loads(r["data"])
+            if "grid" in cached:            # réponses d'avant v1.11.5 : sans locator, on redemande
+                return cached
         with self._lock:
             for attempt in (1, 2):
                 if not self.key:
@@ -108,6 +110,7 @@ class QrzXml:
         out = {"call": c.get("call", call), "fname": c.get("fname", ""), "name": c.get("name", ""),
                "nickname": c.get("nickname", ""), "qth": c.get("addr2", ""), "state": c.get("state", ""),
                "country": c.get("country", ""), "image": c.get("image", ""),
+               "grid": c.get("grid", "").upper(),
                "notice": d["session"].get("message", "")}
         with self.db._lock:
             self.db._con.execute("INSERT OR REPLACE INTO qrz_lookup (call, data, at) VALUES (?, ?, ?)",

@@ -409,6 +409,11 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - L'animateur n'était pas enregistré comme contact : il l'est d'office à l'ouverture (et à la modification)
   d'une session, à l'heure de début, fréquence et mode de la session, commentaire « Animateur ».
 
+## Fait — v1.11.5 (21/10/2026) : locator, nom et QTH depuis l'annuaire QRZ à la saisie
+- `qrzfill.js` : après 0,7 s de pause dans la frappe d'un indicatif (QSO et QSO de groupe), recherche
+  QRZ ; remplit seulement les cases vides (locator `grid`, prénom/surnom, QTH). Indicatif portable
+  (EA8/…, …/P) : nom seulement. Groupe : les habitués passent d'abord, QRZ complète. Cache sans `grid` redemandé.
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

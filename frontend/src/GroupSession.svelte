@@ -1,4 +1,6 @@
 <script>
+  import { qrzFiller } from './qrzfill.js';
+  const qrzFill = qrzFiller();
   import { onMount, untrack } from 'svelte';
   import { api, deleteEntry } from './api.js';
   import { MODES, pad, dayOf, timeOf, fmtTime } from './util.js';
@@ -265,6 +267,7 @@
       if (!p.qth) p.qth = r.qth || '';
       if (!p.gridsquare) p.gridsquare = r.gridsquare || '';
     }
+    qrzFill(p);                                  // ce qui manque encore : annuaire QRZ
   }
 
   function addRegular(r) {

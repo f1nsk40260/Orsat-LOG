@@ -1,5 +1,7 @@
 <script>
   import EibiPick from './EibiPick.svelte';
+  import { qrzFiller } from './qrzfill.js';
+  const qrzFill = qrzFiller();
   import { untrack, tick } from 'svelte';
   import { api } from './api.js';
   import { MODES, defaultRst, dayOf, timeOf, fmtDate } from './util.js';
@@ -89,6 +91,7 @@
     if (kind === 'QSO') form.call = form.call.toUpperCase();
     if (form.call && !startTime) startTime = new Date();
     if (!form.call) startTime = null;
+    if (kind === 'QSO') qrzFill(form);          // locator, nom, QTH depuis l'annuaire QRZ
   }
 
   async function onCallBlur() {
