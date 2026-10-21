@@ -38,11 +38,6 @@
       return;
     }
     if (e.key === 'Escape' && view === 'day') dayPage?.clearForm();
-    // Alt+← / Alt+→ : jour précédent / suivant ; Alt+↓ : aujourd'hui ; Alt+C : carnet
-    if (e.altKey && view === 'day' && e.key === 'ArrowLeft') openDay(addDays(day, -1));
-    if (e.altKey && view === 'day' && e.key === 'ArrowRight' && !isToday) openDay(addDays(day, 1));
-    if (e.altKey && e.key === 'ArrowDown') openDay(today);
-    if (e.altKey && (e.key === 'c' || e.key === 'C')) view = view === 'log' ? 'day' : 'log';
   }
 
   // Liaison TCI avec AetherSDR, ouverte par ce navigateur (sur le PC de l'opérateur)
@@ -63,10 +58,6 @@
     }
   }
 
-  async function logout() {
-    await api.logout().catch(() => {});
-    location.href = 'login';
-  }
 
 
   onMount(() => {
@@ -102,15 +93,15 @@
   </div>
 
   <nav class="datenav" class:dim={view !== 'day'}>
-    <button class="ghost arrow" onclick={() => openDay(addDays(day, -1))} title="Jour précédent (Alt+←)">◀</button>
+    <button class="ghost arrow" onclick={() => openDay(addDays(day, -1))} title="Jour précédent">◀</button>
     <button class="date" onclick={() => (showCalendar = !showCalendar)} title="Ouvrir le calendrier">
       <span class="date-txt">{longDay(day)}</span>
       {#if isToday}<span class="badge">aujourd'hui</span>{/if}
     </button>
     <button class="ghost arrow" onclick={() => openDay(addDays(day, 1))} disabled={isToday}
-            title="Jour suivant (Alt+→)">▶</button>
+            title="Jour suivant">▶</button>
     {#if !isToday}
-      <button class="small" onclick={() => openDay(today)} title="Revenir à la page du jour (Alt+↓)">Aujourd'hui</button>
+      <button class="small" onclick={() => openDay(today)} title="Revenir à la page du jour">Aujourd'hui</button>
     {/if}
   </nav>
 
@@ -118,11 +109,12 @@
     <HeaderClock />
     <button class:active={showHeard && view === 'day'} onclick={toggleHeard}
             title="Afficher / masquer ce que le WebSDR a décodé (autorun : FT8, FT4, JS8, WSPR) sur la page d'agenda">📡 Entendu</button>
-    <button class:active={view === 'log'} onclick={() => (view = view === 'log' ? 'day' : 'log')}
-            title="Ouvrir / fermer le carnet de trafic complet (Alt+C)">
-      {view === 'log' ? 'Agenda' : 'Carnet'}
-    </button>
-    <button onclick={logout} title="Fermer la session du carnet sur ce navigateur">Déconnexion</button>
+    <div class="seg" role="group" aria-label="Affichage">
+      <button type="button" class:on={view === 'day'} onclick={() => (view = 'day')}
+              title="Page d'agenda : saisie, activité, propagation et météo du jour choisi">📅 Agenda</button><button
+              type="button" class:on={view === 'log'} onclick={() => (view = 'log')}
+              title="Tous les QSO et toutes les écoutes, avec recherche et exports">📖 Carnet complet</button>
+    </div>
   </div>
 </header>
 
@@ -162,6 +154,11 @@
   .small { padding: 4px 10px; font-size: 0.82rem; }
 
   .right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  /* Choix Agenda / Carnet : deux boutons accolés, celui affiché en or (comme TU / LOCAL) */
+  .seg { display: inline-flex; border: 1px solid rgba(207, 181, 59, 0.6); border-radius: 999px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; background: rgba(0, 0, 0, 0.3); padding: 5px 14px; }
+  .seg button + button { border-left: 1px solid rgba(207, 181, 59, 0.3); }
+  .seg button.on { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); font-weight: 600; }
   button.active { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); font-weight: 600; }
   :global(.ok) { color: var(--ok); } :global(.warn) { color: var(--warn); } :global(.bad) { color: var(--bad); }
   .station.setup { color: var(--warn); font-family: inherit; font-size: 0.82rem; }

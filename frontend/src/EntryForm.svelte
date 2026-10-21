@@ -242,7 +242,6 @@
     {/if}
     <div class="actions">
       {#if error}<span class="error">{error}</span>{/if}
-      <span class="hint">Entrée = enregistrer · Échap = effacer</span>
       <button type="button" onclick={clear}>Effacer</button>
       <button type="submit" class="primary">{kind === 'SWL' ? "Enregistrer l'écoute" : 'Enregistrer le QSO'}</button>
     </div>

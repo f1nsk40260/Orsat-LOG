@@ -392,6 +392,11 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   (bande + heure ; la ligne grise est alors dessinée à HH:30). `GET api/day/{day}/heard?band=&hour=`.
 - Vérifié dans Chromium avec un faux journal d'autorun (1188 lignes, 5 bandes).
 
+## Fait — v1.10.1 (21/10/2026) : header plus clair
+- Bouton Déconnexion retiré (inutile, session de 30 jours ; la route `logout` reste).
+- « Carnet / Agenda » remplacé par un choix à deux boutons accolés « 📅 Agenda | 📖 Carnet complet ».
+- Raccourcis Alt+← / → / ↓ / C retirés, ainsi que les mentions « Entrée = … · Échap = … » (règle : tout à la souris).
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

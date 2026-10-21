@@ -225,7 +225,6 @@
     <button type="button" onclick={onclose}>Annuler</button>
     <button type="submit" class="primary" disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer'}</button>
   </div>
-  <p class="keys">Entrée = enregistrer · Échap = annuler</p>
 </form>
 
 <style>
