@@ -209,6 +209,17 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   envoie fréquence + mode dès la connexion puis à chaque changement (y compris ceux venus d'AetherSDR),
   et obéit aux recalages du carnet. Le carnet ne répond plus aux questions `vfo:0;` / `modulation:0;`.
 
+## Architecture d'exploitation (F1NSK, 21/10/2026)
+- Serveur unique (PC ORSAT) : PhantomSDR-ORSAT + ORSAT-LOG, `https://orsat.ddns.net` (+ `/log/`).
+- Trois postes clients (QTH A, QTH B, nomade) : AetherSDR et/ou page ORSAT dans un navigateur ;
+  **un seul poste à la fois**, jamais deux simultanément. Les postes ne sont que des télécommandes.
+- Station émettrice fixe : FlexRadio (sous AetherSDR) en **IN93KU**. Récepteur WebSDR ORSAT en **IN93LR**.
+
+## Fait — v0.12.0 (21/10/2026) : deux locators
+- Réglages → Station : « Locator station (QSO) » et « Locator WebSDR (SWL) » (vide = celui de la station).
+- Distances / azimuts : QSO depuis la station, SWL depuis le WebSDR ; ADIF `MY_GRIDSQUARE` idem.
+- Changement de locator → recalcul de tout le carnet (`POST /api/recompute`).
+
 ## Deux PC (question F1NSK 20/10)
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

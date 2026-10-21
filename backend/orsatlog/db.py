@@ -37,7 +37,8 @@ _migrate_old_db()
 
 DEFAULT_SETTINGS = {
     "callsign": "",
-    "locator": "",
+    "locator": "",            # station émettrice (QSO)
+    "swl_locator": "",        # récepteur WebSDR (écoutes SWL) ; vide = locator de la station
     "tci_host": "127.0.0.1",
     "tci_port": "50001",
     "tci_trx": "0",

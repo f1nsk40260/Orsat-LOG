@@ -21,7 +21,7 @@ def _field(tag, value):
     return f"<{tag}:{len(value.encode('utf-8'))}>{value} "
 
 
-def export(qsos, my_call="", my_grid=""):
+def export(qsos, my_call="", my_grid="", swl_grid=""):
     now = datetime.now(timezone.utc).strftime("%Y%m%d %H%M%S")
     out = [
         "Export ORSAT-LOG\n",
@@ -52,7 +52,9 @@ def export(qsos, my_call="", my_grid=""):
             rec.append(_field("FREQ", f"{q['freq'] / 1e6:.6f}"))
         if my_call:
             rec.append(_field("STATION_CALLSIGN", my_call))
-        if my_grid:
-            rec.append(_field("MY_GRIDSQUARE", my_grid))
+        # MY_GRIDSQUARE : la station pour un QSO, le récepteur WebSDR pour une écoute SWL
+        grid = (swl_grid or my_grid) if q.get("kind") == "SWL" else my_grid
+        if grid:
+            rec.append(_field("MY_GRIDSQUARE", grid))
         out.append("".join(rec) + "<EOR>\n")
     return "".join(out)

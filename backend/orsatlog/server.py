@@ -236,6 +236,10 @@ def get_settings():
 @app.put("/api/settings")
 async def put_settings(values: dict):
     before = db.get_settings()
+    if values.get("swl_locator") and not geo.valid_locator(values["swl_locator"]):
+        raise HTTPException(400, "Locator du WebSDR invalide")
+    if "swl_locator" in values:
+        values["swl_locator"] = values["swl_locator"].strip().upper()
     if values.get("locator") and not geo.valid_locator(values["locator"]):
         raise HTTPException(400, "Locator invalide")
     if "callsign" in values:
@@ -253,6 +257,30 @@ async def put_settings(values: dict):
     if before.get("weathercloud") != after.get("weathercloud"):
         asyncio.create_task(_record_weather())
     return after
+
+
+def _origin_locator(kind):
+    """Point de départ des distances : la station émettrice pour un QSO, le récepteur
+    WebSDR pour une écoute SWL (à défaut, la station)."""
+    s = db.get_settings()
+    if kind == "SWL" and geo.valid_locator(s.get("swl_locator", "")):
+        return s["swl_locator"]
+    return s.get("locator", "")
+
+
+@app.post("/api/recompute")
+def recompute():
+    """Recalcule distance et azimut de toutes les entrées (après un changement de locator)."""
+    n = 0
+    for q in db.all_qsos():
+        my_loc = _origin_locator(q.get("kind"))
+        d = b = None
+        if geo.valid_locator(my_loc) and geo.valid_locator(q.get("gridsquare") or ""):
+            d, b = geo.distance_bearing(my_loc, q["gridsquare"])
+        if (d, b) != (q.get("distance_km"), q.get("bearing")):
+            db.update_qso(q["id"], {"distance_km": d, "bearing": b})
+            n += 1
+    return {"updated": n}
 
 
 # ---------- mise à jour depuis GitHub ----------
@@ -407,7 +435,7 @@ async def add_qso(q: QsoIn):
     rec["gridsquare"] = q.gridsquare.strip().upper()
     rec["band"] = geo.band_of(q.freq, swl=kind == "SWL")
 
-    my_loc = db.get_settings().get("locator", "")
+    my_loc = _origin_locator(kind)
     if geo.valid_locator(my_loc) and geo.valid_locator(rec["gridsquare"]):
         rec["distance_km"], rec["bearing"] = geo.distance_bearing(my_loc, rec["gridsquare"])
 
@@ -473,7 +501,7 @@ def update_qso(qso_id: int, q: QsoEdit):
                band=geo.band_of(q.freq, swl=kind == "SWL"), distance_km=None, bearing=None)
     if kind == "SWL":
         rec["rst_sent"] = ""
-    my_loc = db.get_settings().get("locator", "")
+    my_loc = _origin_locator(kind)
     if geo.valid_locator(my_loc) and geo.valid_locator(grid):
         rec["distance_km"], rec["bearing"] = geo.distance_bearing(my_loc, grid)
     return db.update_qso(qso_id, rec)
@@ -703,7 +731,8 @@ async def restore(file: UploadFile = File(...)):
 @app.get("/api/export/adif", response_class=PlainTextResponse)
 def export_adif():
     s = db.get_settings()
-    text = adif.export(db.all_qsos(), s.get("callsign", ""), s.get("locator", ""))
+    text = adif.export(db.all_qsos(), s.get("callsign", ""), s.get("locator", ""),
+                       s.get("swl_locator", "") or s.get("locator", ""))
     name = f"orsat-log_{datetime.now(timezone.utc):%Y%m%d}.adi"
     return PlainTextResponse(text, headers={"Content-Disposition": f'attachment; filename="{name}"'})
 

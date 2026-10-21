@@ -52,9 +52,11 @@
     e.preventDefault();
     error = '';
     try {
+      const locChanged = (s.locator || '') !== (settings.locator || '') || (s.swl_locator || '') !== (settings.swl_locator || '');
       const saved = await api.saveSettings({
         callsign: s.callsign || '',
         locator: s.locator || '',
+        swl_locator: s.swl_locator || '',
         tci_host: s.tci_host || '127.0.0.1',
         tci_port: String(s.tci_port || '50001'),
         tci_trx: String(s.tci_trx || '0'),
@@ -63,6 +65,8 @@
         websdr_port: String(s.websdr_port || '40001'),
         websdr_enabled: s.websdr_enabled === '1' || s.websdr_enabled === true ? '1' : '0',
       });
+      // locator modifié : distances et azimuts de tout le carnet recalculés
+      if (locChanged) await api.recompute().catch(() => {});
       onsaved(saved);
     } catch (err) {
       error = err.message;
@@ -76,17 +80,23 @@
 
   <fieldset>
     <legend>Station</legend>
-    <div class="row">
+    <div class="row3 st">
       <div>
         <label for="s-call">Indicatif</label>
         <input id="s-call" class="mono" bind:value={s.callsign}
                oninput={() => (s.callsign = s.callsign.toUpperCase())} />
       </div>
       <div>
-        <label for="s-loc">Locator</label>
+        <label for="s-loc">Locator station (QSO)</label>
         <input id="s-loc" class="mono" bind:value={s.locator} maxlength="8"
                oninput={() => (s.locator = s.locator.toUpperCase())}
-               title="Nécessaire au calcul des distances et azimuts" />
+               title="Station émettrice (FlexRadio) : distances et azimuts des QSO" />
+      </div>
+      <div>
+        <label for="s-swlloc">Locator WebSDR (SWL)</label>
+        <input id="s-swlloc" class="mono" bind:value={s.swl_locator} maxlength="8"
+               oninput={() => (s.swl_locator = s.swl_locator.toUpperCase())}
+               placeholder="= station" title="Récepteur WebSDR ORSAT : distances et azimuts des écoutes SWL" />
       </div>
     </div>
   </fieldset>
@@ -210,6 +220,7 @@
   legend { color: var(--gold); padding: 0 6px; font-size: 0.85rem; }
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .row3 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; }
+  .row3.st { grid-template-columns: 1fr 1fr 1fr; }
   .note { color: var(--muted); font-size: 0.78rem; margin: 8px 0 0; }
   .note.first { margin: 0 0 6px; }
   .bk { list-style: none; margin: 0 0 8px; padding: 0; font-size: 0.82rem; }
