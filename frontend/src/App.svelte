@@ -2,7 +2,8 @@
   import { onMount } from 'svelte';
   import { api, liveSocket } from './api.js';
   import { startTci, stopTci } from './tciBrowser.js';
-  import { pad, dayOf, addDays, longDay, kClass } from './util.js';
+  import { dayOf, addDays, longDay } from './util.js';
+  import HeaderClock from './HeaderClock.svelte';
   import DayPage from './DayPage.svelte';
   import LogBook from './LogBook.svelte';
   import Calendar from './Calendar.svelte';
@@ -10,7 +11,6 @@
   let settings = $state({});
   let radio = $state({ connected: false, freq: 0, mode: '', submode: '', ptt: false, device: '' });
   let websdr = $state({ listening: false, connected: false, freq: 0, mode: '', submode: '', ptt: false, device: 'WebSDR' });
-  let solar = $state(null);
   let showCalendar = $state(false);
   let view = $state('day');              // 'day' = page d'agenda, 'log' = carnet complet
   let utc = $state(new Date());
@@ -62,14 +62,12 @@
     location.href = 'login';
   }
 
-  async function refreshSolar() { solar = await api.solar().catch(() => solar); }
 
   onMount(() => {
     api.settings().then((s) => {
       settings = s;
       browserTci(s);
     });
-    refreshSolar();
     const stop = liveSocket((msg) => { if (msg.type === 'websdr') websdr = msg.data; });
     const clock = setInterval(() => {
       utc = new Date();
@@ -80,8 +78,7 @@
         if (wasToday) day = t;
       }
     }, 1000);
-    const sol = setInterval(refreshSolar, 15 * 60 * 1000);
-    return () => { stop(); stopTci(); clearInterval(clock); clearInterval(sol); };
+    return () => { stop(); stopTci(); clearInterval(clock); };
   });
 </script>
 
@@ -111,16 +108,8 @@
     {/if}
   </nav>
 
-  <div class="solar" title="Données solaires actuelles (hamqsl.com)">
-    {#if solar}
-      <span>SFI <b>{solar.sfi ?? '—'}</b></span>
-      <span>A <b>{solar.a_index ?? '—'}</b></span>
-      <span>K <b class={kClass(solar.k_index)}>{solar.k_index ?? '—'}</b></span>
-    {/if}
-  </div>
-
   <div class="right">
-    <span class="clock mono" title="Heure UTC">{pad(utc.getUTCHours())}:{pad(utc.getUTCMinutes())}:{pad(utc.getUTCSeconds())} UTC</span>
+    <HeaderClock />
     <button class:active={view === 'log'} onclick={() => (view = view === 'log' ? 'day' : 'log')}
             title="Ouvrir / fermer le carnet de trafic complet (Alt+C)">
       {view === 'log' ? 'Agenda' : 'Carnet'}
@@ -160,10 +149,7 @@
   .badge { font-size: 0.68rem; color: #1a1606; background: var(--gold); border-radius: 10px; padding: 1px 8px; font-weight: 700; }
   .small { padding: 4px 10px; font-size: 0.82rem; }
 
-  .solar { display: flex; gap: 14px; font-size: 0.9rem; color: var(--muted); }
-  .solar b { color: var(--text); }
   .right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
-  .clock { color: var(--gold); font-size: 1.05rem; margin-right: 6px; }
   button.active { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); font-weight: 600; }
   :global(.ok) { color: var(--ok); } :global(.warn) { color: var(--warn); } :global(.bad) { color: var(--bad); }
   .station.setup { color: var(--warn); font-family: inherit; font-size: 0.82rem; }
