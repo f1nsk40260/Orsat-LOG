@@ -6,6 +6,7 @@
 # Dossier du WebSDR par défaut : ~/PhantomSDR-Plus (celui qui contient admin_config.json).
 # Ce que fait le script (relançable sans risque) :
 #   1. environnement Python du carnet (.venv) et compilation de l'interface, en basse priorité ;
+#      (ensuite, les mises à jour se font depuis le panneau admin : update-server.sh)
 #   2. service systemd « orsat-log » : démarrage automatique, plafonds mémoire / CPU, pour ne
 #      jamais gêner le WebSDR ;
 #   3. ajoute log_port à admin_config.json (copie de sécurité faite avant) ;
@@ -43,8 +44,7 @@ python3 -c "import ensurepip" 2>/dev/null \
 say "Environnement Python"
 # Un environnement incomplet (essai précédent sans venv) est refait de zéro
 [ -x .venv/bin/pip ] || { rm -rf .venv; python3 -m venv .venv; }
-# Serveur seulement : pas de fenêtre pywebview sur le serveur
-.venv/bin/pip install -q "fastapi>=0.110" "uvicorn>=0.29" "websockets>=12" python-multipart
+.venv/bin/pip install -q -r requirements.txt
 
 say "Interface (basse priorité)"
 (cd frontend && nice -n 15 npm install --silent && nice -n 15 npm run build --silent)
@@ -60,7 +60,7 @@ After=network-online.target
 User=$(id -un)
 WorkingDirectory=$DIR
 Environment=ORSATLOG_PASSWORD_FILE=$CFG
-ExecStart=$DIR/.venv/bin/python $DIR/run.py --central --port $PORT
+ExecStart=$DIR/.venv/bin/python $DIR/run.py --port $PORT
 Restart=always
 RestartSec=5
 # Ne jamais gêner le WebSDR : priorité basse et plafonds
@@ -116,3 +116,4 @@ code=$(curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/login" || 
 [ "$code" = "200" ] && echo "Carnet : OK" || echo "Carnet : réponse $code (voir journalctl -u orsat-log)"
 echo
 echo "ORSAT-LOG est en ligne sous /log/ du WebSDR, mot de passe du panneau admin."
+echo "Réglages et mises à jour : panneau admin, rubrique « Carnet ORSAT-LOG »."

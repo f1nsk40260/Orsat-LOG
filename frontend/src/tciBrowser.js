@@ -1,9 +1,9 @@
-// Client TCI exécuté dans le navigateur (mode serveur central).
+// Client TCI exécuté dans le navigateur.
 //
-// Le carnet central tourne sur le PC ORSAT, mais AetherSDR tourne sur le PC de
+// Le carnet tourne sur le PC ORSAT (serveur), mais AetherSDR tourne sur le PC de
 // l'opérateur : c'est donc l'interface, ouverte dans le navigateur de ce PC, qui
 // se connecte à ws://127.0.0.1:50001. Les navigateurs l'autorisent vers localhost,
-// même depuis une page https. Même état et mêmes règles que backend/orsatlog/tci.py.
+// même depuis une page https. 
 
 // modulation TCI -> [mode ADIF, sous-mode ADIF]
 const TCI_MODES = {

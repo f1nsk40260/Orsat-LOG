@@ -106,20 +106,19 @@
         <div class="freq mono">{fmtFreq(radio.freq)}<small> MHz</small></div>
         <div class="radio-mode">{radio.modulation ? radio.modulation.toUpperCase() : '—'}</div>
       </section>
-      {#if websdr?.listening || websdr?.error}
+      {#if websdr}
         <section class="panel radio">
           <h2 class="panel-title">WebSDR ORSAT</h2>
           <div class="tci-status">
             <span class="dot" class:on={websdr.connected}></span>
             {#if websdr.connected}
-              Page connectée
+              Page reliée
             {:else}
-              En attente de la page (CAT Sync)
+              Page non reliée
             {/if}
           </div>
-          {#if websdr.error}<div class="tci-error">{websdr.error}</div>{/if}
-          {#if websdr.connected && !websdr.freq}
-            <div class="tci-error">Touchez la fréquence sur la page pour synchroniser.</div>
+          {#if !websdr.connected}
+            <div class="tci-error">Ouvrez la page du WebSDR (https) dans ce navigateur.</div>
           {/if}
           <div class="freq mono">{fmtFreq(websdr.freq)}<small> MHz</small></div>
           <div class="radio-mode">{websdr.modulation ? websdr.modulation.toUpperCase() : '—'}</div>

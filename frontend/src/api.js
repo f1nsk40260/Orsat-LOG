@@ -1,12 +1,12 @@
 // Adresses relatives : le carnet fonctionne à la racine (bureau) comme derrière
-// https://orsat.ddns.net/log/ (serveur central).
+// https://orsat.ddns.net/log/.
 async function req(method, url, body) {
   const r = await fetch(url, {
     method,
     headers: body ? { 'Content-Type': 'application/json' } : {},
     body: body ? JSON.stringify(body) : undefined,
   });
-  if (r.status === 401) {              // session expirée (serveur central) : page de connexion
+  if (r.status === 401) {              // session expirée : page de connexion
     location.href = 'login';
     throw new Error('Connexion requise');
   }
@@ -20,20 +20,9 @@ async function req(method, url, body) {
 
 export const api = {
   info: () => req('GET', 'api/info'),
-  backups: () => req('GET', 'api/backups'),
-  recompute: () => req('POST', 'api/recompute'),
   websdrMirror: (freq, modulation) => req('POST', 'api/websdr/mirror', { freq, modulation }),
-  restore: async (file) => {
-    const fd = new FormData();
-    fd.append('file', file);
-    const r = await fetch('api/restore', { method: 'POST', body: fd });
-    if (r.status === 401) { location.href = 'login'; throw new Error('Connexion requise'); }
-    if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m; } catch {} throw new Error(m); }
-    return r.json();
-  },
   logout: () => req('POST', 'api/logout'),
   settings: () => req('GET', 'api/settings'),
-  saveSettings: (s) => req('PUT', 'api/settings', s),
   solar: () => req('GET', 'api/solar'),
   weather: () => req('GET', 'api/weather'),
   qsos: (limit = 200) => req('GET', `api/qsos?limit=${limit}`),
@@ -42,9 +31,6 @@ export const api = {
   deleteQso: (id) => req('DELETE', `api/qsos/${id}`),
   tune: (q) => req('POST', 'api/tune', { freq: q.freq, mode: q.mode || '', submode: q.submode || '', kind: q.kind || '' }),
   worked: (call) => req('GET', `api/worked/${encodeURIComponent(call)}`),
-  // mise à jour
-  updateCheck: () => req('GET', 'api/update/check'),
-  updateRun: (rebuild = false) => req('POST', `api/update${rebuild ? '?rebuild=true' : ''}`),
   // QSO de groupe
   sessionNames: () => req('GET', 'api/sessions/names'),
   regulars: (name) => req('GET', `api/sessions/regulars?name=${encodeURIComponent(name)}`),

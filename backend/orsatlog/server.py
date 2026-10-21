@@ -1,9 +1,13 @@
-"""Serveur local ORSAT-LOG (FastAPI) : API REST + WebSocket temps réel + frontend."""
+"""ORSAT-LOG, serveur central (FastAPI) : API REST + WebSocket temps réel + interface.
+
+Tourne sur le PC du WebSDR, derrière proxy.py de PhantomSDR-ORSAT (https://<site>/log/).
+Les réglages se font dans le panneau admin du WebSDR (rubrique « Carnet ORSAT-LOG »)."""
 
 import asyncio
 import json
 import logging
-import subprocess
+import os
+import signal
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -16,20 +20,18 @@ from pydantic import BaseModel
 
 from . import __version__, adif, auth, backup, geo, solar, weather
 from .db import Database
-from .tci import TciClient
-from .websdr import FastApiPage, WebSdrServer
+from .websdr import Page, WebSdrLink
 
 log = logging.getLogger("orsatlog")
 
 ROOT = Path(__file__).resolve().parents[2]          # dossier du dépôt (~/Orsat-LOG)
 FRONTEND_DIST = ROOT / "frontend" / "dist"
-LAUNCHER = ROOT / "orsat-log.sh"
 
 db = Database()
 _clients: set[WebSocket] = set()
 
 
-def _broadcast(state, kind="radio"):
+def _broadcast(state, kind):
     msg = json.dumps({"type": kind, "data": state})
     for ws in list(_clients):
         asyncio.create_task(_safe_send(ws, msg))
@@ -42,44 +44,7 @@ async def _safe_send(ws, msg):
         _clients.discard(ws)
 
 
-_last_radio = {"freq": None, "modulation": None}
-
-
-def _on_radio(state):
-    _broadcast(state)
-    # La page (CAT Sync) suit AetherSDR : on recopie seulement un vrai changement de
-    # fréquence ou de mode, pas un PTT ou une reconnexion.
-    freq, mod = state.get("freq"), state.get("modulation")
-    if freq != _last_radio["freq"]:
-        websdr.mirror(freq)
-    if mod != _last_radio["modulation"] and mod:
-        websdr.mirror(freq, mod)
-    _last_radio.update(freq=freq, modulation=mod)
-
-
-tci = TciClient(on_change=_on_radio)
-websdr = WebSdrServer(on_change=lambda st: _broadcast(st, "websdr"))
-
-
-async def _restart_websdr():
-    if auth.central_mode():
-        websdr.serve_central()     # la page arrive par /tci (même adresse que le WebSDR)
-        return
-    s = db.get_settings()
-    if s.get("websdr_enabled") == "1" and not auth.central_mode():
-        await websdr.start(s.get("websdr_port") or 40001)
-    else:
-        await websdr.stop()
-
-
-def _restart_tci():
-    # Serveur central : le TCI du transceiver est sur le PC de l'opérateur, c'est son
-    # navigateur qui s'y connecte (frontend/src/tciBrowser.js), pas ce serveur.
-    s = db.get_settings()
-    if s.get("tci_enabled") == "1" and not auth.central_mode():
-        tci.start(s.get("tci_host") or "127.0.0.1", s.get("tci_port") or 50001, s.get("tci_trx") or 0)
-    else:
-        tci.stop()
+websdr = WebSdrLink(on_change=lambda st: _broadcast(st, "websdr"))
 
 
 def utc_day(dt=None):
@@ -122,21 +87,17 @@ async def _record_weather():
 
 @asynccontextmanager
 async def lifespan(app):
-    _restart_tci()
-    await _restart_websdr()
     recorder = asyncio.create_task(_propagation_recorder())
     saver = asyncio.create_task(backup.daily_task(db))
     yield
     recorder.cancel()
     saver.cancel()
-    tci.stop()
-    await websdr.stop()
 
 
 app = FastAPI(title="ORSAT-LOG", version=__version__, lifespan=lifespan)
 
 
-# ---------- accès protégé (mode serveur central) ----------
+# ---------- accès protégé ----------
 # Pages et appels accessibles sans session : la connexion elle-même.
 _PUBLIC = {"/login", "/favicon.ico"}
 
@@ -179,8 +140,10 @@ def _logged_in(cookies):
 
 @app.middleware("http")
 async def _require_login(request: Request, call_next):
-    if not auth.central_mode() or request.url.path in _PUBLIC or _logged_in(request.cookies):
+    if request.url.path in _PUBLIC or _logged_in(request.cookies):
         return await call_next(request)
+    if request.url.path.startswith("/api/") and auth.is_admin(request.headers):
+        return await call_next(request)                  # panneau admin du WebSDR
     if request.url.path.startswith("/api/"):
         return JSONResponse({"detail": "Connexion requise"}, status_code=401)
     return RedirectResponse("login", status_code=303)   # relatif : marche aussi derrière /log
@@ -188,9 +151,7 @@ async def _require_login(request: Request, call_next):
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page():
-    if not auth.central_mode():
-        return RedirectResponse("./", status_code=303)
-    err = "" if auth.password_origin() else "Aucun mot de passe défini sur le serveur."
+    err = "" if auth.password_available() else "Mot de passe du panneau admin introuvable sur le serveur."
     return _LOGIN_HTML.replace("__ERR__", err)
 
 
@@ -223,8 +184,38 @@ def logout():
 
 @app.get("/api/info")
 def info():
-    """Mode de fonctionnement, pour l'interface : en central, le navigateur fait lui-même le TCI."""
-    return {"version": __version__, "central": auth.central_mode()}
+    """Sondé par la page du WebSDR pour savoir si ce navigateur a une session au carnet."""
+    return {"version": __version__, "central": True}
+
+
+# ---------- panneau admin du WebSDR (en-tête X-OrsatLog-Admin) ----------
+def _require_admin(request: Request):
+    if not auth.is_admin(request.headers):
+        raise HTTPException(403, "Réservé au panneau admin")
+
+
+@app.get("/api/admin/status")
+def admin_status(request: Request):
+    _require_admin(request)
+    import subprocess
+    def git(*a):
+        r = subprocess.run(["git", "-C", str(ROOT), *a], capture_output=True, text=True, timeout=10)
+        return r.stdout.strip() if r.returncode == 0 else ""
+    from .db import DB_PATH
+    st = db.stats()
+    return {"version": __version__, "commit": git("log", "-1", "--format=%h"),
+            "commit_subject": git("log", "-1", "--format=%s"),
+            "commit_date": git("log", "-1", "--format=%cI"),
+            "db_size": DB_PATH.stat().st_size if DB_PATH.exists() else 0, **st,
+            "websdr_pages": websdr.state["pages"], "clients": len(_clients)}
+
+
+@app.post("/api/admin/restart")
+def admin_restart(request: Request):
+    """Redémarrage par systemd (Restart=always), après une mise à jour."""
+    _require_admin(request)
+    asyncio.get_event_loop().call_later(0.5, lambda: os.kill(os.getpid(), signal.SIGTERM))
+    return {"ok": True}
 
 
 # ---------- réglages ----------
@@ -234,7 +225,8 @@ def get_settings():
 
 
 @app.put("/api/settings")
-async def put_settings(values: dict):
+async def put_settings(values: dict, request: Request):
+    _require_admin(request)            # réglages : panneau admin uniquement
     before = db.get_settings()
     if values.get("swl_locator") and not geo.valid_locator(values["swl_locator"]):
         raise HTTPException(400, "Locator du WebSDR invalide")
@@ -250,10 +242,8 @@ async def put_settings(values: dict):
         values["weathercloud"] = weather.parse_code(values["weathercloud"])
     db.set_settings(values)
     after = db.get_settings()
-    if any(before.get(k) != after.get(k) for k in ("tci_host", "tci_port", "tci_trx", "tci_enabled")):
-        _restart_tci()
-    if any(before.get(k) != after.get(k) for k in ("websdr_port", "websdr_enabled")):
-        await _restart_websdr()
+    if any(before.get(k) != after.get(k) for k in ("locator", "swl_locator")):
+        recompute()                       # distances et azimuts de tout le carnet
     if before.get("weathercloud") != after.get("weathercloud"):
         asyncio.create_task(_record_weather())
     return after
@@ -268,7 +258,6 @@ def _origin_locator(kind):
     return s.get("locator", "")
 
 
-@app.post("/api/recompute")
 def recompute():
     """Recalcule distance et azimut de toutes les entrées (après un changement de locator)."""
     n = 0
@@ -281,53 +270,6 @@ def recompute():
             db.update_qso(q["id"], {"distance_km": d, "bearing": b})
             n += 1
     return {"updated": n}
-
-
-# ---------- mise à jour depuis GitHub ----------
-def _git(*args, timeout=30):
-    r = subprocess.run(["git", "-C", str(ROOT), *args], capture_output=True, text=True, timeout=timeout)
-    if r.returncode != 0:
-        raise RuntimeError((r.stderr or r.stdout).strip()[:300] or "erreur git")
-    return r.stdout.strip()
-
-
-def _check_update():
-    current = {"version": __version__, "commit": _git("rev-parse", "--short", "HEAD"),
-               "date": _git("log", "-1", "--format=%cd", "--date=format:%d/%m/%Y %H:%M")}
-    _git("fetch", "-q", "origin", timeout=60)
-    upstream = _git("rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}")
-    changes = _git("log", "--format=%s", f"HEAD..{upstream}")
-    return {"current": current, "changes": [c for c in changes.splitlines() if c]}
-
-
-@app.get("/api/update/check")
-async def update_check():
-    """Version installée + modifications disponibles sur GitHub."""
-    try:
-        return await asyncio.to_thread(_check_update)
-    except Exception as exc:
-        raise HTTPException(502, f"Vérification impossible : {exc}")
-
-
-@app.post("/api/update")
-def update_run(rebuild: bool = False):
-    if auth.central_mode():
-        raise HTTPException(400, "Serveur central : la mise à jour se fait sur le serveur (service ORSAT-LOG)")
-    """Lance le lanceur (mise à jour + recompilation + redémarrage) dans un processus détaché :
-    il ferme cette instance et rouvre l'application à jour."""
-    if not LAUNCHER.exists():
-        raise HTTPException(500, "Lanceur orsat-log.sh introuvable")
-    # rebuild = recompilation complète (comme « orsat-log --rebuild »)
-    cmd = ["bash", str(LAUNCHER)] + (["--rebuild"] if rebuild else [])
-    subprocess.Popen(cmd, cwd=str(ROOT), start_new_session=True,
-                     stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return {"ok": True}
-
-
-# ---------- radio / solaire ----------
-@app.get("/api/radio")
-def get_radio():
-    return tci.state
 
 
 # Mode du carnet (ADIF) -> modulation TCI pour recaler la page du WebSDR
@@ -348,7 +290,7 @@ class MirrorIn(BaseModel):
 
 @app.post("/api/websdr/mirror")
 async def websdr_mirror(m: MirrorIn):
-    """Serveur central : AetherSDR (suivi par le navigateur) a changé de fréquence ; la page
+    """AetherSDR (suivi par le navigateur de l'opérateur) a changé de fréquence ; la page
     WebSDR l'a suivi par CAT Sync sans le relayer au carnet."""
     websdr.mirror(m.freq, m.modulation)
     return {"ok": True}
@@ -356,19 +298,16 @@ async def websdr_mirror(m: MirrorIn):
 
 @app.post("/api/tune")
 async def tune(t: TuneIn):
-    """Recale sur une entrée du carnet : une écoute SWL règle la page du WebSDR,
-    un QSO (ou un QSO de groupe) règle le transceiver (AetherSDR)."""
+    """Recale la page du WebSDR sur une écoute SWL du carnet. (Un QSO règle AetherSDR
+    directement depuis le navigateur de l'opérateur : frontend/src/tciBrowser.js.)"""
     mode = (t.submode or t.mode).upper()
     tci_mode = _TUNE_MODES.get(mode)
     if not tci_mode and mode not in ("", "SSB"):
         tci_mode = "usb"        # modes numériques (FT8, RTTY...) : écoute en USB
     if mode == "SSB":
         tci_mode = "lsb" if t.freq < 10_000_000 else "usb"
-    if t.kind == "SWL":
-        if not await websdr.tune(t.freq, tci_mode):
-            raise HTTPException(409, "Aucune page WebSDR connectée (bouton CAT Sync de la page ORSAT)")
-    elif not await tci.tune(t.freq, tci_mode):
-        raise HTTPException(409, "Transceiver TCI non connecté (AetherSDR)")
+    if not await websdr.tune(t.freq, tci_mode):
+        raise HTTPException(409, "Aucune page WebSDR reliée (ouvrez https://orsat.ddns.net dans ce navigateur)")
     return {"ok": True}
 
 
@@ -688,12 +627,14 @@ def delete_qso(qso_id: int):
 
 # ---------- sauvegardes ----------
 @app.get("/api/backups")
-def list_backups():
+def list_backups(request: Request):
+    _require_admin(request)
     return {"items": backup.list_backups(), "keep_days": backup.KEEP_DAYS}
 
 
 @app.get("/api/backup/download")
-def download_backup():
+def download_backup(request: Request):
+    _require_admin(request)
     """Copie fraîche de la base, à garder chez soi."""
     tmp = backup.snapshot_file(db)
     name = f"orsat-log_{datetime.now(timezone.utc):%Y%m%d-%H%M}.db"
@@ -702,7 +643,8 @@ def download_backup():
 
 
 @app.get("/api/backups/{name}")
-def get_backup(name: str):
+def get_backup(name: str, request: Request):
+    _require_admin(request)
     path = backup.BACKUP_DIR / name
     if not backup.valid_name(name) or not path.is_file():
         raise HTTPException(404, "Sauvegarde introuvable")
@@ -710,7 +652,8 @@ def get_backup(name: str):
 
 
 @app.post("/api/restore")
-async def restore(file: UploadFile = File(...)):
+async def restore(request: Request, file: UploadFile = File(...)):
+    _require_admin(request)
     """Remplace la base par une sauvegarde. La base actuelle est d'abord sauvegardée."""
     tmp = backup.DATA_DIR / "restore-upload.tmp"
     try:
@@ -740,12 +683,11 @@ def export_adif():
 # ---------- temps réel ----------
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
-    if auth.central_mode() and not _logged_in(ws.cookies):
+    if not _logged_in(ws.cookies):
         await ws.close(code=4401)
         return
     await ws.accept()
     _clients.add(ws)
-    await ws.send_text(json.dumps({"type": "radio", "data": tci.state}))
     await ws.send_text(json.dumps({"type": "websdr", "data": websdr.state}))
     try:
         while True:
@@ -758,12 +700,12 @@ async def ws_endpoint(ws: WebSocket):
 
 @app.websocket("/tci")
 async def tci_page(ws: WebSocket):
-    """Serveur central : la page WebSDR (CAT Sync) s'y connecte comme à un serveur TCI."""
-    if not auth.central_mode() or not _logged_in(ws.cookies):
+    """La page du WebSDR s'y relie et parle TCI (voir websdr.py)."""
+    if not _logged_in(ws.cookies):
         await ws.close(code=4401)
         return
     await ws.accept()
-    await websdr.on_page(FastApiPage(ws))
+    await websdr.on_page(Page(ws))
 
 
 # ---------- frontend compilé ----------

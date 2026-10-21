@@ -1,39 +1,15 @@
 """Base SQLite du carnet : QSO / écoutes SWL, relevés de propagation, notes du jour, réglages."""
 
 import json
-import logging
 import os
 import sqlite3
 import threading
 from pathlib import Path
 
-# Données dans le dossier d'ORSAT-LOG lui-même : ~/Orsat-LOG/data (ignoré par git).
-# ORSATLOG_DATA permet toujours de choisir un autre dossier.
 ROOT = Path(__file__).resolve().parents[2]
-OLD_DATA_DIR = Path.home() / ".local/share/orsat-log"      # emplacement jusqu'à la v0.6.4
+# Données dans le dossier du carnet : ~/Orsat-LOG/data (ignoré par git) ; ORSATLOG_DATA pour changer.
 DATA_DIR = Path(os.environ.get("ORSATLOG_DATA", ROOT / "data"))
 DB_PATH = DATA_DIR / "orsatlog.db"
-
-
-def _migrate_old_db():
-    """Reprend la base de l'ancien emplacement au premier lancement. L'ancienne est
-    renommée orsatlog.db.ancien (copie de sécurité), jamais supprimée."""
-    old = OLD_DATA_DIR / "orsatlog.db"
-    if "ORSATLOG_DATA" in os.environ or DB_PATH.exists() or not old.exists():
-        return
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
-    src = sqlite3.connect(old)
-    try:
-        dst = sqlite3.connect(DB_PATH)
-        src.backup(dst)          # copie cohérente, journal WAL compris
-        dst.close()
-    finally:
-        src.close()
-    old.rename(old.with_name("orsatlog.db.ancien"))
-    logging.getLogger("orsatlog").info("Base déplacée de %s vers %s", old, DB_PATH)
-
-
-_migrate_old_db()
 
 DEFAULT_SETTINGS = {
     "callsign": "",
@@ -43,8 +19,6 @@ DEFAULT_SETTINGS = {
     "tci_port": "50001",
     "tci_trx": "0",
     "tci_enabled": "1",
-    "websdr_port": "40001",
-    "websdr_enabled": "1",
     "weathercloud": "9224966553",   # identifiant de la station Weathercloud (F1NSK - Castets)
 }
 
@@ -255,6 +229,16 @@ class Database:
                 (limit,),
             ).fetchall()
         return [dict(r) for r in rows]
+
+    def stats(self):
+        """Chiffres pour le panneau admin."""
+        with self._lock:
+            row = self._con.execute(
+                "SELECT SUM(kind = 'QSO') AS qso, SUM(kind = 'SWL') AS swl, "
+                "MIN(qso_date) AS first_day, MAX(qso_date) AS last_day FROM qso").fetchone()
+            sessions = self._con.execute("SELECT COUNT(*) FROM session").fetchone()[0]
+        return {"qso": row["qso"] or 0, "swl": row["swl"] or 0, "sessions": sessions,
+                "first_day": row["first_day"] or "", "last_day": row["last_day"] or ""}
 
     def all_qsos(self):
         with self._lock:

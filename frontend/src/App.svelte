@@ -3,7 +3,6 @@
   import { api, liveSocket } from './api.js';
   import { startTci, stopTci } from './tciBrowser.js';
   import { pad, dayOf, addDays, longDay, kClass } from './util.js';
-  import Settings from './Settings.svelte';
   import DayPage from './DayPage.svelte';
   import LogBook from './LogBook.svelte';
   import Calendar from './Calendar.svelte';
@@ -12,8 +11,6 @@
   let radio = $state({ connected: false, freq: 0, mode: '', submode: '', ptt: false, device: '' });
   let websdr = $state({ listening: false, connected: false, freq: 0, mode: '', submode: '', ptt: false, device: 'WebSDR' });
   let solar = $state(null);
-  let central = $state(false);          // serveur central : le navigateur fait lui-même le TCI
-  let showSettings = $state(false);
   let showCalendar = $state(false);
   let view = $state('day');              // 'day' = page d'agenda, 'log' = carnet complet
   let utc = $state(new Date());
@@ -30,8 +27,8 @@
   }
 
   function onKey(e) {
-    if (showSettings || showCalendar) {
-      if (e.key === 'Escape') { showSettings = false; showCalendar = false; }
+    if (showCalendar) {
+      if (e.key === 'Escape') showCalendar = false;
       return;
     }
     if (e.key === 'Escape' && view === 'day') dayPage?.clearForm();
@@ -42,7 +39,7 @@
     if (e.altKey && (e.key === 'c' || e.key === 'C')) view = view === 'log' ? 'day' : 'log';
   }
 
-  // Serveur central : liaison TCI avec AetherSDR ouverte par ce navigateur (sur ce PC)
+  // Liaison TCI avec AetherSDR, ouverte par ce navigateur (sur le PC de l'opérateur)
   function browserTci(s) {
     if (s.tci_enabled === '1') {
       let lastF = null, lastM = null;
@@ -68,15 +65,12 @@
   async function refreshSolar() { solar = await api.solar().catch(() => solar); }
 
   onMount(() => {
-    Promise.all([api.settings(), api.info().catch(() => ({}))]).then(([s, inf]) => {
+    api.settings().then((s) => {
       settings = s;
-      central = !!inf.central;
-      if (central) browserTci(s);
-      if (!s.callsign || !s.locator) showSettings = true;
+      browserTci(s);
     });
     refreshSolar();
-    const stop = liveSocket((msg) => { if (msg.type === 'radio') { if (!central) radio = msg.data; }
-      else if (msg.type === 'websdr') websdr = msg.data; });
+    const stop = liveSocket((msg) => { if (msg.type === 'websdr') websdr = msg.data; });
     const clock = setInterval(() => {
       utc = new Date();
       const t = dayOf(utc);
@@ -98,6 +92,9 @@
     <span class="logo">ORSAT</span><span class="logo-sub">-LOG</span>
     {#if settings.callsign}
       <span class="station mono">{settings.callsign}{settings.locator ? ` · ${settings.locator}` : ''}</span>
+    {:else if settings.tci_port}
+      <span class="station setup" title="Indicatif, locators, TCI et météo se règlent dans le panneau admin du WebSDR">
+        À régler : panneau admin → Carnet ORSAT-LOG</span>
     {/if}
   </div>
 
@@ -129,8 +126,7 @@
       {view === 'log' ? 'Agenda' : 'Carnet'}
     </button>
     <a class="btn" href="api/export/adif" title="Exporter tout le carnet au format ADIF">ADIF</a>
-    <button onclick={() => (showSettings = true)} title="Réglages de la station et de la connexion TCI">Réglages</button>
-    {#if central}<button onclick={logout} title="Fermer la session du carnet sur ce navigateur">Déconnexion</button>{/if}
+    <button onclick={logout} title="Fermer la session du carnet sur ce navigateur">Déconnexion</button>
   </div>
 </header>
 
@@ -144,10 +140,6 @@
   <Calendar {day} {today} onpick={openDay} onclose={() => (showCalendar = false)} />
 {/if}
 
-{#if showSettings}
-  <Settings {settings} onclose={() => (showSettings = false)}
-            onsaved={(s) => { settings = s; showSettings = false; if (central) browserTci(s); }} />
-{/if}
 
 <style>
   .topbar {
@@ -175,4 +167,5 @@
   .clock { color: var(--gold); font-size: 1.05rem; margin-right: 6px; }
   button.active { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); font-weight: 600; }
   :global(.ok) { color: var(--ok); } :global(.warn) { color: var(--warn); } :global(.bad) { color: var(--bad); }
+  .station.setup { color: var(--warn); font-family: inherit; font-size: 0.82rem; }
 </style>

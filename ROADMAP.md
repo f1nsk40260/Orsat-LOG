@@ -220,7 +220,21 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - Distances / azimuts : QSO depuis la station, SWL depuis le WebSDR ; ADIF `MY_GRIDSQUARE` idem.
 - Changement de locator → recalcul de tout le carnet (`POST /api/recompute`).
 
-## Deux PC (question F1NSK 20/10)
+## Fait — v1.0.0 (21/10/2026) : un seul centre de gestion, fin de la version bureau
+- **Réglages déplacés dans le panneau admin du WebSDR**, rubrique « Carnet ORSAT-LOG »
+  (`admin_extras.py` / `admin_extras.js` de PhantomSDR-ORSAT) : état du service (version, QSO/SWL,
+  taille de la base, pages reliées), station (indicatif, 2 locators, météo), TCI, sauvegardes
+  (téléchargement, restauration), mise à jour (`update-server.sh` puis redémarrage par systemd).
+- Le panneau parle au carnet en interne (127.0.0.1:log_port) avec l'en-tête `X-OrsatLog-Admin` =
+  HMAC-SHA256(password_hash, "orsatlog-admin") ; réglages en écriture, sauvegardes et restauration
+  **réservés au panneau** (403 sinon). Le carnet lit seulement les réglages (pour le TCI du navigateur).
+- Carnet : plus de bouton Réglages ; si l'indicatif manque, l'en-tête l'indique (« À régler : panneau admin »).
+- **Version bureau supprimée** : `orsat-log.sh`, `update.sh`, `tci.py` (TCI côté serveur), port local
+  40001, fenêtre pywebview, `--central`, `--set-password`, reprise de `~/.local/share/orsat-log`,
+  mise à jour depuis l'interface. `run.py` = serveur seul. Mot de passe = panneau admin uniquement.
+- Le service `orsat-log` apparaît aussi dans « Santé du serveur » du panneau.
+
+## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
   dossier synchronisé (Syncthing/Nextcloud, jamais les deux PC ouverts en même temps) /

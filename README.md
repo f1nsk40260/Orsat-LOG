@@ -1,35 +1,45 @@
 # ORSAT-LOG
 
-Carnet de trafic radioamateur pour Linux, connecté au transceiver en **TCI**, orienté analyse de la propagation.
+Carnet de trafic radioamateur orienté analyse de la propagation, installé sur le PC du
+WebSDR **PhantomSDR-ORSAT** et servi par lui sous **https://orsat.ddns.net/log/**.
 
-## Installation (une seule fois)
+- **Exploitation** : depuis n'importe quel poste, dans un navigateur. Mot de passe = celui du
+  panneau admin du WebSDR.
+  - QSO / QSO de groupe : le navigateur se relie lui-même à AetherSDR (TCI, `ws://127.0.0.1:50001`
+    sur le poste d'exploitation).
+  - SWL : la page du WebSDR ouverte dans le même navigateur envoie fréquence et mode au carnet.
+- **Gestion** : panneau admin du WebSDR, rubrique **Carnet ORSAT-LOG** : réglages (indicatif,
+  locators station / WebSDR, TCI, météo), sauvegardes et restauration, mise à jour, état du service.
+
+## Installation sur le PC du WebSDR (une seule fois)
 
 ```bash
-git clone git@github.com:f1nsk40260/Orsat-LOG.git ~/Orsat-LOG
-cd ~/Orsat-LOG
-chmod +x update.sh
-./update.sh
+cd ~ && git clone https://github.com/f1nsk40260/Orsat-LOG.git
+cd ~/Orsat-LOG && bash install-server.sh ~/PhantomSDR-Plus
 ```
 
-Prérequis : Python 3.10+, Node.js/npm, et pour la fenêtre native GTK/WebKit
-(Debian/Ubuntu/Mint : `sudo apt install python3-gi gir1.2-webkit2-4.1`).
+Le script crée le service systemd `orsat-log` (priorité basse, plafonds CPU et mémoire), ajoute
+`log_port` à `admin_config.json` et relance le proxy du WebSDR (quelques secondes de coupure).
+Prérequis : Python 3 avec venv, Node.js/npm (nvm accepté).
 
-## Mise à jour et lancement
+## Mises à jour
+
+Depuis le panneau admin (rubrique Carnet ORSAT-LOG → METTRE À JOUR), ou à la main :
 
 ```bash
-~/Orsat-LOG/update.sh
+bash ~/Orsat-LOG/update-server.sh && sudo systemctl restart orsat-log
 ```
 
-Le script récupère le code, installe les dépendances, recompile l'interface,
-crée le raccourci « ORSAT-LOG » dans le menu et lance l'application.
+## Données
 
-Lancement direct : `.venv/bin/python run.py` (options `--browser`, `--server`, `--debug`).
+`~/Orsat-LOG/data/` (jamais envoyé sur GitHub) : base `orsatlog.db`, copies quotidiennes
+`backups/`, clé de session `secret.key`.
 
-## Développement de l'interface
+## Développement
 
 ```bash
-.venv/bin/python run.py --server     # backend sur :8740
-cd frontend && npm run dev           # interface avec rechargement à chaud
+.venv/bin/python run.py                              # serveur sur 127.0.0.1:8740
+cd frontend && npm run dev                           # interface avec rechargement à chaud
 ```
 
 Voir [ROADMAP.md](ROADMAP.md) pour l'état du projet.

@@ -12,9 +12,9 @@
   // Clic sur une fréquence : SWL = la page WebSDR se recale, QSO / groupe = le transceiver
   async function tune(q) {
     try {
-      // Serveur central : le transceiver est piloté par la liaison TCI de ce navigateur
-      if (q.kind !== 'SWL' && tciActive()) {
-        if (!tciTune(q.freq, tciModeFor(q))) throw new Error('Transceiver TCI non connecté (AetherSDR, sur ce PC)');
+      // QSO : AetherSDR, par la liaison TCI de ce navigateur ; SWL : la page du WebSDR
+      if (q.kind !== 'SWL') {
+        if (!tciActive() || !tciTune(q.freq, tciModeFor(q))) throw new Error('Transceiver TCI non connecté (AetherSDR, sur ce PC)');
         return;
       }
       await api.tune(q);

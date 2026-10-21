@@ -1,35 +1,40 @@
-"""Serveur TCI local pour la page du WebSDR ORSAT.
+"""Liaison TCI avec la page du WebSDR ORSAT.
 
-La page du WebSDR (bouton « CAT Sync », lib/catsync.js de PhantomSDR-ORSAT)
-cherche un serveur TCI sur localhost, ports 50001 et 40001. ORSAT-LOG écoute
-sur 40001 (50001 reste au transceiver, AetherSDR) : la page s'y connecte et
-lui envoie la fréquence et le mode de ce que l'auditeur écoute vraiment.
+La page du WebSDR (même adresse que le carnet, https://orsat.ddns.net) ouvre un
+WebSocket sur /log/tci dès que ce navigateur a une session au carnet, et parle TCI :
 
-    page -> ORSAT-LOG : vfo:0,0,<Hz>;  modulation:0,<mode>;  rx_filter_band:0,<bas>,<haut>;
-    ORSAT-LOG -> page : vfo:0,0,<Hz>;  modulation:0,<mode>;   (recalage depuis le carnet)
+    page -> carnet : vfo:0,0,<Hz>;  modulation:0,<mode>;      (fréquence et mode écoutés)
+    carnet -> page : vfo:0,0,<Hz>;  modulation:0,<mode>;      (recalage depuis le carnet)
 
-À la connexion, la page interroge « vfo:0; modulation:0; trx:0; ». Le carnet ne
-répond jamais à ces questions : la page est la référence. En serveur central, la
-page envoie d'elle-même sa fréquence et son mode dès la connexion.
+La page est la référence : elle envoie d'elle-même fréquence et mode dès la connexion,
+et le carnet ne répond jamais à ses questions (« vfo:0; », « trx:0; »...).
 """
 
-import asyncio
 import logging
-
-import websockets
-
-from .tci import TCI_MODES
 
 log = logging.getLogger("orsatlog.websdr")
 
+# modulation TCI -> (mode ADIF, sous-mode ADIF)
+TCI_MODES = {
+    "usb": ("SSB", "USB"),
+    "lsb": ("SSB", "LSB"),
+    "cw": ("CW", ""),
+    "cwr": ("CW", ""),
+    "rtty": ("RTTY", ""),
+    "am": ("AM", ""),
+    "sam": ("AM", ""),
+    "dsb": ("AM", ""),
+    "fm": ("FM", ""),
+    "nfm": ("FM", ""),
+    "wfm": ("FM", ""),
+    "digu": ("", ""),   # mode numérique : laissé au choix de l'opérateur (FT8, RTTY...)
+    "digl": ("", ""),
+    "drm": ("DRM", ""),
+}
 
-class PageClosed(Exception):
-    pass
 
-
-class FastApiPage:
-    """Page WebSDR arrivée par le WebSocket /tci du carnet central (même adresse que le
-    WebSDR, derrière proxy.py) : même interface qu'une connexion websockets."""
+class Page:
+    """Une page WebSDR reliée par le WebSocket /tci (FastAPI)."""
 
     def __init__(self, ws):
         self.ws = ws
@@ -48,19 +53,13 @@ class FastApiPage:
             raise StopAsyncIteration
 
 
-class WebSdrServer:
+class WebSdrLink:
     def __init__(self, on_change):
         self._on_change = on_change
-        self._server = None
         self._pages = set()
-        self.port = 40001
-        self.state = self._empty_state()
-
-    @staticmethod
-    def _empty_state():
-        return {
-            "listening": False,   # le port TCI est ouvert
-            "connected": False,   # au moins une page WebSDR est connectée
+        self.state = {
+            "listening": True,
+            "connected": False,   # au moins une page WebSDR est reliée
             "pages": 0,
             "device": "WebSDR",
             "freq": 0,
@@ -71,91 +70,39 @@ class WebSdrServer:
             "error": "",
         }
 
-    # --- cycle de vie ---
-    async def start(self, port):
-        await self.stop()
-        self.port = int(port)
-        # La page cherche « localhost », que Linux résout d'abord en ::1 (IPv6) :
-        # on écoute donc sur les deux boucles locales, IPv4 seule si IPv6 est coupé.
-        try:
-            try:
-                self._server = await websockets.serve(self._on_page, ["127.0.0.1", "::1"],
-                                                      self.port, max_size=2**20)
-            except OSError as exc:
-                if "::1" in str(exc) or getattr(exc, "errno", None) in (97, 99):
-                    self._server = await websockets.serve(self._on_page, "127.0.0.1",
-                                                          self.port, max_size=2**20)
-                else:
-                    raise
-        except OSError as exc:
-            log.warning("WebSDR : port %s indisponible : %s", self.port, exc)
-            self._set(error=f"port {self.port} déjà utilisé (un autre logiciel TCI ?)")
-            return
-        log.info("WebSDR : serveur TCI sur ws://127.0.0.1:%s", self.port)
-        self._set(listening=True, error="")
-
-    def serve_central(self):
-        """Serveur central : pas de port local, les pages arrivent par /tci (server.py)."""
-        self._set(listening=True, error="")
-
     async def on_page(self, page):
-        await self._on_page(page)
-
-    async def stop(self):
-        if self._server:
-            self._server.close()
-            await self._server.wait_closed()
-            self._server = None
-        self._pages.clear()
-        self._set(**self._empty_state())
-
-    # --- une page WebSDR ---
-    async def _on_page(self, ws):
-        self._pages.add(ws)
+        self._pages.add(page)
         self._set(connected=True, pages=len(self._pages))
-        log.info("WebSDR : page connectée (%d)", len(self._pages))
+        log.info("WebSDR : page reliée (%d)", len(self._pages))
         try:
-            await ws.send("protocol:ExpertSDR3,1.9;device:ORSAT-LOG;receive_only:true;"
-                          "trx_count:1;channels_count:1;ready;")
-            seen = 0
-            async for msg in ws:
-                if isinstance(msg, str):
-                    # Journal : les 30 premiers messages de chaque page (diagnostic)
-                    seen += 1
-                    if seen <= 30:
-                        log.info("WebSDR reçu : %s", msg.strip().replace("\n", " "))
-                    for cmd in msg.replace("\n", "").split(";"):
-                        cmd = cmd.strip()
-                        if cmd:
-                            await self._handle(ws, cmd)
-        except (websockets.ConnectionClosed, PageClosed):
-            pass
+            await page.send("protocol:ExpertSDR3,1.9;device:ORSAT-LOG;receive_only:true;"
+                            "trx_count:1;channels_count:1;ready;")
+            async for msg in page:
+                for cmd in msg.replace("\n", "").split(";"):
+                    cmd = cmd.strip()
+                    if cmd:
+                        await self._handle(page, cmd)
+        except Exception as exc:      # page fermée brutalement
+            log.debug("WebSDR : %s", exc)
         finally:
-            self._pages.discard(ws)
+            self._pages.discard(page)
             self._set(connected=bool(self._pages), pages=len(self._pages))
             log.info("WebSDR : page déconnectée (%d)", len(self._pages))
 
-    async def _handle(self, ws, cmd):
+    async def _handle(self, page, cmd):
         name, _, args = cmd.partition(":")
         name = name.strip().lower()
         parts = [a.strip() for a in args.split(",")] if args else []
-        st = self.state
-        if name == "vfo":
-            if len(parts) >= 3:                       # la page a changé de fréquence
-                try:
-                    self._set(freq=int(float(parts[2])))
-                except ValueError:
-                    return
-                await self._send_others(ws, f"vfo:0,0,{st['freq']};")
-            # Question « vfo:0; » : pas de réponse. La page est la référence ; lui renvoyer
-            # une fréquence connue la ferait sauter sur une ancienne écoute à l'ouverture.
-        elif name == "modulation":
-            if len(parts) >= 2:
-                self._set_modulation(parts[1])
-                await self._send_others(ws, f"modulation:0,{st['modulation']};")
-        # trx (PTT) : jamais de réponse. Un « trx:0,false » rétablirait le son de
-        # la page si elle se connectait pendant une émission d'AetherSDR.
-        # rx_filter_band et le reste : rien à faire pour un carnet
+        if name == "vfo" and len(parts) >= 3:
+            try:
+                self._set(freq=int(float(parts[2])))
+            except ValueError:
+                return
+            await self._send_others(page, f"vfo:0,0,{self.state['freq']};")
+        elif name == "modulation" and len(parts) >= 2:
+            self._set_modulation(parts[1])
+            await self._send_others(page, f"modulation:0,{self.state['modulation']};")
+        # questions (vfo:0; modulation:0; trx:0;) et le reste : pas de réponse
 
     def _set_modulation(self, mod):
         mod = mod.lower()
@@ -170,9 +117,8 @@ class WebSdrServer:
                 except Exception:          # page fermée entre-temps
                     pass
 
-    # --- recalage de la page depuis le carnet ---
     async def tune(self, freq, modulation=None):
-        """Envoie fréquence (Hz) et mode TCI à la page. Retourne False sans page connectée."""
+        """Recale la page sur une entrée du carnet. False si aucune page n'est reliée."""
         if not self._pages:
             return False
         text = f"vfo:0,0,{int(freq)};"
@@ -181,7 +127,7 @@ class WebSdrServer:
         for p in list(self._pages):
             try:
                 await p.send(text)
-            except Exception:              # page fermée entre-temps
+            except Exception:
                 pass
         self._set(freq=int(freq))
         if modulation:
@@ -189,9 +135,8 @@ class WebSdrServer:
         return True
 
     def mirror(self, freq, modulation=""):
-        """AetherSDR a changé de fréquence : la page (CAT Sync) l'a suivie sans nous
-        le relayer. On recopie, seulement si la page nous a déjà parlé (freq connue),
-        ce qui prouve que CAT Sync est activé."""
+        """AetherSDR a changé de fréquence ; la page l'a suivi (CAT Sync). Recopié
+        seulement si la page a déjà parlé (fréquence connue)."""
         if not (self._pages and self.state["freq"] and freq):
             return
         self._set(freq=int(freq))
