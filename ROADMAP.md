@@ -258,6 +258,11 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - Bande recalculée depuis FREQ (sinon BAND du fichier) ; distance / azimut depuis le locator station ;
   SFI/A/K laissés vides (inconnus pour un contact ancien).
 - Pas d'import dans le journal d'écoute (décision F1NSK).
+- v1.2.1 (retour F1NSK : export QRZ.com refusé) : longueurs ADIF en **caractères** (QRZ.com compte ainsi ;
+  le comptage en octets tronquait les valeurs accentuées), lecture UTF-8 sinon Latin-1, export aligné.
+  Le refus venait surtout du proxy du WebSDR (limite aiohttp 1 Mo) : PhantomSDR-ORSAT `proxy.py` accepte
+  désormais 60 Mo sous `/log` seulement. Testé avec l'export QRZ réel de F1NSK (4,6 Mo, 4 603 QSO :
+  4 596 importés, 7 doublons QRZ, < 1 s).
 
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.

@@ -19,7 +19,7 @@ _MAP = [
 
 def _field(tag, value):
     value = str(value)
-    return f"<{tag}:{len(value.encode('utf-8'))}>{value} "
+    return f"<{tag}:{len(value)}>{value} "        # longueur en caractères, comme QRZ.com
 
 
 def export(qsos, my_call="", my_grid="", swl_grid="", kind="QSO"):
@@ -65,22 +65,27 @@ def export(qsos, my_call="", my_grid="", swl_grid="", kind="QSO"):
 
 
 # ---------- import ----------
-_TAG = re.compile(rb"<([A-Za-z0-9_]+)(?::(\d+)(?::[A-Za-z])?)?>")
+_TAG = re.compile(r"<([A-Za-z0-9_]+)(?::(\d+)(?::[A-Za-z])?)?>")
 
 
 def parse(data: bytes):
     """Lit un fichier ADIF (.adi) et renvoie la liste des enregistrements {CHAMP: valeur}.
-    L'en-tête (avant <EOH>) est ignoré. Longueurs comptées en octets, comme notre export."""
-    m = re.search(rb"<eoh>", data, re.IGNORECASE)
+    L'en-tête (avant <EOH>) est ignoré. Longueurs en caractères (QRZ.com, la plupart des
+    logiciels) ; fichier en UTF-8, sinon Latin-1."""
+    try:
+        data = data.decode("utf-8")
+    except UnicodeDecodeError:
+        data = data.decode("latin-1")
+    m = re.search(r"<eoh>", data, re.IGNORECASE)
     pos = m.end() if m else 0
-    if not m and not data.lstrip().startswith(b"<"):
+    if not m and not data.lstrip().startswith("<"):
         pos = len(data)          # texte d'en-tête sans <EOH> : rien à lire
     records, cur = [], {}
     while True:
         m = _TAG.search(data, pos)
         if not m:
             break
-        tag = m.group(1).decode("ascii").upper()
+        tag = m.group(1).upper()
         if tag == "EOR":
             if cur:
                 records.append(cur)
@@ -88,7 +93,7 @@ def parse(data: bytes):
             pos = m.end()
             continue
         n = int(m.group(2) or 0)
-        value = data[m.end():m.end() + n].decode("utf-8", errors="replace").strip()
+        value = data[m.end():m.end() + n].strip()
         if value:
             cur[tag] = value
         pos = m.end() + n
