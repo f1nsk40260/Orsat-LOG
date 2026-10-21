@@ -66,7 +66,6 @@
   .logbook { padding: 14px; height: calc(100vh - 62px); }
   .full { height: 100%; display: flex; flex-direction: column; min-height: 0; }
   .head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-  .head .panel-title { margin: 0; white-space: nowrap; }
   .books { display: flex; gap: 8px; }
   .book { padding: 6px 14px; border-radius: 7px; background: rgba(0, 0, 0, 0.35); font-weight: 600; letter-spacing: 0.04em; }
   .book.trafic { --bc: 207, 181, 59; }

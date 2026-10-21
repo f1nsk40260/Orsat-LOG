@@ -420,6 +420,51 @@ def list_qsos(limit: int = 200):
     return db.list_qsos(limit)
 
 
+@app.get("/api/qsos/{qso_id}/context")
+def qso_context(qso_id: int):
+    """Tout ce qu'il faut pour la fiche d'un QSO : conditions solaires et géomagnétiques du jour
+    (archive GFZ), SFI des 7 jours autour, position dans le cycle solaire, QTH d'émission,
+    autres QSO du jour sur la bande, historique avec la station."""
+    q = db.get_qso(qso_id)
+    if not q:
+        raise HTTPException(404, "Entrée introuvable")
+    q.pop("adif_extra", None)
+    s = db.get_settings()
+    table = enrich.gfz_table()
+    from datetime import date as _date, timedelta as _td
+    d0 = _date(int(q["qso_date"][:4]), int(q["qso_date"][4:6]), int(q["qso_date"][6:8]))
+    day = table.get(q["qso_date"])
+    week = []
+    for i in range(-7, 8):
+        k = (d0 + _td(days=i)).strftime("%Y%m%d")
+        row = table.get(k)
+        week.append({"day": k, "sfi": row[2] if row else None, "ap": row[1] if row else None,
+                     "kp_max": max([x for x in row[0] if x is not None], default=None) if row else None})
+    try:
+        slot = min(7, int((q["time_on"] or "00")[:2]) // 3)
+    except ValueError:
+        slot = 0
+    origin = enrich.origin_of(q, s)
+    origin_ll = geo.locator_to_latlon(origin) if geo.valid_locator(origin) else None
+    target_ll = None
+    if geo.valid_locator(q.get("gridsquare") or ""):
+        target_ll = geo.locator_to_latlon(q["gridsquare"])
+    elif q.get("lat") is not None and q.get("lon") is not None:
+        target_ll = (q["lat"], q["lon"])
+    return {
+        "qso": q,
+        "origin": origin, "origin_ll": origin_ll, "target_ll": target_ll,
+        "solar": {"kp": day[0] if day else None, "ap": day[1] if day else None,
+                  "sfi": day[2] if day else None, "sn": day[3] if day else None,
+                  "slot": slot, "source": "GFZ" if day else None},
+        "week": week,
+        "cycle": enrich.cycle_of(q["qso_date"]),
+        "snapshot": db.snapshots_around(q["qso_date"], q["time_on"]),
+        "same_day_band": db.same_day_band(q["qso_date"], q.get("band"), qso_id),
+        "same_call": db.same_call(q["call"], qso_id) if q.get("kind") == "QSO" else [],
+    }
+
+
 @app.get("/api/worked/{call}")
 def worked(call: str):
     return db.worked_before(call)

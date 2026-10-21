@@ -107,7 +107,7 @@ def _download():
 
 
 def load_gfz():
-    """{AAAAMMJJ: (kp[8], Ap, F10.7obs)} ; valeurs manquantes (-1) -> None."""
+    """{AAAAMMJJ: (kp[8], Ap, F10.7obs, SN)} ; valeurs manquantes (-1) -> None."""
     out = {}
     try:
         lines = GFZ_FILE.read_text(errors="replace").splitlines()
@@ -123,20 +123,59 @@ def load_gfz():
             day = f"{int(t[0]):04d}{int(t[1]):02d}{int(t[2]):02d}"
             kp = [float(x) for x in t[7:15]]
             ap_day = float(t[23])
+            sn = float(t[24])
             f107 = float(t[25])
         except ValueError:
             continue
         out[day] = ([k if k >= 0 else None for k in kp],
                     ap_day if ap_day >= 0 else None,
-                    f107 if f107 > 0 else None)
+                    f107 if f107 > 0 else None,
+                    sn if sn >= 0 else None)
     return out
+
+
+_cache = {"mtime": None, "table": {}}
+
+
+def gfz_table():
+    """Archive GFZ chargée une fois (rechargée si le fichier a changé)."""
+    try:
+        m = GFZ_FILE.stat().st_mtime
+    except OSError:
+        return {}
+    if _cache["mtime"] != m:
+        _cache.update(mtime=m, table=load_gfz())
+    return _cache["table"]
+
+
+# Cycles solaires (début = minimum, maximum lissé). Cycle 25 : maximum provisoire.
+CYCLES = [
+    (23, "199608", "200111"),
+    (24, "200812", "201404"),
+    (25, "201912", "202410"),
+]
+
+
+def cycle_of(qso_date):
+    """(numéro du cycle, mois depuis le début, mois par rapport au maximum) pour AAAAMMJJ."""
+    ym = qso_date[:6]
+    current = None
+    for num, start, peak in CYCLES:
+        if ym >= start:
+            current = (num, start, peak)
+    if not current:
+        return None
+    num, start, peak = current
+    months = lambda a, b: (int(b[:4]) - int(a[:4])) * 12 + int(b[4:6]) - int(a[4:6])
+    return {"cycle": num, "since_start": months(start, ym), "from_max": months(peak, ym),
+            "max_provisional": num == 25}
 
 
 def solar_for(table, qso_date, time_on):
     row = table.get(qso_date)
     if not row:
         return None
-    kp, ap, f107 = row
+    kp, ap, f107 = row[:3]
     try:
         slot = min(7, int((time_on or "0000")[:2]) // 3)
     except ValueError:

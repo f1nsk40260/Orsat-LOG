@@ -22,6 +22,7 @@ export const api = {
   info: () => req('GET', 'api/info'),
   websdrMirror: (freq, modulation) => req('POST', 'api/websdr/mirror', { freq, modulation }),
   logout: () => req('POST', 'api/logout'),
+  qsoContext: (id) => req('GET', `api/qsos/${id}/context`),
   settings: () => req('GET', 'api/settings'),
   solar: () => req('GET', 'api/solar'),
   weather: () => req('GET', 'api/weather'),

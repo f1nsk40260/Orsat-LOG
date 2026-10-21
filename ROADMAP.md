@@ -304,6 +304,18 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   « depuis IN93LR »), SFI / K grisés quand ils viennent de l'archive.
 - Panneau admin (état du carnet) : entités DXCC, confirmés, SFI/K connus (dont GFZ), distance connue.
 
+## Fait — v1.5.0 (21/10/2026) : fiche QSO (« les conditions dans lesquelles il a été fait »)
+- Clic sur l'indicatif (page du jour, carnet) → fiche ; « ✎ Modifier » y renvoie à l'édition.
+- Carte Leaflet (fond CARTO dark) : trajet orthodromique depuis le QTH d'émission du QSO (`sun.js`
+  greatCircle, coupé à l'antiméridien) ; **jour / nuit et ligne grise à l'instant UTC du QSO**, calculés
+  pixel par pixel (`shadeImage` : hauteur du Soleil, NOAA ; or = Soleil entre +6° et −6°, sombre la nuit).
+  Hauteur du Soleil et « jour / ligne grise / crépuscule / nuit » chez soi et chez le correspondant.
+- `GET api/qsos/{id}/context` : SFI, Ap, taches (SN) du jour et **8 créneaux Kp** (archive GFZ, créneau du
+  QSO encadré), SFI des 7 jours autour (+ tendance), position dans le cycle solaire (`enrich.CYCLES` :
+  23 1996-08/2001-11, 24 2008-12/2014-04, 25 2019-12/2024-10 provisoire), relevé hamqsl du carnet le plus
+  proche, autres QSO du même jour sur la bande, historique avec la station.
+- Vérifié dans Chromium (captures) sur 4Z7AHG (nuit / nuit) et ES4MM (jour chez soi, ligne grise chez lui).
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

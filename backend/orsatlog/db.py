@@ -282,6 +282,29 @@ class Database:
                 "ORDER BY q.qso_date, q.time_on, q.id").fetchall()
         return [dict(r) for r in rows if r["kind"] == "QSO"]
 
+    # --- fiche QSO ---
+    def same_day_band(self, qso_date, band, exclude_id):
+        with self._lock:
+            return [dict(r) for r in self._con.execute(
+                "SELECT id, call, time_on, mode, submode, country, distance_km, bearing, gridsquare "
+                "FROM qso WHERE kind = 'QSO' AND qso_date = ? AND lower(coalesce(band, '')) = ? AND id <> ? "
+                "ORDER BY time_on", (qso_date, (band or "").lower(), exclude_id))]
+
+    def same_call(self, call, exclude_id):
+        with self._lock:
+            return [dict(r) for r in self._con.execute(
+                "SELECT id, qso_date, time_on, band, mode, submode, sfi, k_index, solar_src, rst_sent, rst_rcvd "
+                "FROM qso WHERE kind = 'QSO' AND upper(call) = ? AND id <> ? "
+                "ORDER BY qso_date DESC, time_on DESC LIMIT 30", ((call or "").upper(), exclude_id))]
+
+    def snapshots_around(self, qso_date, time_on):
+        """Relevé de propagation du carnet le plus proche du QSO (même jour)."""
+        with self._lock:
+            r = self._con.execute(
+                "SELECT * FROM propagation WHERE day = ? ORDER BY abs(cast(time AS INTEGER) - ?) LIMIT 1",
+                (qso_date, int((time_on or "0")[:6] or 0))).fetchone()
+        return dict(r) if r else None
+
     # --- enrichissement (enrich.py) ---
     def all_entries_for_enrich(self):
         with self._lock:
