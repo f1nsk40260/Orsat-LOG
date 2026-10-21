@@ -125,12 +125,28 @@
     };
   }
 
+  // L'animateur ouvre la ronde : il est enregistré d'office comme premier contact du QSO de groupe
+  // (à l'heure de début, sur la fréquence et le mode de la session), s'il n'y est pas déjà.
+  async function logAnimator() {
+    const a = (active?.animator || '').trim().toUpperCase();
+    if (!a || active.participants.some((x) => x.call === a)) return;
+    const known = regulars.find((r) => r.call === a) || {};
+    await api.addQso({
+      session_id: active.id, call: a, qso_date: active.day, time_on: `${active.time_start}00`,
+      freq: active.freq, mode: active.mode, submode: active.submode,
+      name: known.name || '', qth: known.qth || '', gridsquare: (known.gridsquare || '').toUpperCase(),
+      comment: 'Animateur',
+    });
+    active = await api.session(active.id);
+  }
+
   async function openSession(e) {
     e?.preventDefault();
     error = '';
     try {
       const s = await api.createSession(setupPayload());
       await load(s.id);
+      await logAnimator();
       onchanged?.();
     } catch (err) { error = err.message; }
   }
@@ -163,6 +179,7 @@
     try {
       await api.updateSession(active.id, setupPayload());
       await load(active.id);
+      await logAnimator();
       onchanged?.();
     } catch (err) { error = err.message; }
   }
