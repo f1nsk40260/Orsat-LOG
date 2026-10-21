@@ -234,6 +234,18 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   mise à jour depuis l'interface. `run.py` = serveur seul. Mot de passe = panneau admin uniquement.
 - Le service `orsat-log` apparaît aussi dans « Santé du serveur » du panneau.
 
+## Fait — v1.1.0 (21/10/2026) : carnet de trafic et journal d'écoute séparés
+- Motif (F1NSK) : les écoutes SWL ne doivent jamais partir vers QRZ.com avec les contacts.
+- Une seule table (`qso.kind` = QSO / SWL), mais deux carnets partout ailleurs :
+  - **Carnet de trafic** = QSO + QSO de groupe ; `db.traffic_qsos()` (garde-fou : ne renvoie que
+    `kind = 'QSO'`) ; export `api/export/adif` → `orsat-log_trafic_AAAAMMJJ.adi`. **Seule source
+    autorisée pour la future synchro QRZ.com / LoTW / eQSL.**
+  - **Journal d'écoute** = SWL ; `db.listening_qsos()` ; export à part `api/export/adif-swl`
+    → `orsat-log_ecoutes_AAAAMMJJ.adi` (SWL:Y).
+  - `adif.export(kind=…)` écarte toujours les entrées de l'autre type.
+- Interface : bouton ADIF du header supprimé ; « Carnet » = deux onglets (⇄ Carnet de trafic, ◉ Journal
+  d'écoute) avec chacun son export. La page du jour garde les deux côte à côte (analyse de propagation).
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
@@ -249,7 +261,7 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 5. Préfixes → pays DXCC (cty.dat) et entité dans chaque QSO.
 6. Spots TCI / DX cluster, croisement RBN / PSKReporter.
 7. Envoi de commandes TCI (cliquer un spot = changer de fréquence).
-8. Upload LoTW / QRZ / eQSL.
+8. Upload LoTW / QRZ / eQSL — **uniquement depuis `db.traffic_qsos()`** (jamais les SWL).
 
 ## Sources TCI visées
 - **AetherSDR** (serveur TCI v2.0 : CAT, audio, IQ, CW, spots, événements récepteur ; FlexRadio en priorité,

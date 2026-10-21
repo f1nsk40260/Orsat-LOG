@@ -21,10 +21,13 @@ def _field(tag, value):
     return f"<{tag}:{len(value.encode('utf-8'))}>{value} "
 
 
-def export(qsos, my_call="", my_grid="", swl_grid=""):
+def export(qsos, my_call="", my_grid="", swl_grid="", kind="QSO"):
+    """ADIF d'UN seul carnet : kind="QSO" = carnet de trafic (contacts, pour QRZ.com),
+    kind="SWL" = journal d'écoute. Une entrée de l'autre type est toujours écartée."""
+    qsos = [q for q in qsos if (q.get("kind") or "QSO") == kind]
     now = datetime.now(timezone.utc).strftime("%Y%m%d %H%M%S")
     out = [
-        "Export ORSAT-LOG\n",
+        ("Export ORSAT-LOG - carnet de trafic\n" if kind == "QSO" else "Export ORSAT-LOG - journal d'écoute (SWL)\n"),
         _field("ADIF_VER", "3.1.4"),
         _field("PROGRAMID", "ORSAT-LOG"),
         _field("PROGRAMVERSION", __version__),

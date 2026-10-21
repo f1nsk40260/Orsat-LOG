@@ -240,6 +240,24 @@ class Database:
         return {"qso": row["qso"] or 0, "swl": row["swl"] or 0, "sessions": sessions,
                 "first_day": row["first_day"] or "", "last_day": row["last_day"] or ""}
 
+    # --- carnet de trafic / journal d'écoute ---
+    # Garde-fou : tout ce qui sort vers l'extérieur (export ADIF du trafic, future
+    # synchronisation QRZ.com / LoTW / eQSL) passe par traffic_qsos(), qui ne peut
+    # renvoyer QUE des contacts réalisés. Les écoutes SWL n'en sortent jamais.
+    def traffic_qsos(self):
+        with self._lock:
+            rows = self._con.execute(
+                "SELECT q.*, s.name AS session_name, s.animator AS session_animator FROM qso q "
+                "LEFT JOIN session s ON s.id = q.session_id WHERE q.kind = 'QSO' "
+                "ORDER BY q.qso_date, q.time_on, q.id").fetchall()
+        return [dict(r) for r in rows if r["kind"] == "QSO"]
+
+    def listening_qsos(self):
+        with self._lock:
+            rows = self._con.execute(
+                "SELECT q.* FROM qso q WHERE q.kind = 'SWL' ORDER BY q.qso_date, q.time_on, q.id").fetchall()
+        return [dict(r) for r in rows if r["kind"] == "SWL"]
+
     def all_qsos(self):
         with self._lock:
             rows = self._con.execute("SELECT q.*, s.name AS session_name, s.animator AS session_animator FROM qso q LEFT JOIN session s ON s.id = q.session_id ORDER BY q.qso_date, q.time_on, q.id").fetchall()

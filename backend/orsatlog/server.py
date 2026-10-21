@@ -673,10 +673,20 @@ async def restore(request: Request, file: UploadFile = File(...)):
 
 @app.get("/api/export/adif", response_class=PlainTextResponse)
 def export_adif():
+    """Carnet de trafic (QSO et QSO de groupe) : le seul destiné à QRZ.com / LoTW."""
     s = db.get_settings()
-    text = adif.export(db.all_qsos(), s.get("callsign", ""), s.get("locator", ""),
-                       s.get("swl_locator", "") or s.get("locator", ""))
-    name = f"orsat-log_{datetime.now(timezone.utc):%Y%m%d}.adi"
+    text = adif.export(db.traffic_qsos(), s.get("callsign", ""), s.get("locator", ""), kind="QSO")
+    name = f"orsat-log_trafic_{datetime.now(timezone.utc):%Y%m%d}.adi"
+    return PlainTextResponse(text, headers={"Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@app.get("/api/export/adif-swl", response_class=PlainTextResponse)
+def export_adif_swl():
+    """Journal d'écoute (SWL), à part : jamais envoyé vers QRZ.com."""
+    s = db.get_settings()
+    text = adif.export(db.listening_qsos(), s.get("callsign", ""), s.get("locator", ""),
+                       s.get("swl_locator", "") or s.get("locator", ""), kind="SWL")
+    name = f"orsat-log_ecoutes_{datetime.now(timezone.utc):%Y%m%d}.adi"
     return PlainTextResponse(text, headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 

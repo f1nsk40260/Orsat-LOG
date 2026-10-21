@@ -125,7 +125,6 @@
             title="Ouvrir / fermer le carnet de trafic complet (Alt+C)">
       {view === 'log' ? 'Agenda' : 'Carnet'}
     </button>
-    <a class="btn" href="api/export/adif" title="Exporter tout le carnet au format ADIF">ADIF</a>
     <button onclick={logout} title="Fermer la session du carnet sur ce navigateur">Déconnexion</button>
   </div>
 </header>
