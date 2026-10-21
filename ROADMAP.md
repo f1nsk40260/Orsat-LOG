@@ -316,6 +316,21 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   proche, autres QSO du même jour sur la bande, historique avec la station.
 - Vérifié dans Chromium (captures) sur 4Z7AHG (nuit / nuit) et ES4MM (jour chez soi, ligne grise chez lui).
 
+## Fait — v1.6.0 (21/10/2026) : ionosphère mesurée dans la fiche QSO (ionosondes GIRO)
+- `ionosonde.py` : DIDBase GIRO, `https://lgdc.uml.edu/fastchar/getbest` (foF2, MUF(D) D=3000 km, foEs ;
+  texte, en-tête « # », « --- » = absent ; vérifié depuis le serveur ORSAT : Roquetes depuis 1988, Dourbes
+  depuis 2001). Liste des stations relue chaque semaine (DIDBFastStationList → `data/giro_stations.json`),
+  secours : 23 stations européennes. Requêtes espacées de 1,2 s (sinon 429). `/common/DIDBGetValues` = 404.
+- Point de réflexion : milieu du trajet si ≤ 4000 km, sinon 1er et dernier saut (sauts ≤ 4000 km).
+  Ionosonde la plus proche ≤ 1500 km ayant une mesure à ±45 min ; sinon les 2 suivantes ; sinon on le dit.
+- MUF du saut = MUF(3000) mesurée ramenée à la longueur réelle du saut (sécante, Terre sphérique, h 300 km).
+  Verdict : fréquence ≤ 85 % MUF « franche », ≤ 100 % « en limite », au-delà « pas par F2 seule ».
+- `GET api/qsos/{id}/iono[?refresh=true]` : chargé après la fiche, mémorisé (table `iono_cache`, clé
+  date+heure+trajet+fréquence ; pas de mise en cache si GIRO injoignable). Carte : point(s) de réflexion
+  et ionosonde(s). Courbe ±2 h foF2 / MUF(3000) / foEs + fréquence du QSO. Note Es si foEs ≥ 5 MHz.
+- Licence CC BY-NC-SA 4.0 : crédit GIRO (Reinisch & Galkin 2011) et observatoire affichés dans la fiche.
+- Testé hors ligne (GIRO injoignable depuis le bac à sable) : à valider sur le serveur.
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
@@ -331,7 +346,8 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 5. Préfixes → pays DXCC (cty.dat) et entité dans chaque QSO.
 6. Spots TCI / DX cluster, croisement RBN / PSKReporter.
 7. Envoi de commandes TCI (cliquer un spot = changer de fréquence).
-8. ~~QRZ~~ (fait v1.3.0). LoTW / eQSL — **uniquement des contacts** (jamais les SWL).
+8. ~~QRZ~~ (fait v1.3.0).
+9. Suite fiche QSO : éruptions X (GOES), météo pour la VHF, décodages FT8/WSPR du WebSDR. LoTW / eQSL — **uniquement des contacts** (jamais les SWL).
 
 ## Sources TCI visées
 - **AetherSDR** (serveur TCI v2.0 : CAT, audio, IQ, CW, spots, événements récepteur ; FlexRadio en priorité,

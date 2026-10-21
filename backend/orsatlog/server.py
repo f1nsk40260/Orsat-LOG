@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, enrich, geo, qrz, solar, weather
+from . import __version__, adif, auth, backup, enrich, geo, ionosonde, qrz, solar, weather
 from .db import Database
 from .websdr import Page, WebSdrLink
 
@@ -463,6 +463,32 @@ def qso_context(qso_id: int):
         "same_day_band": db.same_day_band(q["qso_date"], q.get("band"), qso_id),
         "same_call": db.same_call(q["call"], qso_id) if q.get("kind") == "QSO" else [],
     }
+
+
+@app.get("/api/qsos/{qso_id}/iono")
+def qso_iono(qso_id: int, refresh: bool = False):
+    """Ionosphère mesurée (ionosondes GIRO) au point de réflexion du trajet, à l'heure du QSO.
+    Interrogée à la première ouverture de la fiche puis mémorisée (fonction synchrone : FastAPI
+    l'exécute hors de la boucle, le carnet reste réactif pendant l'attente)."""
+    q = db.get_qso(qso_id)
+    if not q:
+        raise HTTPException(404, "Entrée introuvable")
+    origin = enrich.origin_of(q, db.get_settings())
+    origin_ll = geo.locator_to_latlon(origin) if geo.valid_locator(origin) else None
+    target_ll = None
+    if geo.valid_locator(q.get("gridsquare") or ""):
+        target_ll = geo.locator_to_latlon(q["gridsquare"])
+    elif q.get("lat") is not None and q.get("lon") is not None:
+        target_ll = (q["lat"], q["lon"])
+    key = f"{q['qso_date']}{q.get('time_on') or ''}|{origin_ll}|{target_ll}|{q.get('freq')}"
+    if not refresh:
+        hit = db.iono_get(qso_id, key)
+        if hit:
+            return hit
+    res = ionosonde.for_qso(q, origin_ll, target_ll)
+    if res.get("ok") and not any(p.get("net_error") for p in res["points"]):
+        db.iono_put(qso_id, key, res)
+    return res
 
 
 @app.get("/api/worked/{call}")

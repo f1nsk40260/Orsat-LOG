@@ -14,6 +14,10 @@
   let error = $state('');
   let mapEl = $state();
   let map;
+  let iono = $state(null);          // ionosphère mesurée (GIRO), chargée après la fiche
+  let ionoBusy = $state(false);
+  let ionoErr = $state('');
+  let ionoLayer;
 
   const d8 = (d) => (d ? `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}` : '');
   const t4 = (t) => (t ? `${t.slice(0, 2)}:${t.slice(2, 4)}` : '');
@@ -45,6 +49,74 @@
     const when = m === 0 ? 'au maximum' : m < 0 ? `${-m} mois avant le maximum` : `${m} mois après le maximum`;
     return `Cycle ${c.cycle} · ${when}${c.max_provisional ? ' (maximum provisoire)' : ''}`;
   });
+
+  // Ionosphère : MUF limitante du trajet (plus petite des MUF aux points de réflexion)
+  const ionoPts = $derived((iono?.points || []).filter((p) => p.station));
+  const mufPath = $derived.by(() => {
+    const v = ionoPts.map((p) => p.muf_hop ?? p.measure.mufd).filter((x) => x != null);
+    return v.length ? Math.min(...v) : null;
+  });
+  const verdict = $derived.by(() => {
+    const f = iono?.freq_mhz, m = mufPath;
+    if (!f || !m) return null;
+    const r = f / m;
+    if (r <= 0.85) return { cls: 'ok', txt: `${f.toFixed(3)} MHz sous la MUF de ${m.toFixed(1)} MHz : réflexion F2 franche.` };
+    if (r <= 1) return { cls: 'warn', txt: `${f.toFixed(3)} MHz juste sous la MUF de ${m.toFixed(1)} MHz : en limite, signaux souvent forts mais instables.` };
+    return { cls: 'bad', txt: `${f.toFixed(3)} MHz au-dessus de la MUF de ${m.toFixed(1)} MHz : pas par la couche F2 seule — sporadique E, diffusion, ou ionosphère différente du point de mesure.` };
+  });
+  const foesMax = $derived(Math.max(0, ...ionoPts.map((p) => p.measure.foes ?? 0)) || null);
+
+  // Courbe ±2 h d'un point : foF2 (bleu), MUF(3000) (or), fréquence du QSO (pointillés)
+  function ionoCurve(p) {
+    const s = (p.series || []).filter((x) => x.fof2 != null || x.mufd != null);
+    if (s.length < 2) return null;
+    const t0 = new Date(iono.when).getTime(), span = 2 * 3600e3;
+    const vals = s.flatMap((x) => [x.fof2, x.mufd, x.foes]).filter((v) => v != null);
+    if (iono.freq_mhz) vals.push(iono.freq_mhz);
+    const hi = Math.ceil(Math.max(...vals) + 1), lo = 0;
+    const X = (ts) => 22 + ((new Date(ts).getTime() - t0 + span) / (2 * span)) * 252;
+    const Y = (v) => 62 - ((v - lo) / (hi - lo)) * 56;
+    const path = (k) => {
+      let d = '', pen = false;
+      for (const x of s) {
+        if (x[k] == null) { pen = false; continue; }
+        d += `${pen ? 'L' : 'M'}${X(x.ts).toFixed(1)},${Y(x[k]).toFixed(1)}`;
+        pen = true;
+      }
+      return d;
+    };
+    return { fof2: path('fof2'), mufd: path('mufd'), foes: path('foes'), hi,
+             fy: iono.freq_mhz ? Y(iono.freq_mhz) : null, xq: X(iono.when) };
+  }
+
+  async function loadIono(refresh = false) {
+    ionoBusy = true;
+    ionoErr = '';
+    try {
+      iono = await api.qsoIono(entry.id, refresh);
+      drawIono();
+    } catch (err) {
+      ionoErr = err.message;
+    } finally {
+      ionoBusy = false;
+    }
+  }
+
+  // Points de réflexion et ionosondes sur la carte
+  function drawIono() {
+    if (!map || !iono?.points) return;
+    ionoLayer?.remove();
+    ionoLayer = L.layerGroup().addTo(map);
+    for (const p of iono.points) {
+      L.circleMarker(p.point, { radius: 4, color: '#cfb53b', fillColor: '#0b0d12', fillOpacity: 1, weight: 2 })
+        .bindTooltip(`Point de réflexion · ${p.label}`).addTo(ionoLayer);
+      if (p.station) {
+        L.polyline([p.point, [p.station.lat, p.station.lon]], { color: '#9ad08a', weight: 1, dashArray: '3 4' }).addTo(ionoLayer);
+        L.circleMarker([p.station.lat, p.station.lon], { radius: 5, color: '#9ad08a', fillColor: '#9ad08a', fillOpacity: 0.9, weight: 1 })
+          .bindTooltip(`Ionosonde ${p.station.name} (${p.station.code})`).addTo(ionoLayer);
+      }
+    }
+  }
 
   function drawMap() {
     if (!mapEl || !ctx) return;
@@ -81,7 +153,7 @@
   onMount(async () => {
     try {
       ctx = await api.qsoContext(entry.id);
-      setTimeout(drawMap, 0);
+      setTimeout(() => { drawMap(); if (entry.kind !== 'SWL' || entry.freq) loadIono(); }, 0);
     } catch (err) {
       error = err.message;
     }
@@ -118,6 +190,7 @@
           <span><i class="sw gold"></i>trajet (chemin court)</span>
           <span><i class="sw grey"></i>ligne grise (Soleil entre +6° et −6°)</span>
           <span><i class="sw night"></i>nuit</span>
+          {#if iono?.points?.length}<span><i class="sw iono"></i>ionosonde · ◯ point de réflexion</span>{/if}
           <span class="muted">à {t4(entry.time_on)} UTC le {d8(entry.qso_date)}</span>
         </div>
         <div class="ends">
@@ -186,6 +259,56 @@
         </section>
 
         <section>
+          <h3>Ionosphère mesurée
+            {#if iono && !ionoBusy}<button type="button" class="mini" onclick={() => loadIono(true)} title="Interroger à nouveau GIRO">↻</button>{/if}
+          </h3>
+          {#if ionoBusy}
+            <p class="muted small">Interrogation des ionosondes GIRO… (quelques secondes)</p>
+          {:else if ionoErr}
+            <p class="err small">{ionoErr}</p>
+          {:else if iono && !iono.ok}
+            <p class="muted small">{iono.msg}</p>
+          {:else if iono}
+            {#if verdict}<p class="verdict {verdict.cls}">{verdict.txt}</p>{/if}
+            {#each iono.points as p}
+              <div class="ipt">
+                <div class="lbl">{p.label} · saut de {p.hop_km} km
+                  {#if p.station} — ionosonde <b>{p.station.name}</b> à {p.station.km} km du point{/if}</div>
+                {#if p.station}
+                  <div class="kpis k5">
+                    <div><span>foF2</span><b>{r1(p.measure.fof2)}</b></div>
+                    <div><span>MUF 3000</span><b>{r1(p.measure.mufd)}</b></div>
+                    <div><span>MUF du saut</span><b class="g">{r1(p.muf_hop)}</b></div>
+                    <div><span>foEs</span><b>{r1(p.measure.foes)}</b></div>
+                  </div>
+                  <p class="src">Mesure de {p.measure.ts.slice(11, 16)} UTC ({p.dt_min ? `${p.dt_min} min d’écart` : 'à la minute'}){p.measure.cs === 999 ? ', dépouillée à la main' : p.measure.cs >= 0 ? `, confiance ${p.measure.cs} %` : ''} · MHz</p>
+                  {@const c = ionoCurve(p)}
+                  {#if c}
+                    <svg viewBox="0 0 280 74" class="kpsvg">
+                      <line x1={c.xq} y1="4" x2={c.xq} y2="62" stroke="#cfb53b" stroke-dasharray="2 3" />
+                      {#if c.fy != null}<line x1="22" y1={c.fy} x2="274" y2={c.fy} stroke="#e8e2c8" stroke-dasharray="4 3" stroke-width="0.8" opacity="0.7" />{/if}
+                      <path d={c.mufd} fill="none" stroke="#cfb53b" stroke-width="2" />
+                      <path d={c.fof2} fill="none" stroke="#6eaae6" stroke-width="1.6" />
+                      <path d={c.foes} fill="none" stroke="#9ad08a" stroke-width="1.2" opacity="0.9" />
+                      <text x="2" y="10" class="v">{c.hi}</text><text x="2" y="64" class="v">0</text>
+                      <text x="22" y="72">−2 h</text><text x={c.xq} y="72" text-anchor="middle">QSO</text><text x="274" y="72" text-anchor="end">+2 h</text>
+                    </svg>
+                    <div class="legend in">
+                      <span><i class="sw gold"></i>MUF(3000)</span><span><i class="sw blue"></i>foF2</span>
+                      <span><i class="sw green"></i>foEs</span><span><i class="sw dash"></i>fréquence du QSO</span>
+                    </div>
+                  {/if}
+                {:else}
+                  <p class="muted small">{p.msg}</p>
+                {/if}
+              </div>
+            {/each}
+            {#if foesMax && foesMax >= 5}<p class="small es">Couche E sporadique mesurée (foEs {r1(foesMax)} MHz) : ouvertures Es possibles jusque vers {Math.round(foesMax * 5)} MHz sur un saut de 2000 km.</p>{/if}
+            {#if ionoPts.length}<p class="src">{iono.credit} · données de l’observatoire {ionoPts.map((p) => p.station.name).join(', ')}. MUF du saut : MUF(3000) mesurée ramenée à la longueur du saut (loi de la sécante).</p>{/if}
+          {/if}
+        </section>
+
+        <section>
           <h3>Ce jour-là sur {entry.band || 'cette bande'} <span class="n">{ctx.same_day_band.length}</span></h3>
           {#if ctx.same_day_band.length}
             <ul class="list">
@@ -233,6 +356,20 @@
   .sw { display: inline-block; width: 18px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
   .sw.gold { background: #cfb53b; height: 3px; }
   .sw.grey { background: rgba(207, 181, 59, 0.35); }
+  .sw.iono { background: #9ad08a; width: 8px; height: 8px; border-radius: 50%; }
+  .sw.blue { background: #6eaae6; height: 3px; }
+  .sw.green { background: #9ad08a; height: 3px; }
+  .sw.dash { background: repeating-linear-gradient(90deg, #e8e2c8 0 4px, transparent 4px 7px); height: 2px; }
+  .legend.in { margin: 2px 0 0; gap: 10px; font-size: 0.68rem; }
+  .ipt { margin-top: 6px; }
+  .ipt + .ipt { border-top: 1px dashed var(--panel-edge); padding-top: 6px; }
+  .ipt .lbl b { color: var(--gold-soft); font-weight: 600; }
+  .kpis.k5 { margin-top: 4px; }
+  .kpis b.g { color: var(--gold); }
+  .verdict { margin: 0 0 6px; font-size: 0.84rem; padding: 5px 8px; border-radius: 5px; background: rgba(0, 0, 0, 0.35); }
+  .verdict.ok { color: var(--ok); } .verdict.warn { color: var(--warn); } .verdict.bad { color: var(--bad); }
+  .es { color: #9ad08a; margin-top: 6px; }
+  .mini { float: right; padding: 0 7px; font-size: 0.8rem; line-height: 1.4; }
   .sw.night { background: rgba(4, 6, 20, 0.75); border: 1px solid #333; }
   .ends { display: grid; gap: 4px; font-size: 0.88rem; }
   .ends b { color: var(--gold-soft); font-weight: 600; }

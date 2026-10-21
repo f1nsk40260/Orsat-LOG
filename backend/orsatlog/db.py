@@ -174,6 +174,9 @@ class Database:
         # QSO retirés du carnet mais laissés chez QRZ : la synchronisation ne les reprend plus
         self._con.execute("CREATE TABLE IF NOT EXISTS qrz_ignored (logid INTEGER PRIMARY KEY, "
                           "call TEXT, qso_date TEXT, at TEXT DEFAULT (datetime('now')))")
+        # v1.6 : ionosphère mesurée (GIRO) mémorisée par QSO ; clé = date, heure et trajet
+        self._con.execute("CREATE TABLE IF NOT EXISTS iono_cache (qso_id INTEGER PRIMARY KEY, "
+                          "key TEXT, data TEXT, at TEXT DEFAULT (datetime('now')))")
         # migration v0.4 -> v0.5 : rattachement à un QSO de groupe
         if "session_id" not in cols:
             self._con.execute("ALTER TABLE qso ADD COLUMN session_id INTEGER")
@@ -304,6 +307,19 @@ class Database:
                 "SELECT * FROM propagation WHERE day = ? ORDER BY abs(cast(time AS INTEGER) - ?) LIMIT 1",
                 (qso_date, int((time_on or "0")[:6] or 0))).fetchone()
         return dict(r) if r else None
+
+    # --- ionosphère (ionosonde.py) ---
+    def iono_get(self, qso_id, key):
+        with self._lock:
+            r = self._con.execute("SELECT data FROM iono_cache WHERE qso_id = ? AND key = ?",
+                                  (qso_id, key)).fetchone()
+        return json.loads(r["data"]) if r else None
+
+    def iono_put(self, qso_id, key, data):
+        with self._lock:
+            self._con.execute("INSERT OR REPLACE INTO iono_cache (qso_id, key, data) VALUES (?, ?, ?)",
+                              (qso_id, key, json.dumps(data)))
+            self._con.commit()
 
     # --- enrichissement (enrich.py) ---
     def all_entries_for_enrich(self):

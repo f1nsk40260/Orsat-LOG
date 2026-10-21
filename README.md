@@ -35,6 +35,11 @@ bash ~/Orsat-LOG/update-server.sh && sudo systemctl restart orsat-log
 Indices solaires historiques : archive Kp / ap / Ap / SN / F10.7 du GFZ Potsdam (Matzka et al., 2021,
 *Space Weather*, https://doi.org/10.1029/2020SW002641), licence CC BY 4.0.
 
+Ionosphère mesurée (fiche QSO) : ionosondes du réseau GIRO, Lowell GIRO Data Center (Reinisch, B. W., and
+I. A. Galkin, *Global ionospheric radio observatory (GIRO)*, Earth Planets Space, 63, 377-381, 2011 ;
+http://spase.info/SMWG/Observatory/GIRO), licence CC BY-NC-SA 4.0, usage non commercial ; l'observatoire
+fournisseur est cité dans chaque fiche.
+
 
 `~/Orsat-LOG/data/` (jamais envoyé sur GitHub) : base `orsatlog.db`, copies quotidiennes
 `backups/`, clé de session `secret.key`.
