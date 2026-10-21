@@ -198,7 +198,11 @@
       </button>
     {/if}
     <div class="ident">
-      <h2 class="call mono">{entry.call}</h2>
+      <h2 class="call mono">{#if entry.kind !== 'SWL'}<a href={`https://www.qrz.com/db/${encodeURIComponent(entry.call)}`} target="_blank" rel="noopener"
+          title="Ouvrir la page QRZ.com de {entry.call} (nouvel onglet)">{entry.call}</a>{:else}{entry.call}{/if}</h2>
+      {#if who && !who.ok && entry.kind !== 'SWL'}
+        <div class="who dim" title={who.msg}>{/non réglés/.test(who.msg || '') ? 'Photo, nom et QTH : régler l’annuaire QRZ dans le panneau admin (carte QRZ).' : `QRZ.com : ${who.msg}`}</div>
+      {/if}
       {#if who?.ok && (who.fname || who.name || who.qth)}
         <div class="who">{[who.fname, who.name].filter(Boolean).join(' ')}{who.qth ? ` · ${who.qth}` : ''}{who.state ? ` (${who.state})` : ''}{who.country ? ` · ${who.country}` : ''}</div>
       {/if}
@@ -419,6 +423,9 @@
   .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
   .head { align-items: center; }
   .ident { flex: 1; }
+  .call a { color: inherit; text-decoration: none; border-bottom: 1px dotted rgba(207, 181, 59, 0.5); }
+  .call a:hover { border-bottom-style: solid; }
+  .who.dim { color: var(--muted); font-size: 0.78rem; }
   .who { color: var(--gold-soft); font-size: 0.95rem; margin-top: 1px; }
   .photo { padding: 0; border: 1px solid var(--panel-edge); border-radius: 6px; overflow: hidden; background: #000; height: 76px; cursor: zoom-in; }
   .photo img { height: 100%; width: auto; max-width: 130px; object-fit: cover; display: block; }

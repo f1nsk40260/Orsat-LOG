@@ -403,6 +403,7 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   Sans abonnement XML, QRZ peut ne renvoyer qu'une partie des champs (photo comprise) : à vérifier.
 - Panneau admin → Carnet ORSAT-LOG → carte QRZ : identifiant et mot de passe, vérifiés avant enregistrement.
 - Fiche QSO (pas les écoutes SWL) : photo (clic = agrandie), prénom nom · QTH · pays. `GET api/qrz/lookup/{call}`.
+- v1.11.1 : indicatif de la fiche = lien vers sa page QRZ.com ; message si l'annuaire n'est pas réglé. La fiche est la même depuis l'agenda et le carnet complet.
 
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
