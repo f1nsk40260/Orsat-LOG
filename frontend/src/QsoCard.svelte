@@ -201,7 +201,7 @@
       <h2 class="call mono">{#if entry.kind !== 'SWL'}<a href={`https://www.qrz.com/db/${encodeURIComponent(entry.call)}`} target="_blank" rel="noopener"
           title="Ouvrir la page QRZ.com de {entry.call} (nouvel onglet)">{entry.call}</a>{:else}{entry.call}{/if}</h2>
       {#if who && !who.ok && entry.kind !== 'SWL'}
-        <div class="who dim" title={who.msg}>{/non réglés/.test(who.msg || '') ? 'Photo, nom et QTH : régler l’annuaire QRZ dans le panneau admin (carte QRZ).' : `QRZ.com : ${who.msg}`}</div>
+        <div class="who dim" title={who.msg}>{(who.msg || '').includes('non réglés') ? 'Photo, nom et QTH : régler l’annuaire QRZ dans le panneau admin (carte QRZ).' : `QRZ.com : ${who.msg}`}</div>
       {/if}
       {#if who?.ok && (who.fname || who.name || who.qth)}
         <div class="who">{[who.fname, who.name].filter(Boolean).join(' ')}{who.qth ? ` · ${who.qth}` : ''}{who.state ? ` (${who.state})` : ''}{who.country ? ` · ${who.country}` : ''}</div>
