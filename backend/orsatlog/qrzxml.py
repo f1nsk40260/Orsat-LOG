@@ -117,3 +117,70 @@ class QrzXml:
                                  (call, json.dumps(out), time.time()))
             self.db._con.commit()
         return out
+
+
+class GridFiller:
+    """Complète le locator des QSO déjà enregistrés qui n'en ont pas, depuis l'annuaire QRZ.
+    Un indicatif = une recherche (toutes ses lignes en profitent) ; indicatifs portables (avec « / »)
+    laissés de côté : le locator QRZ est celui du domicile. Distance et azimut sont recalculés.
+    Les QSO ne sont pas renvoyés vers le logbook QRZ (enrichissement local)."""
+
+    def __init__(self, db, qrz_dir):
+        self.db, self.dir = db, qrz_dir
+        self.state = {"running": False, "done": 0, "total": 0, "filled": 0, "qsos": 0,
+                      "notfound": 0, "skipped": 0, "last": "", "error": ""}
+
+    def missing(self):
+        with self.db._lock:
+            return [dict(r) for r in self.db._con.execute(
+                "SELECT id, kind, call, gridsquare, my_gridsquare, lat, lon FROM qso "
+                "WHERE kind = 'QSO' AND (gridsquare IS NULL OR gridsquare = '')")]
+
+    def count(self):
+        rows = self.missing()
+        return {"qsos": len(rows), "calls": len({r["call"].upper() for r in rows})}
+
+    def run(self):
+        from . import enrich, geo
+        if self.state["running"]:
+            return
+        rows = self.missing()
+        by_call = {}
+        for r in rows:
+            by_call.setdefault(r["call"].strip().upper(), []).append(r)
+        st = self.state
+        st.update(running=True, done=0, total=len(by_call), filled=0, qsos=0, notfound=0, skipped=0, error="")
+        settings = self.db.get_settings()
+        try:
+            for call, qs in by_call.items():
+                st["done"] += 1
+                if "/" in call:
+                    st["skipped"] += 1
+                    continue
+                try:
+                    info = self.dir.lookup(call)
+                except QrzXmlError as exc:
+                    if "non réglés" in str(exc) or "refusée" in str(exc) or "password" in str(exc).lower():
+                        st["error"] = str(exc)
+                        break
+                    st["notfound"] += 1
+                    continue
+                grid = (info.get("grid") or "").upper()
+                if not geo.valid_locator(grid):
+                    st["notfound"] += 1
+                    continue
+                for q in qs:
+                    change = {"gridsquare": grid}
+                    d, b = enrich.geometry({**q, "gridsquare": grid}, settings)
+                    if d is not None:
+                        change.update(distance_km=d, bearing=b)
+                    self.db.update_qso(q["id"], change)
+                    st["qsos"] += 1
+                st["filled"] += 1
+                st["last"] = f"{call} → {grid}"
+                time.sleep(1.0)                 # rester discret avec l'annuaire QRZ
+        except Exception as exc:
+            st["error"] = str(exc)
+            log.warning("locators QRZ : %s", exc)
+        finally:
+            st["running"] = False

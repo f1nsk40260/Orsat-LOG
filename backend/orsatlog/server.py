@@ -48,6 +48,7 @@ async def _safe_send(ws, msg):
 websdr = WebSdrLink(on_change=lambda st: _broadcast(st, "websdr"))
 qrz_sync = qrz.QrzSync(db)
 qrz_dir = qrzxml.QrzXml(db)         # annuaire QRZ : photo, nom, QTH d'un indicatif
+grid_filler = qrzxml.GridFiller(db, qrz_dir)
 
 
 def utc_day(dt=None):
@@ -315,6 +316,23 @@ async def admin_qrz_set(cfg: QrzIn, request: Request):
     if qrz_sync.enabled():
         qrz_sync.poke()
     return _qrz_status()
+
+
+@app.get("/api/admin/gridfill")
+def admin_gridfill(request: Request):
+    """Locators manquants des QSO enregistrés : nombre et avancement de la recherche QRZ."""
+    _require_admin(request)
+    return {**grid_filler.count(), "state": grid_filler.state}
+
+
+@app.post("/api/admin/gridfill")
+async def admin_gridfill_run(request: Request):
+    _require_admin(request)
+    if not db.get_settings().get("qrz_xml_password"):
+        raise HTTPException(400, "Annuaire QRZ non réglé (identifiant et mot de passe QRZ.com)")
+    if not grid_filler.state["running"]:
+        asyncio.create_task(asyncio.to_thread(grid_filler.run))
+    return {**grid_filler.count(), "state": grid_filler.state}
 
 
 @app.post("/api/admin/qrz/run")

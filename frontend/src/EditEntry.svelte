@@ -39,6 +39,19 @@
     keepSession: e.session_id != null,
   });
   let error = $state('');
+  // Locator, nom, QTH depuis l'annuaire QRZ (cases vides seulement)
+  let qrzMsg = $state('');
+  async function fromQrz() {
+    qrzMsg = 'recherche…';
+    const r = await api.qrzLookup(f.call).catch((e) => ({ ok: false, msg: e.message }));
+    if (!r.ok) { qrzMsg = r.msg || 'introuvable'; return; }
+    const portable = f.call.includes('/');
+    const got = [];
+    if (!portable && r.grid && !f.gridsquare) { f.gridsquare = r.grid; got.push('locator'); }
+    if ((r.nickname || r.fname) && !f.name) { f.name = r.nickname || r.fname; got.push('nom'); }
+    if (!portable && r.qth && !f.qth) { f.qth = r.qth; got.push('QTH'); }
+    qrzMsg = got.length ? `repris de QRZ : ${got.join(', ')}` : (r.grid ? 'rien à compléter' : 'pas de locator chez QRZ');
+  }
   let saving = $state(false);
   let callInput;
 
@@ -183,6 +196,9 @@
         <label for="e-grid">{swl ? 'Loc. émetteur' : 'Locator'}</label>
         <input id="e-grid" class="mono" bind:value={f.gridsquare}
                oninput={() => (f.gridsquare = f.gridsquare.toUpperCase())} />
+        {#if f.kind !== 'SWL'}<button type="button" class="qrzb" onclick={fromQrz}
+          title="Compléter locator, nom et QTH vides depuis l'annuaire QRZ.com">📇 QRZ</button>
+          {#if qrzMsg}<span class="qrzm">{qrzMsg}</span>{/if}{/if}
       </div>
     </div>
     <p class="note">
@@ -228,6 +244,8 @@
 </form>
 
 <style>
+  .qrzb { margin-top: 4px; padding: 1px 8px; font-size: 0.75rem; }
+  .qrzm { font-size: 0.7rem; color: var(--muted); margin-left: 6px; }
   .backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.6); z-index: 30; }
   .dialog {
     position: fixed; z-index: 31; top: 50%; left: 50%; transform: translate(-50%, -50%);

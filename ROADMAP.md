@@ -414,6 +414,14 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   QRZ ; remplit seulement les cases vides (locator `grid`, prénom/surnom, QTH). Indicatif portable
   (EA8/…, …/P) : nom seulement. Groupe : les habitués passent d'abord, QRZ complète. Cache sans `grid` redemandé.
 
+## Fait — v1.12.0 (21/10/2026) : locators manquants des QSO enregistrés
+- `qrzxml.GridFiller` : QSO de trafic sans locator, une recherche annuaire QRZ par indicatif (1 s entre
+  deux), portables (« / ») ignorés ; locator + distance/azimut mis à jour, **pas renvoyés vers le
+  logbook QRZ** (qrz_state inchangé). `GET/POST api/admin/gridfill` ; panneau admin, carte QRZ :
+  nombre de QSO sans locator, bouton « Compléter les locators », avancement.
+- Formulaire d'édition : bouton « 📇 QRZ » (locator, nom, QTH vides) pour un QSO isolé.
+- Limite : le locator QRZ est l'adresse actuelle de la station, pas forcément celle du jour du QSO.
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
