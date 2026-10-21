@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, eibi, enrich, geo, heard, ionosonde, qrz, solar, weather
+from . import __version__, adif, auth, backup, eibi, enrich, geo, heard, ionosonde, qrz, qrzxml, solar, weather
 from .db import Database
 from .websdr import Page, WebSdrLink
 
@@ -47,6 +47,7 @@ async def _safe_send(ws, msg):
 
 websdr = WebSdrLink(on_change=lambda st: _broadcast(st, "websdr"))
 qrz_sync = qrz.QrzSync(db)
+qrz_dir = qrzxml.QrzXml(db)         # annuaire QRZ : photo, nom, QTH d'un indicatif
 
 
 def utc_day(dt=None):
@@ -261,6 +262,7 @@ def _qrz_status():
     return {"enabled": s.get("qrz_sync") == "1", "key_set": bool(key),
             "key_hint": ("…" + key[-4:]) if len(key) >= 4 else "",
             "full_done": s.get("qrz_full_done") == "1", "last_pull": s.get("qrz_last_pull", ""),
+            "xml_user": s.get("qrz_xml_user", ""), "xml_set": bool(s.get("qrz_xml_password")),
             **qrz_sync.state, **db.qrz_counts(), "journal": list(qrz_sync.journal)[-80:]}
 
 
@@ -273,6 +275,8 @@ def admin_qrz(request: Request):
 class QrzIn(BaseModel):
     api_key: str | None = None     # None = inchangée ; "" = effacer
     enabled: bool | None = None
+    xml_user: str | None = None    # annuaire QRZ : identifiant (None = inchangé ; "" = effacer)
+    xml_password: str | None = None
 
 
 @app.post("/api/admin/qrz")
@@ -289,6 +293,20 @@ async def admin_qrz_set(cfg: QrzIn, request: Request):
             qrz_sync.note("Clé QRZ vérifiée et enregistrée.")
         if key != db.get_settings().get("qrz_api_key", ""):
             values.update(qrz_api_key=key, qrz_full_done="0", qrz_last_pull="")
+    if cfg.xml_user is not None or cfg.xml_password is not None:
+        cur = db.get_settings()
+        user = (cfg.xml_user if cfg.xml_user is not None else cur.get("qrz_xml_user", "")).strip()
+        pwd = cfg.xml_password if cfg.xml_password else cur.get("qrz_xml_password", "")
+        if not user:
+            values.update(qrz_xml_user="", qrz_xml_password="")
+        else:
+            try:      # identifiants essayés avant d'être enregistrés
+                sess = await asyncio.to_thread(qrz_dir.login, user, pwd)
+            except Exception as exc:
+                raise HTTPException(400, f"Annuaire QRZ : {exc}")
+            values.update(qrz_xml_user=user, qrz_xml_password=pwd)
+            qrz_sync.note("Annuaire QRZ : connexion vérifiée" + (f" — {sess['message']}" if sess.get("message") else "."))
+        qrz_dir.forget()
     if cfg.enabled is not None:
         values["qrz_sync"] = "1" if cfg.enabled else "0"
         qrz_sync.note("Synchronisation automatique " + ("activée." if cfg.enabled else "désactivée."))
@@ -324,6 +342,7 @@ def get_settings(request: Request):
     s = db.get_settings()
     if not auth.is_admin(request.headers):
         s.pop("qrz_api_key", None)        # la clé QRZ ne sort jamais vers les navigateurs
+        s.pop("qrz_xml_password", None)
     return s
 
 
@@ -522,6 +541,15 @@ def eibi_lookup(freq: int, date: str = "", time: str = ""):
     par défaut) : identification des écoutes SWL et position de l'émetteur."""
     now = datetime.now(timezone.utc)
     return eibi.lookup(freq, date or now.strftime("%Y%m%d"), time or now.strftime("%H%M"))
+
+
+@app.get("/api/qrz/lookup/{call}")
+def qrz_lookup(call: str):
+    """Annuaire QRZ : photo, prénom, nom et QTH d'un indicatif (gardé 30 jours)."""
+    try:
+        return {"ok": True, **qrz_dir.lookup(call)}
+    except Exception as exc:
+        return {"ok": False, "msg": str(exc)}
 
 
 @app.get("/api/worked/{call}")

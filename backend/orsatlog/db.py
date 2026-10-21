@@ -23,6 +23,8 @@ DEFAULT_SETTINGS = {
     # Synchronisation avec le logbook QRZ.com (réglée dans le panneau admin)
     "qrz_api_key": "",
     "qrz_sync": "0",               # 1 = synchronisation automatique
+    "qrz_xml_user": "",            # annuaire QRZ (photo, nom, QTH) : identifiant du compte QRZ
+    "qrz_xml_password": "",        #   et son mot de passe (ne sort jamais vers les navigateurs)
     "qrz_full_done": "0",          # 1 = logbook QRZ rapatrié en entier une première fois
     "qrz_last_pull": "",           # AAAA-MM-JJ de la dernière lecture des modifications   # identifiant de la station Weathercloud (F1NSK - Castets)
 }

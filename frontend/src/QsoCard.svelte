@@ -21,6 +21,9 @@
   let ionoBusy = $state(false);
   let ionoErr = $state('');
   let ionoLayer;
+  // Annuaire QRZ : photo, prénom, nom, QTH du correspondant (pas pour les écoutes SWL)
+  let who = $state(null);
+  let bigPhoto = $state(false);
 
   const d8 = (d) => (d ? `${d.slice(6, 8)}/${d.slice(4, 6)}/${d.slice(0, 4)}` : '');
   const t4 = (t) => (t ? `${t.slice(0, 2)}:${t.slice(2, 4)}` : '');
@@ -175,6 +178,7 @@
   }
 
   onMount(async () => {
+    if (entry.kind !== 'SWL') api.qrzLookup(entry.call).then((r) => (who = r)).catch(() => {});
     try {
       ctx = await api.qsoContext(entry.id);
       setTimeout(() => { drawMap(); if (entry.kind !== 'SWL' || entry.freq) loadIono(); }, 0);
@@ -188,8 +192,16 @@
 <div class="backdrop" onclick={onclose} role="presentation"></div>
 <div class="panel card" role="dialog" aria-label="Fiche du QSO">
   <div class="head">
-    <div>
+    {#if who?.ok && who.image}
+      <button type="button" class="photo" onclick={() => (bigPhoto = true)} title="Agrandir la photo (QRZ.com)">
+        <img src={who.image} alt={`Photo de ${entry.call}`} referrerpolicy="no-referrer" />
+      </button>
+    {/if}
+    <div class="ident">
       <h2 class="call mono">{entry.call}</h2>
+      {#if who?.ok && (who.fname || who.name || who.qth)}
+        <div class="who">{[who.fname, who.name].filter(Boolean).join(' ')}{who.qth ? ` · ${who.qth}` : ''}{who.state ? ` (${who.state})` : ''}{who.country ? ` · ${who.country}` : ''}</div>
+      {/if}
       <div class="sub">
         {d8(entry.qso_date)} · {t4(entry.time_on)} UTC · {entry.band || '—'} · {entry.submode || entry.mode || '—'}
         {#if entry.freq} · {(entry.freq / 1e6).toFixed(3)} MHz{/if}
@@ -201,6 +213,13 @@
       <button type="button" onclick={onclose}>Fermer</button>
     </div>
   </div>
+
+  {#if bigPhoto && who?.image}
+    <button type="button" class="photo-big" onclick={() => (bigPhoto = false)} title="Fermer">
+      <img src={who.image} alt={`Photo de ${entry.call}`} referrerpolicy="no-referrer" />
+      <span>{entry.call} · {[who.fname, who.name].filter(Boolean).join(' ')} — photo QRZ.com</span>
+    </button>
+  {/if}
 
   {#if error}
     <p class="err">{error}</p>
@@ -398,6 +417,15 @@
     width: min(1220px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto;
   }
   .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+  .head { align-items: center; }
+  .ident { flex: 1; }
+  .who { color: var(--gold-soft); font-size: 0.95rem; margin-top: 1px; }
+  .photo { padding: 0; border: 1px solid var(--panel-edge); border-radius: 6px; overflow: hidden; background: #000; height: 76px; cursor: zoom-in; }
+  .photo img { height: 100%; width: auto; max-width: 130px; object-fit: cover; display: block; }
+  .photo-big { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, 0.85); border: 0; border-radius: 0;
+               display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; cursor: zoom-out; }
+  .photo-big img { max-width: 90vw; max-height: 82vh; border-radius: 6px; box-shadow: 0 6px 30px rgba(0, 0, 0, 0.8); }
+  .photo-big span { color: var(--gold-soft); font-size: 0.9rem; }
   .call { margin: 0; font-size: 1.6rem; color: var(--gold); letter-spacing: 0.06em; }
   .sub { color: var(--text); font-size: 0.9rem; margin-top: 2px; }
   .swl { margin-left: 8px; color: rgb(110, 170, 230); }

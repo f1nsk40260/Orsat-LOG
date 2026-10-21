@@ -397,6 +397,13 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - « Carnet / Agenda » remplacé par un choix à deux boutons accolés « 📅 Agenda | 📖 Carnet complet ».
 - Raccourcis Alt+← / → / ↓ / C retirés, ainsi que les mentions « Entrée = … · Échap = … » (règle : tout à la souris).
 
+## Fait — v1.11.0 (21/10/2026) : photo, nom et QTH du correspondant (annuaire QRZ)
+- `qrzxml.py` : service XML de QRZ (identifiant + mot de passe du compte, pas la clé du logbook) ;
+  session gardée, reconnexion si expirée ; réponses gardées 30 jours (table `qrz_lookup`).
+  Sans abonnement XML, QRZ peut ne renvoyer qu'une partie des champs (photo comprise) : à vérifier.
+- Panneau admin → Carnet ORSAT-LOG → carte QRZ : identifiant et mot de passe, vérifiés avant enregistrement.
+- Fiche QSO (pas les écoutes SWL) : photo (clic = agrandie), prénom nom · QTH · pays. `GET api/qrz/lookup/{call}`.
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
