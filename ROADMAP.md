@@ -246,6 +246,19 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - Interface : bouton ADIF du header supprimé ; « Carnet » = deux onglets (⇄ Carnet de trafic, ◉ Journal
   d'écoute) avec chacun son export. La page du jour garde les deux côte à côte (analyse de propagation).
 
+## Fait — v1.2.0 (21/10/2026) : import ADIF (carnet de trafic uniquement)
+- Carnet → onglet « Carnet de trafic » → **Importer (ADIF)** : aperçu (lus, à ajouter, période, doublons,
+  écoutes écartées, illisibles + motifs, exemples), puis « Importer N contacts ».
+- `POST api/import/adif` (`confirm=false` = aperçu sans écriture) ; sauvegarde de la base avant l'import ;
+  une seule transaction (`db.import_traffic`, n'insère que `kind = 'QSO'`).
+- `adif.parse` : longueurs en octets (comme notre export), balises insensibles à la casse, en-tête ignoré.
+  `adif.to_entry` : **SWL:Y écartées**, indicatif + date + heure obligatoires, TIME_ON HHMM accepté,
+  FREQ en MHz → Hz, COMMENT ou NOTES.
+- Doublon = même indicatif, date, heure à la minute et bande (aussi entre lignes du fichier).
+- Bande recalculée depuis FREQ (sinon BAND du fichier) ; distance / azimut depuis le locator station ;
+  SFI/A/K laissés vides (inconnus pour un contact ancien).
+- Pas d'import dans le journal d'écoute (décision F1NSK).
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
@@ -253,7 +266,7 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   sauvegarde-restauration complète dans les Réglages / un PC serveur accessible à distance.
 
 ## À faire (ordre proposé)
-1. Import ADIF (reprise de l'ancien carnet).
+1. ~~Import ADIF~~ (fait en v1.2.0, carnet de trafic seulement).
 2. ~~Édition d'un QSO existant~~ (fait en v0.7.0).
 3. Onglet **Analyse** : QSO par bande × heure UTC, carte des contacts (grand cercle depuis le QTH),
    distances max par bande, corrélation avec SFI/K.

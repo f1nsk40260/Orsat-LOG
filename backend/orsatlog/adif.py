@@ -1,5 +1,6 @@
-"""Export ADIF 3.1."""
+"""ADIF 3.1 : export (carnet de trafic / journal d'écoute) et import (carnet de trafic seul)."""
 
+import re
 from datetime import datetime, timezone
 
 from . import __version__
@@ -61,3 +62,69 @@ def export(qsos, my_call="", my_grid="", swl_grid="", kind="QSO"):
             rec.append(_field("MY_GRIDSQUARE", grid))
         out.append("".join(rec) + "<EOR>\n")
     return "".join(out)
+
+
+# ---------- import ----------
+_TAG = re.compile(rb"<([A-Za-z0-9_]+)(?::(\d+)(?::[A-Za-z])?)?>")
+
+
+def parse(data: bytes):
+    """Lit un fichier ADIF (.adi) et renvoie la liste des enregistrements {CHAMP: valeur}.
+    L'en-tête (avant <EOH>) est ignoré. Longueurs comptées en octets, comme notre export."""
+    m = re.search(rb"<eoh>", data, re.IGNORECASE)
+    pos = m.end() if m else 0
+    if not m and not data.lstrip().startswith(b"<"):
+        pos = len(data)          # texte d'en-tête sans <EOH> : rien à lire
+    records, cur = [], {}
+    while True:
+        m = _TAG.search(data, pos)
+        if not m:
+            break
+        tag = m.group(1).decode("ascii").upper()
+        if tag == "EOR":
+            if cur:
+                records.append(cur)
+            cur = {}
+            pos = m.end()
+            continue
+        n = int(m.group(2) or 0)
+        value = data[m.end():m.end() + n].decode("utf-8", errors="replace").strip()
+        if value:
+            cur[tag] = value
+        pos = m.end() + n
+    return records
+
+
+def to_entry(rec):
+    """Enregistrement ADIF -> entrée du carnet de trafic (champs de la base), ou None si
+    l'enregistrement n'est pas un contact exploitable. Renvoie (entrée, motif du refus)."""
+    if rec.get("SWL", "").upper() == "Y":
+        return None, "écoute (SWL)"
+    call = rec.get("CALL", "").strip().upper()
+    date = re.sub(r"\D", "", rec.get("QSO_DATE", ""))
+    time_on = re.sub(r"\D", "", rec.get("TIME_ON", ""))
+    if not call or len(date) != 8:
+        return None, "indicatif ou date manquant"
+    if len(time_on) == 4:
+        time_on += "00"
+    if len(time_on) != 6:
+        return None, "heure manquante"
+    try:
+        datetime.strptime(date + time_on, "%Y%m%d%H%M%S")
+    except ValueError:
+        return None, "date ou heure invalide"
+    freq = None
+    try:
+        if rec.get("FREQ"):
+            freq = round(float(rec["FREQ"].replace(",", ".")) * 1e6)
+    except ValueError:
+        freq = None
+    return {
+        "kind": "QSO", "call": call, "qso_date": date, "time_on": time_on, "freq": freq,
+        "band": rec.get("BAND", "").lower(),
+        "mode": rec.get("MODE", "").upper(), "submode": rec.get("SUBMODE", "").upper(),
+        "rst_sent": rec.get("RST_SENT", ""), "rst_rcvd": rec.get("RST_RCVD", ""),
+        "name": rec.get("NAME", ""), "qth": rec.get("QTH", ""),
+        "gridsquare": rec.get("GRIDSQUARE", "").upper(),
+        "comment": rec.get("COMMENT", "") or rec.get("NOTES", ""),
+    }, ""
