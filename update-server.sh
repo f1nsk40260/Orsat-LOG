@@ -18,6 +18,7 @@ fi
 
 echo "== Code =="
 BEFORE=$(git rev-parse --short HEAD)
+git checkout -- frontend/package-lock.json 2>/dev/null || true
 git pull --ff-only
 AFTER=$(git rev-parse --short HEAD)
 [ "$BEFORE" = "$AFTER" ] && echo "Déjà à jour ($AFTER)." || git --no-pager log --format='  %h %s' "$BEFORE..$AFTER"
@@ -28,5 +29,7 @@ echo "== Dépendances Python =="
 echo "== Interface (basse priorité) =="
 command -v npm >/dev/null || { echo "npm introuvable"; exit 1; }
 (cd frontend && nice -n 15 npm install --silent --no-audit --no-fund && nice -n 15 npm run build --silent)
+# npm réécrit parfois package-lock.json selon sa version : on le remet, sinon le prochain git pull échoue
+git checkout -- frontend/package-lock.json 2>/dev/null || true
 echo "OK"
 echo "== Terminé ($AFTER) =="

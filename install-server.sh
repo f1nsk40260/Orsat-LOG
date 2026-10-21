@@ -48,6 +48,7 @@ say "Environnement Python"
 
 say "Interface (basse priorité)"
 (cd frontend && nice -n 15 npm install --silent && nice -n 15 npm run build --silent)
+git checkout -- frontend/package-lock.json 2>/dev/null || true
 
 say "Service systemd orsat-log"
 UNIT=/etc/systemd/system/orsat-log.service
