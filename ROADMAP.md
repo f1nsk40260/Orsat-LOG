@@ -355,6 +355,11 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - Horloge du WebSDR (`HeaderClock.svelte`, TU / LOCAL, clé `phantom.clockUtc` partagée avec la page).
 - Fond d'écran ORSAT (`assets/background.jpg`, copie de celui de PhantomSDR-ORSAT).
 
+## Fait — v1.7.3 (21/10/2026) : infobulles des valeurs de propagation
+- `proptips.js` : ce que mesure l'indice + lecture de la valeur affichée (SFI, A, K/Kp, taches, X-ray,
+  champ géomagnétique, état des bandes, foF2, MUF(3000), MUF du saut, foEs). Panneau propagation,
+  fiche QSO (y compris chaque barre Kp), colonne SFI / K du carnet. Attribut title (survol souris).
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

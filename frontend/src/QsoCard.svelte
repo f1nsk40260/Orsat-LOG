@@ -7,6 +7,7 @@
   import 'leaflet/dist/leaflet.css';
   import { api } from './api.js';
   import EibiPick from './EibiPick.svelte';
+  import { tipSfi, tipA, tipK, tipSn, TIP_FOF2, TIP_MUF3000, TIP_MUFHOP, TIP_FOES } from './proptips.js';
   import { qsoInstant, sunElevation, daylight, shadeImage, greatCircle, MERCATOR_LAT } from './sun.js';
 
   let { entry, onclose, onedit } = $props();
@@ -246,21 +247,21 @@
         <section>
           <h3>Soleil et champ magnétique</h3>
           <div class="kpis">
-            <div><span>SFI</span><b>{ctx.solar.sfi != null ? Math.round(ctx.solar.sfi) : entry.sfi != null ? Math.round(entry.sfi) : '—'}</b></div>
-            <div><span>Indice A</span><b>{ctx.solar.ap ?? entry.a_index ?? '—'}</b></div>
-            <div><span>K du QSO</span><b style:color={kpColor(ctx.solar.kp?.[ctx.solar.slot] ?? entry.k_index)}>{r1(ctx.solar.kp?.[ctx.solar.slot] ?? entry.k_index)}</b></div>
-            <div><span>Taches</span><b>{ctx.solar.sn ?? '—'}</b></div>
+            <div title={tipSfi(ctx.solar.sfi ?? entry.sfi)}><span>SFI</span><b>{ctx.solar.sfi != null ? Math.round(ctx.solar.sfi) : entry.sfi != null ? Math.round(entry.sfi) : '—'}</b></div>
+            <div title={tipA(ctx.solar.ap ?? entry.a_index)}><span>Indice A</span><b>{ctx.solar.ap ?? entry.a_index ?? '—'}</b></div>
+            <div title={tipK(ctx.solar.kp?.[ctx.solar.slot] ?? entry.k_index)}><span>K du QSO</span><b style:color={kpColor(ctx.solar.kp?.[ctx.solar.slot] ?? entry.k_index)}>{r1(ctx.solar.kp?.[ctx.solar.slot] ?? entry.k_index)}</b></div>
+            <div title={tipSn(ctx.solar.sn)}><span>Taches</span><b>{ctx.solar.sn ?? '—'}</b></div>
           </div>
           {#if cycleText}<p class="cycle">{cycleText}</p>{/if}
 
           {#if ctx.solar.kp}
             <div class="kp">
-              <div class="lbl">Kp de la journée (créneaux de 3 h UTC)</div>
+              <div class="lbl" title={tipK(null)}>Kp de la journée (créneaux de 3 h UTC)</div>
               <svg viewBox="0 0 280 74" class="kpsvg">
                 {#each ctx.solar.kp as k, i}
                   {@const h = k == null ? 0 : Math.max(2, (k / 9) * 52)}
                   <rect x={8 + i * 34} y={58 - h} width="26" height={h} rx="2" fill={kpColor(k)}
-                        opacity={i === ctx.solar.slot ? 1 : 0.45} />
+                        opacity={i === ctx.solar.slot ? 1 : 0.45}><title>{SLOTS[i]}–{String((i + 1) * 3).padStart(2, '0')} h UTC{'\n'}{tipK(k)}</title></rect>
                   {#if i === ctx.solar.slot}<rect x={6 + i * 34} y="2" width="30" height="58" fill="none" stroke="#cfb53b" stroke-width="1.2" rx="3" />{/if}
                   <text x={21 + i * 34} y="70" text-anchor="middle">{SLOTS[i]}</text>
                   {#if k != null}<text x={21 + i * 34} y={54 - h} text-anchor="middle" class="v">{r1(k)}</text>{/if}
@@ -318,10 +319,10 @@
                   {#if p.station} — ionosonde <b>{p.station.name}</b> à {p.station.km} km du point{/if}</div>
                 {#if p.station}
                   <div class="kpis k5">
-                    <div><span>foF2</span><b>{r1(p.measure.fof2)}</b></div>
-                    <div><span>MUF 3000</span><b>{r1(p.measure.mufd)}</b></div>
-                    <div><span>MUF du saut</span><b class="g">{r1(p.muf_hop)}</b></div>
-                    <div><span>foEs</span><b>{r1(p.measure.foes)}</b></div>
+                    <div title={TIP_FOF2}><span>foF2</span><b>{r1(p.measure.fof2)}</b></div>
+                    <div title={TIP_MUF3000}><span>MUF 3000</span><b>{r1(p.measure.mufd)}</b></div>
+                    <div title={TIP_MUFHOP}><span>MUF du saut</span><b class="g">{r1(p.muf_hop)}</b></div>
+                    <div title={TIP_FOES}><span>foEs</span><b>{r1(p.measure.foes)}</b></div>
                   </div>
                   <p class="src">Mesure de {p.measure.ts.slice(11, 16)} UTC ({p.dt_min ? `${p.dt_min} min d’écart` : 'à la minute'}){p.measure.cs === 999 ? ', dépouillée à la main' : p.measure.cs >= 0 ? `, confiance ${p.measure.cs} %` : ''} · MHz</p>
                   {@const c = ionoCurve(p)}
@@ -425,7 +426,7 @@
   h3 { margin: 0 0 8px; color: var(--gold); font-size: 0.82rem; letter-spacing: 0.1em; text-transform: uppercase; }
   h3 .n { color: var(--muted); font-weight: 400; letter-spacing: 0; margin-left: 4px; }
   .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-  .kpis div { background: rgba(0, 0, 0, 0.35); border-radius: 5px; padding: 4px 6px; text-align: center; }
+  .kpis div { cursor: help; background: rgba(0, 0, 0, 0.35); border-radius: 5px; padding: 4px 6px; text-align: center; }
   .kpis span { display: block; font-size: 0.66rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
   .kpis b { font-size: 1.15rem; color: var(--text); }
   .cycle { margin: 8px 0 0; font-size: 0.82rem; color: var(--gold-soft); }

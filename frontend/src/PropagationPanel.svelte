@@ -1,5 +1,6 @@
 <script>
   import { kClass, fmtTime } from './util.js';
+  import { tipSfi, tipA, tipK, tipSn, tipXray, tipGeomag, TIP_BANDS } from './proptips.js';
 
   let { snapshots = [], isToday = false } = $props();
 
@@ -43,14 +44,14 @@
 
   {#if latest}
     <div class="indices">
-      <div><span>SFI</span><b>{latest.sfi ?? '—'}</b></div>
-      <div><span>A</span><b>{latest.a_index ?? '—'}</b></div>
-      <div><span>K</span><b class={kClass(latest.k_index)}>{latest.k_index ?? '—'}</b></div>
-      <div><span>Taches</span><b>{latest.sunspots ?? '—'}</b></div>
-      <div><span>X-ray</span><b>{latest.xray || '—'}</b></div>
+      <div title={tipSfi(latest.sfi)}><span>SFI</span><b>{latest.sfi ?? '—'}</b></div>
+      <div title={tipA(latest.a_index)}><span>A</span><b>{latest.a_index ?? '—'}</b></div>
+      <div title={tipK(latest.k_index)}><span>K</span><b class={kClass(latest.k_index)}>{latest.k_index ?? '—'}</b></div>
+      <div title={tipSn(latest.sunspots)}><span>Taches</span><b>{latest.sunspots ?? '—'}</b></div>
+      <div title={tipXray(latest.xray)}><span>X-ray</span><b>{latest.xray || '—'}</b></div>
     </div>
     {#if latest.geomagfield}
-      <div class="geomag">Champ géomagnétique : {latest.geomagfield}</div>
+      <div class="geomag" title={tipGeomag(latest.geomagfield)}>Champ géomagnétique : {latest.geomagfield}</div>
     {/if}
 
     <svg viewBox="0 0 {W} {H}" class="chart" role="img" aria-label="Indice K et flux solaire sur la journée">
@@ -79,7 +80,7 @@
     </div>
 
     {#if Object.keys(bands).length}
-      <table class="bands">
+      <table class="bands" title={TIP_BANDS}>
         <thead><tr><th>Bandes</th><th>Jour</th><th>Nuit</th></tr></thead>
         <tbody>
           {#each Object.entries(bands) as [band, c]}
@@ -102,7 +103,7 @@
 <style>
   .prop { display: flex; flex-direction: column; gap: 8px; }
   .indices { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
-  .indices div { text-align: center; background: rgba(0, 0, 0, 0.3); border-radius: 6px; padding: 6px 2px; }
+  .indices div { cursor: help; text-align: center; background: rgba(0, 0, 0, 0.3); border-radius: 6px; padding: 6px 2px; }
   .indices span { display: block; font-size: 0.68rem; color: var(--gold-soft); letter-spacing: 0.08em; text-transform: uppercase; }
   .indices b { font-size: 1.25rem; color: var(--text); }
   .geomag { font-size: 0.8rem; color: var(--muted); }
