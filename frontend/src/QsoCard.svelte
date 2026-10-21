@@ -152,6 +152,11 @@
         .bindTooltip(`${ctx.qso.call}${ctx.qso.gridsquare ? ' · ' + ctx.qso.gridsquare : ''}`).addTo(map);
       pts.push(ctx.target_ll);
     }
+    // Stations décodées par le WebSDR sur la bande, dans l'heure du QSO (autorun)
+    for (const h of ctx.heard?.points || []) {
+      L.circleMarker([h.lat, h.lon], { radius: 2.5, color: '#e07a5f', fillColor: '#e07a5f', fillOpacity: 0.8, weight: 0 })
+        .bindTooltip(`${h.call} · ${h.km ?? '?'} km · ${h.snr ?? '?'} dB (décodé par le WebSDR)`).addTo(map);
+    }
     if (pts.length === 2) {
       for (const seg of greatCircle(pts[0], pts[1])) {
         L.polyline(seg, { color: gold, weight: 2.5, opacity: 0.95 }).addTo(map);
@@ -223,6 +228,7 @@
           <span><i class="sw gold"></i>trajet (chemin court)</span>
           <span><i class="sw grey"></i>ligne grise (Soleil entre +6° et −6°)</span>
           <span><i class="sw night"></i>nuit</span>
+          {#if ctx.heard?.points?.length}<span><i class="sw heard"></i>entendu par le WebSDR (±1 h)</span>{/if}
           {#if iono?.points?.length}<span><i class="sw iono"></i>ionosonde · ◯ point de réflexion</span>{/if}
           <span class="muted">à {t4(entry.time_on)} UTC le {d8(entry.qso_date)}</span>
         </div>
@@ -351,6 +357,23 @@
           {/if}
         </section>
 
+        {#if ctx.heard}
+          {@const h = ctx.heard}
+          <section>
+            <h3>Le WebSDR entendait <span class="n">{h.band} · ±1 h</span></h3>
+            <p class="small"><b class="g">{h.stations}</b> station{h.stations > 1 ? 's' : ''} décodée{h.stations > 1 ? 's' : ''} sur {h.band} dans l'heure du QSO et les heures voisines.</p>
+            {#if h.toward}
+              <p class="small">Vers {entry.call} (azimut {entry.bearing}° ± 30°) : <b class="g">{h.toward.count}</b>
+                {#if h.toward.far_call} — la plus lointaine <span class="mono">{h.toward.far_call}</span> à {h.toward.far_km} km ({h.toward.far_snr ?? '?'} dB){/if}</p>
+            {/if}
+            {#if h.near}
+              <p class="small">Station décodée la plus proche de {entry.call} : <span class="mono">{h.near.call}</span>, à {h.near.km_from_target} km de lui ({h.near.snr ?? '?'} dB en {h.near.mode.toUpperCase()}).</p>
+            {/if}
+            {#if !h.detail}<p class="src">Détail effacé (plus de 2 ans) : seul le résumé est conservé.</p>{/if}
+            <p class="src">Décodages FT8 / FT4 / JS8 / WSPR de l'autorun du WebSDR (IN93LR) : une ouverture constatée, pas une prévision.</p>
+          </section>
+        {/if}
+
         <section>
           <h3>Ce jour-là sur {entry.band || 'cette bande'} <span class="n">{ctx.same_day_band.length}</span></h3>
           {#if ctx.same_day_band.length}
@@ -402,6 +425,8 @@
   .sw { display: inline-block; width: 18px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
   .sw.gold { background: #cfb53b; height: 3px; }
   .sw.grey { background: rgba(207, 181, 59, 0.35); }
+  .sw.heard { background: #e07a5f; width: 6px; height: 6px; border-radius: 50%; }
+  b.g { color: var(--gold); }
   .sw.iono { background: #9ad08a; width: 8px; height: 8px; border-radius: 50%; }
   .sw.blue { background: #6eaae6; height: 3px; }
   .sw.green { background: #9ad08a; height: 3px; }

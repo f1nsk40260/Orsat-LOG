@@ -368,6 +368,21 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - Ajout : `archive` dans `GET api/day/{day}` (GFZ : 8 Kp, Ap, SFI, SN). Page d'un jour sans relevé
   (historique QRZ depuis 2011) : indices + Kp officiels ; jour avec relevés : Kp définitifs en plus.
 
+## Fait — v1.9.0 (21/10/2026) : le WebSDR comme sonde de propagation (autorun)
+- PhantomSDR-ORSAT `autorun/spool.js` : chaque station décodée → `autorun-spots/AAAAMMJJ-HH.jsonl`
+  ({t, mode, band, call, grid, snr, f[, dbm]}), indépendamment de l'envoi PSK Reporter / WSPRnet ;
+  fichiers > 3 jours effacés par l'autorun (si le carnet ne tourne pas).
+- `heard.py` : lecture chaque minute (position mémorisée, ligne incomplète laissée), fichiers lus
+  effacés 10 min après la fin de leur heure. Dossier : `<dossier de admin_config.json>/autorun-spots`
+  (env `ORSATLOG_SPOTS_DIR`). Table `heard` (une ligne par jour, heure, bande, mode, indicatif ;
+  meilleur SNR, nombre de décodages, distance et azimut depuis le locator WebSDR) : **2 ans, plafond
+  14 M lignes (~2 Go), FIFO par jour**. Table `heard_sum` (jour, heure, bande, secteur 8 directions :
+  stations, distance max) gardée toujours.
+- Page d'agenda : « Entendu par le WebSDR » (grille bande × heure, plus lointaines par bande).
+  Fiche QSO : stations décodées sur la bande ±1 h (points sur la carte), nombre vers le correspondant
+  (azimut ± 30°), plus lointaine dans cette direction, station décodée la plus proche du correspondant.
+- Choix F1NSK 21/10 : disque de 232 Go (< 30 Go utilisés) ; taille laissée à mon estimation.
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

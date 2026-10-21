@@ -5,6 +5,7 @@
   import EntryForm from './EntryForm.svelte';
   import EntriesTable from './EntriesTable.svelte';
   import PropagationPanel from './PropagationPanel.svelte';
+  import HeardPanel from './HeardPanel.svelte';
   import WeatherPanel from './WeatherPanel.svelte';
 
   let { day, isToday, radio, websdr, settings } = $props();
@@ -124,6 +125,7 @@
       {/if}
     {/if}
     <PropagationPanel snapshots={page?.propagation ?? []} archive={page?.archive} {isToday} />
+    <HeardPanel heard={page?.heard} />
   </div>
 
   <!-- colonne centrale : saisie + activité du jour -->
