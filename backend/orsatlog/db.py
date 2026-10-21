@@ -272,29 +272,6 @@ class Database:
                 "ORDER BY q.qso_date, q.time_on, q.id").fetchall()
         return [dict(r) for r in rows if r["kind"] == "QSO"]
 
-    def traffic_keys(self):
-        """Clés de doublon du carnet de trafic : (indicatif, date, HHMM, bande)."""
-        with self._lock:
-            rows = self._con.execute(
-                "SELECT call, qso_date, time_on, band FROM qso WHERE kind = 'QSO'").fetchall()
-        return {(r["call"].upper(), r["qso_date"], (r["time_on"] or "")[:4], (r["band"] or "").lower())
-                for r in rows}
-
-    def import_traffic(self, entries):
-        """Ajoute des contacts au carnet de trafic en une seule transaction."""
-        n = 0
-        with self._lock:
-            for q in entries:
-                if q.get("kind") != "QSO":          # garde-fou : jamais d'écoute ici
-                    continue
-                cols = [f for f in QSO_FIELDS if f in q]
-                self._con.execute(
-                    f"INSERT INTO qso({', '.join(cols)}) VALUES ({', '.join('?' * len(cols))})",
-                    [q[c] for c in cols])
-                n += 1
-            self._con.commit()
-        return n
-
     # --- synchronisation QRZ.com ---
     def qrz_pending(self, limit=50):
         """Contacts à envoyer vers QRZ (jamais d'écoute SWL)."""

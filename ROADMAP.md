@@ -265,7 +265,8 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   4 596 importés, 7 doublons QRZ, < 1 s).
 
 ## Fait — v1.3.0 (21/10/2026) : synchronisation automatique avec le logbook QRZ.com
-- Décision F1NSK : remplace l'import ADIF (qui sera **retiré** une fois la synchro validée chez lui).
+- Décision F1NSK : remplace l'import ADIF. **v1.3.1 : synchro validée par F1NSK (base peuplée depuis QRZ),
+  import ADIF retiré** (route, `db.import_traffic`, bouton et aperçu). `adif.parse` / `to_entry` servent à la synchro.
 - `backend/orsatlog/qrz.py` (QRZ Logbook API, https://logbook.qrz.com/api ; abonnement QRZ requis) :
   - 1er passage : tout le logbook QRZ (FETCH par pages de 250, AFTERLOGID) ; ensuite MODSINCE toutes les
     15 min (`PERIOD`) ; les contacts du carnet absents de QRZ partent (INSERT).
@@ -293,7 +294,7 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   sauvegarde-restauration complète dans les Réglages / un PC serveur accessible à distance.
 
 ## À faire (ordre proposé)
-1. ~~Import ADIF~~ (fait en v1.2.0, carnet de trafic seulement).
+1. ~~Import ADIF~~ (v1.2.0, retiré en v1.3.1 au profit de la synchronisation QRZ.com).
 2. ~~Édition d'un QSO existant~~ (fait en v0.7.0).
 3. Onglet **Analyse** : QSO par bande × heure UTC, carte des contacts (grand cercle depuis le QTH),
    distances max par bande, corrélation avec SFI/K.

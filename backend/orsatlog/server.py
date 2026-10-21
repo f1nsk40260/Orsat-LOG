@@ -769,54 +769,6 @@ def export_adif():
     return PlainTextResponse(text, headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
-@app.post("/api/import/adif")
-async def import_adif(file: UploadFile = File(...), confirm: bool = Form(False)):
-    """Import ADIF dans le CARNET DE TRAFIC uniquement. Les écoutes (SWL:Y) sont écartées,
-    les doublons (même indicatif, date, heure à la minute, bande) aussi.
-    confirm=false : aperçu sans rien écrire ; confirm=true : import, après une sauvegarde."""
-    data = await file.read()
-    if len(data) > 50 * 1024 * 1024:
-        raise HTTPException(400, "Fichier trop gros (50 Mo au plus)")
-    records = await asyncio.to_thread(adif.parse, data)
-    if not records:
-        raise HTTPException(400, "Aucun enregistrement ADIF trouvé dans ce fichier")
-    s = db.get_settings()
-    my_loc = s.get("locator", "")
-    known = db.traffic_keys()
-    new, dup, swl, bad, reasons = [], 0, 0, 0, {}
-    for rec in records:
-        q, why = adif.to_entry(rec)
-        if q is None:
-            if why.startswith("écoute"):
-                swl += 1
-            else:
-                bad += 1
-                reasons[why] = reasons.get(why, 0) + 1
-            continue
-        q["band"] = geo.band_of(q["freq"]) or q["band"]
-        key = (q["call"], q["qso_date"], q["time_on"][:4], q["band"])
-        if key in known:
-            dup += 1
-            continue
-        known.add(key)
-        if geo.valid_locator(my_loc) and geo.valid_locator(q["gridsquare"]):
-            q["distance_km"], q["bearing"] = geo.distance_bearing(my_loc, q["gridsquare"])
-        new.append(q)
-    summary = {"records": len(records), "new": len(new), "duplicates": dup, "swl": swl,
-               "invalid": bad, "reasons": reasons,
-               "first": min((q["qso_date"] for q in new), default=""),
-               "last": max((q["qso_date"] for q in new), default=""),
-               "sample": [{k: q[k] for k in ("call", "qso_date", "time_on", "band", "mode")} for q in new[:5]]}
-    if not confirm:
-        return {"preview": True, **summary}
-    before = f"orsatlog-{datetime.now(timezone.utc):%Y%m%d-%H%M}.db"
-    await asyncio.to_thread(backup.make_backup, db, before)
-    added = await asyncio.to_thread(db.import_traffic, new)
-    log.info("Import ADIF %s : %d contacts ajoutés (%d doublons, %d SWL écartées, %d invalides)",
-             file.filename, added, dup, swl, bad)
-    return {"preview": False, "added": added, "backup": before, **summary}
-
-
 @app.get("/api/export/adif-swl", response_class=PlainTextResponse)
 def export_adif_swl():
     """Journal d'écoute (SWL), à part : jamais envoyé vers QRZ.com."""

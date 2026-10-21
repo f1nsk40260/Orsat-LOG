@@ -1,4 +1,5 @@
-"""ADIF 3.1 : export (carnet de trafic / journal d'écoute) et import (carnet de trafic seul)."""
+"""ADIF 3.1 : export (carnet de trafic / journal d'écoute) et lecture des enregistrements
+renvoyés par QRZ.com (synchronisation, voir qrz.py)."""
 
 import re
 from datetime import datetime, timezone
@@ -64,7 +65,7 @@ def export(qsos, my_call="", my_grid="", swl_grid="", kind="QSO"):
     return "".join(out)
 
 
-# ---------- import ----------
+# ---------- lecture (enregistrements QRZ.com) ----------
 _TAG = re.compile(r"<([A-Za-z0-9_]+)(?::(\d+)(?::[A-Za-z])?)?>")
 
 

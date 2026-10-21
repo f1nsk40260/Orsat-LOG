@@ -22,15 +22,6 @@ export const api = {
   info: () => req('GET', 'api/info'),
   websdrMirror: (freq, modulation) => req('POST', 'api/websdr/mirror', { freq, modulation }),
   logout: () => req('POST', 'api/logout'),
-  importAdif: async (file, confirm) => {
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('confirm', confirm ? 'true' : 'false');
-    const r = await fetch('api/import/adif', { method: 'POST', body: fd });
-    if (r.status === 401) { location.href = 'login'; throw new Error('Connexion requise'); }
-    if (!r.ok) { let m = r.statusText; try { m = (await r.json()).detail || m; } catch {} throw new Error(m); }
-    return r.json();
-  },
   settings: () => req('GET', 'api/settings'),
   solar: () => req('GET', 'api/solar'),
   weather: () => req('GET', 'api/weather'),
