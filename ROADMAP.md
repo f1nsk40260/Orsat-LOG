@@ -360,6 +360,13 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   champ géomagnétique, état des bandes, foF2, MUF(3000), MUF du saut, foEs). Panneau propagation,
   fiche QSO (y compris chaque barre Kp), colonne SFI / K du carnet. Attribut title (survol souris).
 
+## Fait — v1.8.0 (21/10/2026) : pages d'agenda historiques
+- Déjà en place depuis v0.9 : relevé de propagation hamqsl toutes les 15 min côté serveur (point à chaque
+  publication + 1/h), météo si la station est configurée, QSO / écoutes, notes ; navigation par le header.
+  Volume estimé ~30 ko/jour (propagation) + ~10 ko/jour (météo) : ~15 Mo/an, pas de FIFO nécessaire.
+- Ajout : `archive` dans `GET api/day/{day}` (GFZ : 8 Kp, Ap, SFI, SN). Page d'un jour sans relevé
+  (historique QRZ depuis 2011) : indices + Kp officiels ; jour avec relevés : Kp définitifs en plus.
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

@@ -123,7 +123,7 @@
         </section>
       {/if}
     {/if}
-    <PropagationPanel snapshots={page?.propagation ?? []} {isToday} />
+    <PropagationPanel snapshots={page?.propagation ?? []} archive={page?.archive} {isToday} />
   </div>
 
   <!-- colonne centrale : saisie + activité du jour -->

@@ -752,6 +752,15 @@ def today():
     return {"day": utc_day()}
 
 
+def _gfz_day(day):
+    """Indices officiels du jour (archive GFZ Potsdam) : pour les jours d'avant les relevés du
+    carnet, et pour comparer avec eux. None si la date n'est pas (encore) dans l'archive."""
+    row = enrich.gfz_table().get(day)
+    if not row:
+        return None
+    return {"kp": row[0], "ap": row[1], "sfi": row[2], "sn": row[3]}
+
+
 @app.get("/api/day/{day}")
 def get_day(day: str):
     """Page d'agenda : activité, relevés de propagation et notes d'un jour UTC."""
@@ -765,6 +774,7 @@ def get_day(day: str):
         "day": day,
         "entries": entries,
         "propagation": db.day_snapshots(day),
+        "archive": _gfz_day(day),
         "weather": db.day_weather(day),
         "note": db.get_note(day),
         "sessions": db.day_sessions(day),

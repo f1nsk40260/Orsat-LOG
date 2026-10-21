@@ -2,7 +2,12 @@
   import { kClass, fmtTime } from './util.js';
   import { tipSfi, tipA, tipK, tipSn, tipXray, tipGeomag, TIP_BANDS } from './proptips.js';
 
-  let { snapshots = [], isToday = false } = $props();
+  let { snapshots = [], archive = null, isToday = false } = $props();
+  const SLOTS = ['00', '03', '06', '09', '12', '15', '18', '21'];
+  const kpMax = $derived.by(() => {
+    const v = (archive?.kp || []).filter((k) => k != null);
+    return v.length ? Math.max(...v) : null;
+  });
 
   const latest = $derived(snapshots.length ? snapshots[snapshots.length - 1] : null);
 
@@ -93,10 +98,34 @@
         </tbody>
       </table>
     {/if}
-  {:else}
+  {:else if !archive}
     <p class="muted">
       {isToday ? 'Premier relevé en cours… (hamqsl.com, toutes les 15 min)' : 'Aucun relevé de propagation ce jour-là.'}
     </p>
+  {/if}
+
+  {#if archive?.kp}
+    <!-- Indices officiels du jour : seuls disponibles avant la mise en service du carnet -->
+    {#if !latest}
+      <div class="indices four">
+        <div title={tipSfi(archive.sfi)}><span>SFI</span><b>{archive.sfi != null ? Math.round(archive.sfi) : '—'}</b></div>
+        <div title={tipA(archive.ap)}><span>A</span><b>{archive.ap ?? '—'}</b></div>
+        <div title={tipK(kpMax)}><span>Kp max</span><b class={kClass(kpMax)}>{kpMax != null ? +kpMax.toFixed(1) : '—'}</b></div>
+        <div title={tipSn(archive.sn)}><span>Taches</span><b>{archive.sn ?? '—'}</b></div>
+      </div>
+    {/if}
+    <div class="lbl" title={tipK(null)}>Kp officiels du jour (créneaux de 3 h UTC)</div>
+    <svg viewBox="0 0 290 70" class="chart" role="img" aria-label="Kp officiels du jour">
+      {#each archive.kp as k, i}
+        {@const h = k == null ? 0 : Math.max(2, (k / 9) * 48)}
+        <rect x={10 + i * 35} y={54 - h} width="27" height={h} rx="2" fill={k == null ? 'none' : kColor(k)} opacity="0.8">
+          <title>{SLOTS[i]}–{String((i + 1) * 3).padStart(2, '0')} h UTC{'\n'}{tipK(k)}</title>
+        </rect>
+        <text x={23.5 + i * 35} y="66" class="axis" text-anchor="middle">{SLOTS[i]}</text>
+        {#if k != null}<text x={23.5 + i * 35} y={50 - h} class="axis v" text-anchor="middle">{+k.toFixed(1)}</text>{/if}
+      {/each}
+    </svg>
+    <p class="src">Archive GFZ Potsdam (CC BY 4.0){latest ? ' — valeurs définitives, à comparer aux relevés en direct ci-dessus' : ' — pas de relevé en direct ce jour-là'}.</p>
   {/if}
 </section>
 
@@ -106,6 +135,10 @@
   .indices div { cursor: help; text-align: center; background: rgba(0, 0, 0, 0.3); border-radius: 6px; padding: 6px 2px; }
   .indices span { display: block; font-size: 0.68rem; color: var(--gold-soft); letter-spacing: 0.08em; text-transform: uppercase; }
   .indices b { font-size: 1.25rem; color: var(--text); }
+  .indices.four { grid-template-columns: repeat(4, 1fr); }
+  .lbl { font-size: 0.72rem; color: var(--muted); margin-top: 4px; }
+  .axis.v { fill: var(--text); }
+  .src { font-size: 0.7rem; color: var(--muted); margin: 0; }
   .geomag { font-size: 0.8rem; color: var(--muted); }
   .chart { width: 100%; height: auto; }
   .grid { stroke: rgba(207, 181, 59, 0.12); }
