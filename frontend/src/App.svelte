@@ -134,7 +134,11 @@
     display: flex; align-items: center; gap: 20px;
     padding: 10px 18px; height: 62px;
     border-bottom: 1px solid var(--panel-edge);
-    background: linear-gradient(180deg, rgba(207, 181, 59, 0.1), transparent);
+    /* Bandeau semi-opaque au-dessus du fond d'écran ORSAT, pour la lisibilité */
+    background: linear-gradient(180deg, rgba(40, 34, 14, 0.82), rgba(12, 12, 14, 0.78));
+    backdrop-filter: blur(6px);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55);
+    position: relative; z-index: 5;
   }
   .brand { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
   .logo { color: var(--gold); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.1em; }

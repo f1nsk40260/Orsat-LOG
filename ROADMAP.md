@@ -350,7 +350,7 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   « Qui émettait ? » ; un clic enregistre site + locator et recalcule trajet et ionosphère.
 - Formats relevés sur le serveur ORSAT ; testé sur des extraits (eibispace.de injoignable d'ici).
 
-## Fait — v1.7.1 (21/10/2026) : header au style ORSAT
+## Fait — v1.7.1 / v1.7.2 (21/10/2026) : header au style ORSAT (bandeau semi-opaque en 1.7.2)
 - Indices SFI/A/K retirés du header (déjà dans le panneau propagation).
 - Horloge du WebSDR (`HeaderClock.svelte`, TU / LOCAL, clé `phantom.clockUtc` partagée avec la page).
 - Fond d'écran ORSAT (`assets/background.jpg`, copie de celui de PhantomSDR-ORSAT).
