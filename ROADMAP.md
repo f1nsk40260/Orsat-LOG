@@ -65,6 +65,7 @@ Style ORSAT (thème vieil or `rgb(207,181,59)`), Linux en priorité.
 - Panneau Météo de la page du jour : température, humidité, rosée, pression + tendance 3 h,
   vent (direction, rafales), pluie, soleil/UV, mini/maxi, courbes température + pression 24 h.
 - Constat 20/10 : la page Weathercloud de la station affichait « - » partout (station n'émettant plus ?).
+- **Vérifié 21/10 : la météo fonctionne** (63 relevés enregistrés ce jour-là sur la page du jour). Ne plus la dire en panne.
 - **Retour F1NSK 20/10 : ne fonctionne pas chez lui → à reprendre plus tard** (cause non diagnostiquée).
 
 ## Fait — v0.5.0 (20/10/2026) : QSO de groupe (tables rondes quotidiennes)
@@ -363,7 +364,7 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 ## Fait — v1.8.0 (21/10/2026) : pages d'agenda historiques
 - Déjà en place depuis v0.9 : relevé de propagation hamqsl toutes les 15 min côté serveur (point à chaque
   publication + 1/h), météo si la station est configurée, QSO / écoutes, notes ; navigation par le header.
-  Volume estimé ~30 ko/jour (propagation) + ~10 ko/jour (météo) : ~15 Mo/an, pas de FIFO nécessaire.
+  Volume estimé ~30 ko/jour (propagation) + ~10 ko/jour (météo, qui fonctionne) : ~15 Mo/an, pas de FIFO nécessaire.
 - Ajout : `archive` dans `GET api/day/{day}` (GFZ : 8 Kp, Ap, SFI, SN). Page d'un jour sans relevé
   (historique QRZ depuis 2011) : indices + Kp officiels ; jour avec relevés : Kp définitifs en plus.
 
