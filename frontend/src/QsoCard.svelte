@@ -199,7 +199,7 @@
     {/if}
     <div class="ident">
       <h2 class="call mono">{#if entry.kind !== 'SWL'}<a href={`https://www.qrz.com/db/${encodeURIComponent(entry.call)}`} target="_blank" rel="noopener"
-          title="Ouvrir la page QRZ.com de {entry.call} (nouvel onglet)">{entry.call}</a>{:else}{entry.call}{/if}</h2>
+          title="Ouvrir la page QRZ.com de {entry.call} (nouvel onglet)">{entry.call}<small>QRZ ↗</small></a>{:else}{entry.call}{/if}</h2>
       {#if who && !who.ok && entry.kind !== 'SWL'}
         <div class="who dim" title={who.msg}>{(who.msg || '').includes('non réglés') ? 'Photo, nom et QTH : régler l’annuaire QRZ dans le panneau admin (carte QRZ).' : `QRZ.com : ${who.msg}`}</div>
       {/if}
@@ -423,8 +423,12 @@
   .head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
   .head { align-items: center; }
   .ident { flex: 1; }
-  .call a { color: inherit; text-decoration: none; border-bottom: 1px dotted rgba(207, 181, 59, 0.5); }
-  .call a:hover { border-bottom-style: solid; }
+  /* Indicatif = bouton encadré vers sa page QRZ.com */
+  .call a { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 8px;
+            border: 1px solid rgba(207, 181, 59, 0.6); border-radius: 6px; padding: 0 10px 1px;
+            background: linear-gradient(180deg, rgba(207, 181, 59, 0.16), rgba(207, 181, 59, 0.04)); }
+  .call a:hover { background: linear-gradient(180deg, rgba(207, 181, 59, 0.32), rgba(207, 181, 59, 0.1)); }
+  .call a small { font-size: 0.62rem; letter-spacing: 0.05em; color: var(--gold-soft); font-family: inherit; }
   .who.dim { color: var(--muted); font-size: 0.78rem; }
   .who { color: var(--gold-soft); font-size: 0.95rem; margin-top: 1px; }
   .photo { padding: 0; border: 1px solid var(--panel-edge); border-radius: 6px; overflow: hidden; background: #000; height: 76px; cursor: zoom-in; }
