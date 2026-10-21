@@ -129,3 +129,8 @@ td { padding: 5px 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.05); }
 tr:hover td { background: var(--gold-faint); }
 
 .mono { font-family: 'DejaVu Sans Mono', 'Ubuntu Mono', monospace; }
+
+/* Fonds de carte assombris (mapbase.js) */
+.fond-nuit { filter: brightness(0.55) contrast(1.15); }
+.fond-sat { filter: brightness(0.7) saturate(0.8); }
+.osm-dark { filter: invert(1) hue-rotate(180deg) brightness(0.8) contrast(0.9); }

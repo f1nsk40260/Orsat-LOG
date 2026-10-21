@@ -14,6 +14,17 @@
   const maxN = $derived(Math.max(1, ...(heard?.grid || []).map((g) => g.stations)));
   // Intensité : racine du nombre, pour que les heures calmes restent visibles
   const shade = (n) => (n ? `rgba(207, 181, 59, ${(0.15 + 0.85 * Math.sqrt(n / maxN)).toFixed(2)})` : 'rgba(255,255,255,0.03)');
+  import HeardMap from './HeardMap.svelte';
+  // Fenêtre : filtres de la carte choisis à la souris dans la grille
+  let selBand = $state('');
+  let selHour = $state(null);
+  const BAND_COLORS = { '160m': '#8e7cc3', '80m': '#6fa8dc', '60m': '#76a5af', '40m': '#93c47d', '30m': '#b6d7a8',
+    '20m': '#ffd966', '17m': '#f6b26b', '15m': '#e69138', '12m': '#e06666', '10m': '#c27ba0', '6m': '#d5a6bd' };
+  function pickBand(b) { selBand = selBand === b && selHour == null ? '' : b; selHour = null; }
+  function pickCell(b, h) {
+    if (selBand === b && selHour === h) { selHour = null; return; }
+    selBand = b; selHour = h;
+  }
   const km = (v) => (v == null ? '' : `${v.toLocaleString('fr-FR')} km`);
 </script>
 
@@ -26,16 +37,31 @@
   {#if rows.length}
     <div class="grid" style:grid-template-columns={large ? "48px repeat(24, 1fr)" : "34px repeat(24, 1fr)"}>
       {#each rows as r}
-        <span class="b">{r.band}</span>
+        {#if large}<button type="button" class="b bb" class:on={selBand === r.band} onclick={() => pickBand(r.band)}>{r.band}</button>
+        {:else}<span class="b">{r.band}</span>{/if}
         {#each Array(24) as _, h}
           {@const c = r.hours[h]}
-          <span class="cell" style:background={shade(c?.stations)}
-                title={c ? `${r.band} · ${String(h).padStart(2, '0')} h UTC : ${c.stations} station${c.stations > 1 ? 's' : ''} décodée${c.stations > 1 ? 's' : ''}${c.max_km ? `, la plus lointaine à ${km(c.max_km)}` : ''}` : `${r.band} · ${String(h).padStart(2, '0')} h UTC : rien décodé`}></span>
+          <span class="cell" class:sel={large && selBand === r.band && (selHour === h || selHour == null)}
+                class:click={large} onclick={() => large && pickCell(r.band, h)} role="presentation"
+                style:background={shade(c?.stations)}
+                title={c ? `${r.band} · ${String(h).padStart(2, '0')} h UTC : ${c.stations} station${c.stations > 1 ? 's' : ''} décodée${c.stations > 1 ? 's' : ''}${c.max_km ? `, la plus lointaine à ${km(c.max_km)}` : ''}` + (large ? '\nClic : carte de cette heure' : '') : `${r.band} · ${String(h).padStart(2, '0')} h UTC : rien décodé`}></span>
         {/each}
       {/each}
       <span></span>
       {#each Array(24) as _, h}<span class="hh">{large ? String(h).padStart(2, '0') : h % 6 === 0 ? h : ''}</span>{/each}
     </div>
+    {#if large}
+      <div class="filters">
+        <span class="muted">Carte :</span>
+        <button type="button" class:on={!selBand && selHour == null} onclick={() => { selBand = ''; selHour = null; }}>Toutes bandes, toute la journée</button>
+        {#each rows as r}
+          <button type="button" class:on={selBand === r.band} onclick={() => pickBand(r.band)}
+                  title="N'afficher que le {r.band} (clic sur une case de la grille : une seule heure)">
+            <i class="dot" style:background={BAND_COLORS[r.band] || '#e07a5f'}></i>{r.band}</button>
+        {/each}
+      </div>
+      <HeardMap {day} band={selBand} hour={selHour} colors={BAND_COLORS} />
+    {/if}
     {#if heard.detail && Object.keys(heard.farthest || {}).length}
       <div class="far">
         <div class="lbl">Les plus lointaines</div>
@@ -63,6 +89,14 @@
     width: min(1100px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; gap: 12px; padding: 16px 20px;
   }
   .large .grid { gap: 3px; }
+  .bb { background: none; border: 1px solid transparent; padding: 0 4px; text-align: left; cursor: pointer; color: var(--gold-soft); }
+  .bb.on { border-color: var(--gold); color: var(--gold); }
+  .cell.click { cursor: pointer; }
+  .cell.sel { outline: 1px solid var(--gold); outline-offset: 0; }
+  .filters { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 0.8rem; }
+  .filters button { padding: 2px 9px; font-size: 0.8rem; }
+  .filters button.on { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; vertical-align: 0; }
   .large .b { font-size: 0.85rem; }
   .large .cell { height: 24px; }
   .large .hh { font-size: 0.7rem; text-align: center; }

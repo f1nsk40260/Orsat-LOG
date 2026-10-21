@@ -200,6 +200,22 @@ class Heard:
                 best[f["band"]].append(f)
         return {"grid": grid, "farthest": best, "detail": bool(detail)}
 
+    def points(self, day, band="", hour=None, limit=4000):
+        """Carte du jour : une ligne par station et par bande (meilleur SNR), filtrable par bande / heure."""
+        sql = ("SELECT band, call, grid, mode, max(snr) AS snr, max(km) AS km, bearing, lat, lon, "
+               "min(hour) AS h1, max(hour) AS h2, sum(n) AS n FROM heard WHERE day = ? AND lat IS NOT NULL")
+        args = [day]
+        if band:
+            sql += " AND band = ?"
+            args.append(band)
+        if hour is not None:
+            sql += " AND hour = ?"
+            args.append(int(hour))
+        sql += " GROUP BY band, call ORDER BY km DESC LIMIT ?"
+        args.append(limit)
+        with self.db._lock:
+            return [dict(r) for r in self.db._con.execute(sql, args)]
+
     def around(self, qso_date, time_on, band, target_ll=None, bearing=None):
         """Fiche QSO : ce que le WebSDR décodait sur la bande, dans l'heure du QSO et les voisines."""
         if not band:

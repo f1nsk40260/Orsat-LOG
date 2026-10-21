@@ -24,6 +24,7 @@ export const api = {
   logout: () => req('POST', 'api/logout'),
   qsoContext: (id) => req('GET', `api/qsos/${id}/context`),
   eibi: (freq, date = '', time = '') => req('GET', `api/eibi?freq=${freq}${date ? `&date=${date}&time=${time}` : ''}`),
+  dayHeard: (day, band = '', hour = null) => req('GET', `api/day/${day}/heard?band=${encodeURIComponent(band)}${hour != null ? `&hour=${hour}` : ''}`),
   qsoIono: (id, refresh = false) => req('GET', `api/qsos/${id}/iono${refresh ? '?refresh=true' : ''}`),
   settings: () => req('GET', 'api/settings'),
   solar: () => req('GET', 'api/solar'),

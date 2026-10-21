@@ -808,6 +808,16 @@ def get_day(day: str):
     }
 
 
+@app.get("/api/day/{day}/heard")
+def day_heard_points(day: str, band: str = "", hour: int | None = None):
+    """Stations décodées par l'autorun ce jour-là, avec position : carte de la fenêtre « Entendu »."""
+    _check_day(day)
+    if hour is not None and not 0 <= hour <= 23:
+        raise HTTPException(400, "Heure invalide")
+    home = heard_log._home()
+    return {"home": home, "points": heard_log.points(day, band, hour)}
+
+
 class NoteIn(BaseModel):
     text: str = ""
 
