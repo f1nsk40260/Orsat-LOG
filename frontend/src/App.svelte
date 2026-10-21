@@ -12,11 +12,10 @@
   let radio = $state({ connected: false, freq: 0, mode: '', submode: '', ptt: false, device: '' });
   let websdr = $state({ listening: false, connected: false, freq: 0, mode: '', submode: '', ptt: false, device: 'WebSDR' });
   let showCalendar = $state(false);
-  // Panneau « Entendu par le WebSDR » (autorun) : affiché à la demande, choix retenu par le navigateur
-  let showHeard = $state((() => { try { return localStorage.getItem('orsatlog.heard') === '1'; } catch { return false; } })());
+  // Fenêtre « Entendu par le WebSDR » (autorun) : ouverte à la demande, pour le jour affiché
+  let showHeard = $state(false);
   function toggleHeard() {
     showHeard = !showHeard;
-    try { localStorage.setItem('orsatlog.heard', showHeard ? '1' : '0'); } catch {}
     if (showHeard) view = 'day';
   }
   let view = $state('day');              // 'day' = page d'agenda, 'log' = carnet complet
@@ -128,7 +127,7 @@
 </header>
 
 {#if view === 'day'}
-  <DayPage bind:this={dayPage} {day} {isToday} {radio} {websdr} {settings} {showHeard} />
+  <DayPage bind:this={dayPage} {day} {isToday} {radio} {websdr} {settings} {showHeard} onCloseHeard={toggleHeard} />
 {:else}
   <LogBook onopenday={openDay} />
 {/if}

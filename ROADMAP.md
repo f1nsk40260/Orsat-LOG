@@ -384,7 +384,7 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - Choix F1NSK 21/10 : disque de 232 Go (< 30 Go utilisés) ; taille laissée à mon estimation.
 
 ## Fait — v1.9.1 (21/10/2026) : bouton « 📡 Entendu » dans le header
-- Le panneau « Entendu par le WebSDR » de la page d'agenda s'affiche à la demande (choix retenu par le navigateur).
+- « Entendu par le WebSDR » s'ouvre à la demande dans une grande fenêtre par-dessus la page (v1.9.2), pour le jour affiché.
 
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
