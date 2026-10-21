@@ -1,7 +1,7 @@
 <script>
   // Formulaire d'édition complet d'une entrée du carnet (QSO, écoute SWL, passage de QSO de groupe).
   // Bande, distance et azimut sont recalculés par le serveur à l'enregistrement.
-  import { onMount } from 'svelte';
+  import { onMount, untrack } from 'svelte';
   import { api } from './api.js';
   import { MODES } from './util.js';
 
@@ -15,7 +15,8 @@
     return byMode ? byMode.label : (q.mode || 'SSB');
   }
 
-  const e = entry;
+  // L'entrée est copiée une fois à l'ouverture : le formulaire travaille sur sa copie
+  const e = untrack(() => entry);
   const fmtDate = (d) => (d && d.length === 8 ? `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}` : '');
   const fmtTime = (t) => (t && t.length >= 4 ? `${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4, 6) || '00'}` : '');
   const num = (v) => (v === null || v === undefined ? '' : String(v));
