@@ -8,7 +8,7 @@
   import HeardPanel from './HeardPanel.svelte';
   import WeatherPanel from './WeatherPanel.svelte';
 
-  let { day, isToday, radio, websdr, settings } = $props();
+  let { day, isToday, radio, websdr, settings, showHeard = false } = $props();
 
   let page = $state(null);
   let note = $state('');
@@ -125,7 +125,7 @@
       {/if}
     {/if}
     <PropagationPanel snapshots={page?.propagation ?? []} archive={page?.archive} {isToday} />
-    <HeardPanel heard={page?.heard} />
+    {#if showHeard}<HeardPanel heard={page?.heard} />{/if}
   </div>
 
   <!-- colonne centrale : saisie + activité du jour -->

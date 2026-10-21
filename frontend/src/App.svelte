@@ -12,6 +12,13 @@
   let radio = $state({ connected: false, freq: 0, mode: '', submode: '', ptt: false, device: '' });
   let websdr = $state({ listening: false, connected: false, freq: 0, mode: '', submode: '', ptt: false, device: 'WebSDR' });
   let showCalendar = $state(false);
+  // Panneau « Entendu par le WebSDR » (autorun) : affiché à la demande, choix retenu par le navigateur
+  let showHeard = $state((() => { try { return localStorage.getItem('orsatlog.heard') === '1'; } catch { return false; } })());
+  function toggleHeard() {
+    showHeard = !showHeard;
+    try { localStorage.setItem('orsatlog.heard', showHeard ? '1' : '0'); } catch {}
+    if (showHeard) view = 'day';
+  }
   let view = $state('day');              // 'day' = page d'agenda, 'log' = carnet complet
   let utc = $state(new Date());
   let today = $state(dayOf());           // jour UTC en cours
@@ -110,6 +117,8 @@
 
   <div class="right">
     <HeaderClock />
+    <button class:active={showHeard && view === 'day'} onclick={toggleHeard}
+            title="Afficher / masquer ce que le WebSDR a décodé (autorun : FT8, FT4, JS8, WSPR) sur la page d'agenda">📡 Entendu</button>
     <button class:active={view === 'log'} onclick={() => (view = view === 'log' ? 'day' : 'log')}
             title="Ouvrir / fermer le carnet de trafic complet (Alt+C)">
       {view === 'log' ? 'Agenda' : 'Carnet'}
@@ -119,7 +128,7 @@
 </header>
 
 {#if view === 'day'}
-  <DayPage bind:this={dayPage} {day} {isToday} {radio} {websdr} {settings} />
+  <DayPage bind:this={dayPage} {day} {isToday} {radio} {websdr} {settings} {showHeard} />
 {:else}
   <LogBook onopenday={openDay} />
 {/if}
