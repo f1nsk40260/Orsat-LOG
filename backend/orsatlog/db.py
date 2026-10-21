@@ -32,6 +32,7 @@ QSO_FIELDS = [
     "rst_sent", "rst_rcvd", "name", "qth", "gridsquare", "comment",
     "distance_km", "bearing", "sfi", "a_index", "k_index",
     "qrz_logid", "qrz_state", "qrz_error", "adif_extra",
+    "my_gridsquare", "country", "dxcc", "cont", "cqz", "ituz", "lat", "lon", "confirmed", "solar_src",
 ]
 
 _SCHEMA = """
@@ -161,6 +162,15 @@ class Database:
             if col not in cols:
                 self._con.execute(f"ALTER TABLE qso ADD COLUMN {col} {ddl}")
         self._con.execute("CREATE INDEX IF NOT EXISTS idx_qso_qrz ON qso(qrz_logid)")
+        # migration v1.3 -> v1.4 : enrichissement pour l'analyse (voir enrich.py)
+        #   my_gridsquare : QTH d'où le QSO a été fait (IN93LR puis IN93KU pour F1NSK)
+        #   country, dxcc, cont, cqz, ituz, lat, lon : correspondant (fournis par QRZ.com)
+        #   confirmed : 'LoTW', 'QSL', 'eQSL' ou '' ; solar_src : 'hamqsl' (relevé direct) ou 'GFZ' (archive)
+        for col, ddl in (("my_gridsquare", "TEXT"), ("country", "TEXT"), ("dxcc", "INTEGER"),
+                         ("cont", "TEXT"), ("cqz", "INTEGER"), ("ituz", "INTEGER"), ("lat", "REAL"),
+                         ("lon", "REAL"), ("confirmed", "TEXT"), ("solar_src", "TEXT")):
+            if col not in cols:
+                self._con.execute(f"ALTER TABLE qso ADD COLUMN {col} {ddl}")
         # QSO retirés du carnet mais laissés chez QRZ : la synchronisation ne les reprend plus
         self._con.execute("CREATE TABLE IF NOT EXISTS qrz_ignored (logid INTEGER PRIMARY KEY, "
                           "call TEXT, qso_date TEXT, at TEXT DEFAULT (datetime('now')))")
@@ -271,6 +281,27 @@ class Database:
                 "LEFT JOIN session s ON s.id = q.session_id WHERE q.kind = 'QSO' "
                 "ORDER BY q.qso_date, q.time_on, q.id").fetchall()
         return [dict(r) for r in rows if r["kind"] == "QSO"]
+
+    # --- enrichissement (enrich.py) ---
+    def all_entries_for_enrich(self):
+        with self._lock:
+            return [dict(r) for r in self._con.execute(
+                "SELECT id, kind, gridsquare, my_gridsquare, lat, lon, country, adif_extra, "
+                "distance_km, bearing FROM qso")]
+
+    def entries_without_solar(self):
+        with self._lock:
+            return [dict(r) for r in self._con.execute(
+                "SELECT id, qso_date, time_on FROM qso WHERE sfi IS NULL AND k_index IS NULL")]
+
+    def enrich_stats(self):
+        with self._lock:
+            r = self._con.execute(
+                "SELECT COUNT(*) AS n, SUM(sfi IS NOT NULL OR k_index IS NOT NULL) AS solar, "
+                "SUM(solar_src = 'GFZ') AS gfz, SUM(distance_km IS NOT NULL) AS dist, "
+                "SUM(coalesce(country, '') <> '') AS country, SUM(coalesce(confirmed, '') <> '') AS conf, "
+                "COUNT(DISTINCT dxcc) AS dxcc FROM qso WHERE kind = 'QSO'").fetchone()
+        return {k: r[k] or 0 for k in r.keys()}
 
     # --- synchronisation QRZ.com ---
     def qrz_pending(self, limit=50):

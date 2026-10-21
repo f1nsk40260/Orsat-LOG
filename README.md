@@ -32,6 +32,10 @@ bash ~/Orsat-LOG/update-server.sh && sudo systemctl restart orsat-log
 
 ## Données
 
+Indices solaires historiques : archive Kp / ap / Ap / SN / F10.7 du GFZ Potsdam (Matzka et al., 2021,
+*Space Weather*, https://doi.org/10.1029/2020SW002641), licence CC BY 4.0.
+
+
 `~/Orsat-LOG/data/` (jamais envoyé sur GitHub) : base `orsatlog.db`, copies quotidiennes
 `backups/`, clé de session `secret.key`.
 

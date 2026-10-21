@@ -27,7 +27,7 @@ import urllib.request
 from collections import deque
 from datetime import datetime, timedelta, timezone
 
-from . import __version__, adif, geo
+from . import __version__, adif, enrich, geo
 
 log = logging.getLogger("orsatlog.qrz")
 
@@ -119,11 +119,11 @@ def record_to_fields(rec, settings):
     if q is None:
         return None, None
     q["band"] = geo.band_of(q["freq"]) or q["band"]
-    my_loc = settings.get("locator", "")
-    q["distance_km"] = q["bearing"] = None
-    if geo.valid_locator(my_loc) and geo.valid_locator(q["gridsquare"]):
-        q["distance_km"], q["bearing"] = geo.distance_bearing(my_loc, q["gridsquare"])
     extra = {k: v for k, v in rec.items() if k not in _OWN and not _QRZ_ONLY.match(k)}
+    p = enrich.promote(extra)                   # QTH d'émission, pays, DXCC, confirmation…
+    q.update({k: v for k, v in p.items() if v is not None})
+    q["country"] = p["country"] or ""
+    q["distance_km"], q["bearing"] = enrich.geometry(q, settings)
     return q, extra
 
 
@@ -146,8 +146,8 @@ def fields_to_adif(q, settings):
     rec.update({k: v for k, v in own.items() if v != ""})
     if settings.get("callsign"):
         rec.setdefault("STATION_CALLSIGN", settings["callsign"])
-    if settings.get("locator"):
-        rec.setdefault("MY_GRIDSQUARE", settings["locator"])
+    if q.get("my_gridsquare") or settings.get("locator"):
+        rec.setdefault("MY_GRIDSQUARE", q.get("my_gridsquare") or settings["locator"])
     return "".join(f"<{k.lower()}:{len(str(v))}>{v}" for k, v in rec.items()) + "<eor>"
 
 
@@ -221,6 +221,7 @@ class QrzSync:
             self._pull_since(client, s, since)
         self.db.set_settings({"qrz_last_pull": (datetime.now(timezone.utc) - timedelta(days=1)).strftime("%Y-%m-%d")})
         self._push(client, s)
+        enrich.run(self.db)                     # SFI / A / K historiques des nouveaux contacts
 
     def _pull_all(self, client, s):
         self.note("Lecture complète du logbook QRZ…")

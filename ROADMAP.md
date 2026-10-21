@@ -287,6 +287,23 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - Carnet : repère sur chaque QSO (✓ synchronisé, ⏳ en attente, ⚠ refusé + motif).
 - Testé contre un faux QRZ (API documentée) chargé de 600 QSO du vrai logbook QRZ de F1NSK.
 
+## Fait — v1.4.0 (21/10/2026) : enrichissement des QSO (préalable à l'Analyse)
+- Constat sur le logbook QRZ de F1NSK (4 603 QSO, 2008-2026) : **4 144 QSO faits depuis IN93LR**, 393 depuis
+  IN93KU (+ IN93, IN93KV) → chaque QSO garde son QTH d'émission (`qso.my_gridsquare`, MY_GRIDSQUARE QRZ ;
+  saisie du jour = locator station). Distances / azimuts calculés depuis ce QTH ; un changement de locator
+  station ne touche plus les anciens QSO. Écoutes SWL : toujours depuis le locator WebSDR.
+- Données QRZ promues en colonnes (`enrich.promote`) : country, dxcc, cont, cqz, ituz, lat/lon (ADIF
+  « N031 13.700 »), confirmed (LoTW / QSL / eQSL). Correspondant sans locator : distance depuis ses
+  coordonnées (`geo.adif_coord`, `distance_bearing` accepte (lat, lon)).
+- SFI / A / K historiques (`enrich.py`) : archive GFZ Potsdam `Kp_ap_Ap_SN_F107_since_1932.txt`
+  (kp.gfz.de, repli kp.gfz-potsdam.de ; CC BY 4.0, Matzka et al. 2021), relue chaque semaine dans
+  `data/gfz_kp_ap_f107.txt`. SFI = F10.7 observé du jour, A = Ap du jour, K = Kp du créneau de 3 h du QSO ;
+  `qso.solar_src` = 'GFZ' (archive) ou 'hamqsl' (relevé à la saisie). Seuls les QSO sans SFI ni K sont complétés.
+- Passe d'enrichissement au démarrage (+30 s), chaque jour, et après chaque synchro QRZ ; idempotente.
+- Carnet : colonne **Pays** (survol : DXCC, continent, zones CQ / ITU ; ◆ = confirmé), distance (survol :
+  « depuis IN93LR »), SFI / K grisés quand ils viennent de l'archive.
+- Panneau admin (état du carnet) : entités DXCC, confirmés, SFI/K connus (dont GFZ), distance connue.
+
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

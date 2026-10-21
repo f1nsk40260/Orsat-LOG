@@ -84,10 +84,22 @@ def locator_to_latlon(loc):
     return lat + w_lat / 2, lon + w_lon / 2
 
 
+def adif_coord(text):
+    """Coordonnée ADIF « N031 13.700 » / « W001 04.703 » -> degrés décimaux (None si illisible)."""
+    m = re.match(r"^\s*([NSEW])\s*(\d{1,3})\s+(\d{1,2}(?:\.\d+)?)\s*$", text or "", re.I)
+    if not m:
+        return None
+    v = int(m.group(2)) + float(m.group(3)) / 60
+    return -v if m.group(1).upper() in "SW" else v
+
+
 def distance_bearing(loc_a, loc_b):
-    """Distance orthodromique (km) et azimut (degrés) de A vers B."""
-    lat1, lon1 = map(math.radians, locator_to_latlon(loc_a))
-    lat2, lon2 = map(math.radians, locator_to_latlon(loc_b))
+    """Distance orthodromique (km) et azimut (degrés) de A vers B ; A et B sont des locators
+    ou des couples (lat, lon) en degrés."""
+    def pos(p):
+        return p if isinstance(p, tuple) else locator_to_latlon(p)
+    lat1, lon1 = map(math.radians, pos(loc_a))
+    lat2, lon2 = map(math.radians, pos(loc_b))
     dlon = lon2 - lon1
     a = math.sin((lat2 - lat1) / 2) ** 2 + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2
     dist = 2 * 6371.0 * math.asin(min(1.0, math.sqrt(a)))

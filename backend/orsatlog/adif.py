@@ -58,7 +58,7 @@ def export(qsos, my_call="", my_grid="", swl_grid="", kind="QSO"):
         if my_call:
             rec.append(_field("STATION_CALLSIGN", my_call))
         # MY_GRIDSQUARE : la station pour un QSO, le récepteur WebSDR pour une écoute SWL
-        grid = (swl_grid or my_grid) if q.get("kind") == "SWL" else my_grid
+        grid = (swl_grid or my_grid) if q.get("kind") == "SWL" else (q.get("my_gridsquare") or my_grid)
         if grid:
             rec.append(_field("MY_GRIDSQUARE", grid))
         out.append("".join(rec) + "<EOR>\n")

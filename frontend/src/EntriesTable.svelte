@@ -30,7 +30,7 @@
       <tr>
         {#if showDate}<th>Date</th>{/if}
         <th>UTC</th><th>Type</th><th>Indicatif / station</th><th>Bande</th><th>Fréq.</th><th>Mode</th>
-        <th>Env.</th><th title="RST reçu ou SINPO">Reçu</th><th>Locator</th><th>Dist.</th><th>Az.</th>
+        <th>Env.</th><th title="RST reçu ou SINPO">Reçu</th><th>Locator</th><th>Pays</th><th>Dist.</th><th>Az.</th>
         <th title="Flux solaire / indice K au moment de l'entrée">SFI / K</th><th>Nom / émetteur</th><th></th>
       </tr>
     </thead>
@@ -66,9 +66,13 @@
           <td class="mono">{q.rst_sent}</td>
           <td class="mono">{q.rst_rcvd}</td>
           <td class="mono">{q.gridsquare}</td>
-          <td>{q.distance_km != null ? `${q.distance_km} km` : ''}</td>
+          <td class="country" title={q.country ? `${q.country}${q.dxcc ? ` · DXCC ${q.dxcc}` : ''}${q.cont ? ` · ${q.cont}` : ''}${q.cqz ? ` · CQ ${q.cqz}` : ''}${q.ituz ? ` · ITU ${q.ituz}` : ''}` : ''}>
+            {q.country || ''}{#if q.confirmed}<span class="conf" title={`Confirmé (${q.confirmed})`}>◆</span>{/if}
+          </td>
+          <td title={q.my_gridsquare && q.kind !== 'SWL' ? `depuis ${q.my_gridsquare}` : ''}>{q.distance_km != null ? `${q.distance_km} km` : ''}</td>
           <td>{q.bearing != null ? `${q.bearing}°` : ''}</td>
-          <td>{q.sfi ?? ''}{q.k_index != null ? ` / ${q.k_index}` : ''}</td>
+          <td title={q.solar_src === 'GFZ' ? `Archive GFZ Potsdam : SFI du jour, K du créneau de 3 h${q.a_index != null ? `, A ${q.a_index}` : ''}` : (q.sfi != null ? 'Relevé hamqsl au moment de la saisie' : '')}
+              class:archive={q.solar_src === 'GFZ'}>{q.sfi != null ? Math.round(q.sfi) : ''}{q.k_index != null ? ` / ${+(+q.k_index).toFixed(1)}` : ''}</td>
           <td>{q.kind === 'SWL' ? q.qth : q.name}</td>
           <td>
             <button class="ghost edit" title="Modifier cette entrée" onclick={() => (editing = q)}>✎</button>
@@ -78,7 +82,7 @@
           </td>
         </tr>
       {:else}
-        <tr><td colspan="15" class="muted empty">{empty}</td></tr>
+        <tr><td colspan="16" class="muted empty">{empty}</td></tr>
       {/each}
     </tbody>
   </table>
@@ -100,6 +104,9 @@
   .tag-grp { border-color: rgba(95, 191, 107, 0.6); color: var(--ok); cursor: help; }
   .tag-swl { border-color: rgba(120, 170, 220, 0.6); color: rgb(140, 185, 230); }
   tr.swl .call-cell { color: rgb(160, 200, 240); }
+  .country { white-space: nowrap; max-width: 140px; overflow: hidden; text-overflow: ellipsis; }
+  .conf { color: var(--gold); margin-left: 4px; font-size: 0.7rem; cursor: help; }
+  td.archive { color: var(--muted); }
   .qrz { margin-left: 5px; font-size: 0.72rem; font-weight: 400; cursor: help; }
   .q-synced { color: var(--ok); opacity: 0.7; }
   .q-pending { color: var(--muted); }

@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, geo, qrz, solar, weather
+from . import __version__, adif, auth, backup, enrich, geo, qrz, solar, weather
 from .db import Database
 from .websdr import Page, WebSdrLink
 
@@ -86,15 +86,36 @@ async def _record_weather():
     db.add_weather(utc_day(at), at.strftime("%H%M%S"), data)
 
 
+_enrich_state = {"last": "", "summary": {}}
+
+
+async def _enrich_loop():
+    """Enrichissement du carnet (enrich.py) : au démarrage, puis une fois par jour."""
+    await asyncio.sleep(30)
+    while True:
+        await run_enrich()
+        await asyncio.sleep(24 * 3600)
+
+
+async def run_enrich():
+    try:
+        _enrich_state["summary"] = await asyncio.to_thread(enrich.run, db)
+        _enrich_state["last"] = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    except Exception as exc:
+        log.warning("enrichissement : %s", exc)
+
+
 @asynccontextmanager
 async def lifespan(app):
     recorder = asyncio.create_task(_propagation_recorder())
     syncer = asyncio.create_task(qrz_sync.loop())
+    enricher = asyncio.create_task(_enrich_loop())
     saver = asyncio.create_task(backup.daily_task(db))
     yield
     recorder.cancel()
     saver.cancel()
     syncer.cancel()
+    enricher.cancel()
 
 
 app = FastAPI(title="ORSAT-LOG", version=__version__, lifespan=lifespan)
@@ -210,7 +231,8 @@ def admin_status(request: Request):
             "commit_subject": git("log", "-1", "--format=%s"),
             "commit_date": git("log", "-1", "--format=%cI"),
             "db_size": DB_PATH.stat().st_size if DB_PATH.exists() else 0, **st,
-            "websdr_pages": websdr.state["pages"], "clients": len(_clients)}
+            "websdr_pages": websdr.state["pages"], "clients": len(_clients),
+            "enrich": {**db.enrich_stats(), **_enrich_state}}
 
 
 # ---------- synchronisation QRZ.com (panneau admin) ----------
@@ -311,23 +333,14 @@ async def put_settings(values: dict, request: Request):
     return after
 
 
-def _origin_locator(kind):
-    """Point de départ des distances : la station émettrice pour un QSO, le récepteur
-    WebSDR pour une écoute SWL (à défaut, la station)."""
-    s = db.get_settings()
-    if kind == "SWL" and geo.valid_locator(s.get("swl_locator", "")):
-        return s["swl_locator"]
-    return s.get("locator", "")
-
-
 def recompute():
-    """Recalcule distance et azimut de toutes les entrées (après un changement de locator)."""
+    """Recalcule distance et azimut de toutes les entrées (après un changement de locator).
+    Un QSO garde son propre QTH d'émission (my_gridsquare) : seuls ceux qui n'en ont pas, et les
+    écoutes SWL, suivent le locator des réglages."""
     n = 0
+    s = db.get_settings()
     for q in db.all_qsos():
-        my_loc = _origin_locator(q.get("kind"))
-        d = b = None
-        if geo.valid_locator(my_loc) and geo.valid_locator(q.get("gridsquare") or ""):
-            d, b = geo.distance_bearing(my_loc, q["gridsquare"])
+        d, b = enrich.geometry(q, s)
         if (d, b) != (q.get("distance_km"), q.get("bearing")):
             db.update_qso(q["id"], {"distance_km": d, "bearing": b})
             n += 1
@@ -436,13 +449,15 @@ async def add_qso(q: QsoIn):
     rec["gridsquare"] = q.gridsquare.strip().upper()
     rec["band"] = geo.band_of(q.freq, swl=kind == "SWL")
 
-    my_loc = _origin_locator(kind)
-    if geo.valid_locator(my_loc) and geo.valid_locator(rec["gridsquare"]):
-        rec["distance_km"], rec["bearing"] = geo.distance_bearing(my_loc, rec["gridsquare"])
+    settings = db.get_settings()
+    if kind == "QSO" and geo.valid_locator(settings.get("locator", "")):
+        rec["my_gridsquare"] = settings["locator"].upper()     # QTH d'émission du jour
+    rec["distance_km"], rec["bearing"] = enrich.geometry({**rec, "kind": kind}, settings)
 
     sol = await asyncio.to_thread(solar.get_solar) or db.last_snapshot()
     if sol:
         rec["sfi"], rec["a_index"], rec["k_index"] = sol["sfi"], sol["a_index"], sol["k_index"]
+        rec["solar_src"] = "hamqsl"
 
     if kind == "QSO":
         rec["qrz_state"] = "pending"           # à envoyer vers QRZ.com
@@ -507,10 +522,11 @@ def update_qso(qso_id: int, q: QsoEdit):
                band=geo.band_of(q.freq, swl=kind == "SWL"), distance_km=None, bearing=None)
     if kind == "SWL":
         rec["rst_sent"] = ""
-    my_loc = _origin_locator(kind)
-    if geo.valid_locator(my_loc) and geo.valid_locator(grid):
-        rec["distance_km"], rec["bearing"] = geo.distance_bearing(my_loc, grid)
     old = db.get_qso(qso_id)
+    rec["distance_km"], rec["bearing"] = enrich.geometry(
+        {**rec, "kind": kind, "my_gridsquare": old.get("my_gridsquare"),
+         "lat": None if grid else old.get("lat"), "lon": None if grid else old.get("lon")},
+        db.get_settings())
     if kind == "QSO":
         rec["qrz_state"] = "pending"           # correction à renvoyer vers QRZ.com
     elif old.get("qrz_logid"):
