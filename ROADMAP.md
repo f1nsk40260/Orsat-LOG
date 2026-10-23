@@ -546,6 +546,22 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
   recevait rien juste après un défilement de la fenêtre. Écouteur `wheel` sur window (capture, non passif) :
   zoom dès que le pointeur est dans le cadre de la carte, quel que soit l'élément visé.
   Pas de Firefox dans le bac à sable (téléchargement bloqué) : testé sous Chromium, à confirmer sous Firefox.
+
+## Fait — v1.21.0 (23/10/2026) : zone d'écoute du WebSDR (carte + page publique)
+- Antenne du WebSDR simulée avec NEC-2 (PyNEC, sol de Sommerfeld) : loop horizontale 80 m de périmètre,
+  légèrement trapézoïdale (modèle 25/15/20/20 m), 6 m au-dessus d'un sol sablonneux (εr 5, σ 1 mS/m),
+  alimentée dans un angle par un balun 4:1. `backend/orsatlog/websdr_loop.json` : par bande, gain moyen
+  par degré d'élévation (« avg »), grille complète élévation × azimut 5° (« grid », pour une future
+  orientation), impédance, désadaptation / 200 Ω, pénalité S/B (désadaptation au-delà de la marge de bruit
+  extérieur UIT-R P.372 rural : nulle partout).
+- `reach.listen_map` : là où la bande passe, gain de la loop à l'angle d'arrivée (−3 dB en limite de MUF,
+  −6 dB si affaiblie) → G bonne (≥ 0 dBi) / M moyenne (≥ −6) / P faible ; grille propre au locator du
+  WebSDR (`swl_locator`), grilles en cache par locator. `GET api/listenmap` (connecté),
+  `GET api/public/listenmap` (sans connexion, aucune donnée du carnet).
+- Carte : bouton « Émission station / Écoute ORSAT ». Page publique `/ecoute` (https://orsat.ddns.net/log/ecoute) :
+  carte d'écoute seule, sans correspondants ni image satellite ; publics : /ecoute, /assets/*,
+  api/public/listenmap. Vérifié : carnet, réglages, cartes privées et tuiles restent en 401 sans connexion.
+- À faire : bouton sur la page du WebSDR (dépôt PhantomSDR-ORSAT) ouvrant /log/ecoute ; orientation de la loop.
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

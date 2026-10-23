@@ -164,3 +164,31 @@ def cached_table(bands, ranges):
     if key not in _TABLE:
         _TABLE[key] = table(bands, ranges)
     return _TABLE[key]
+
+
+# ---------- antenne du WebSDR ORSAT : diagramme NEC réel ----------
+# websdr_loop.json : loop horizontale 80 m (trapèze) à 6 m sur sable, alimentée dans un angle (balun 4:1),
+# NEC-2 avec sol de Sommerfeld ; désadaptation calculée par rapport à 200 Ω.
+# « avg » = gain moyenné sur l'azimut par degré d'élévation ; « grid » = [élévation][azimut tous les 5°]
+# (orientation de la loop encore inconnue : on utilise la moyenne).
+_WEBSDR = None
+
+
+def websdr_pattern():
+    global _WEBSDR
+    if _WEBSDR is None:
+        import json
+        from pathlib import Path
+        _WEBSDR = json.loads((Path(__file__).with_name("websdr_loop.json")).read_text())
+    return _WEBSDR
+
+
+def websdr_gain(band, elev_deg):
+    """Gain de réception (dBi, moyenne azimut) de la loop du WebSDR ; bande sans calcul -> la plus proche."""
+    pat = websdr_pattern()["bands"]
+    if band not in pat:
+        mhz = {"6m": 50.0}.get(band)
+        band = min(pat, key=lambda b: abs(pat[b]["mhz"] - (mhz or 0)))
+    e = max(0, min(90, int(round(elev_deg))))
+    # pénalité de rapport signal/bruit due à la désadaptation (nulle tant que le bruit extérieur domine)
+    return pat[band]["avg"][e] - pat[band].get("snr_penalty_db", 0.0)

@@ -120,7 +120,6 @@ def _state(freq, muf):
     return "open" if freq <= 0.85 * muf else "edge" if freq <= muf else "closed"
 
 
-_map_cache = {"key": None, "data": None}
 
 
 def skip_map(locator, sfi=None):
@@ -136,12 +135,30 @@ def skip_map(locator, sfi=None):
 
 
 def _grid(home, locator, sts):
-    """Grille commune à la carte et au tableau de portée, recalculée quand les mesures changent."""
+    """Grille commune à la carte et au tableau de portée, recalculée quand les mesures changent
+    (une par locator : station d'émission et WebSDR)."""
     key = (locator, _cache["t"])
-    if _map_cache["key"] != key:
-        _map_cache["data"] = reach.build_grid(home, lambda pt, f: _interp(sts, pt, f), destination)
-        _map_cache["key"] = key
-    return _map_cache["data"]
+    if key not in _grids:
+        for k in [k for k in _grids if k[1] != _cache["t"]]:
+            del _grids[k]                                   # mesures renouvelées : anciennes grilles jetées
+        _grids[key] = reach.build_grid(home, lambda pt, f: _interp(sts, pt, f), destination)
+    return _grids[key]
+
+
+_grids = {}
+
+
+def listen_map(locator, sfi=None):
+    """Où le WebSDR entend bien en ce moment : propagation depuis son locator × diagramme NEC de sa loop."""
+    home = geo.locator_to_latlon(locator) if geo.valid_locator(locator or "") else None
+    if not home:
+        return {"ok": False, "msg": "Locator du WebSDR non réglé (panneau admin)."}
+    sts = stations()
+    if sts is None:
+        return {"ok": False, "msg": "Mesures d'ionosondes (KC2G) momentanément indisponibles."}
+    data = reach.listen_map(_grid(home, locator, sts), BANDS, sfi, antennas.websdr_gain, antennas.takeoff_deg)
+    return {"ok": True, "mode": "listen", "home": [round(home[0], 3), round(home[1], 3)], "locator": locator.upper(),
+            "antenna": antennas.websdr_pattern()["description"], **data}
 
 
 def open_bands(locator, sfi=None):

@@ -140,7 +140,8 @@ app = FastAPI(title="ORSAT-LOG", version=__version__, lifespan=lifespan)
 
 # ---------- accès protégé ----------
 # Pages et appels accessibles sans session : la connexion elle-même.
-_PUBLIC = {"/login", "/favicon.ico"}
+_PUBLIC = {"/login", "/favicon.ico", "/ecoute", "/ecoute.html", "/api/public/listenmap"}
+_PUBLIC_PREFIX = ("/assets/",)      # fichiers compilés de l'interface (aucune donnée du carnet)
 
 _LOGIN_HTML = """<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>ORSAT-LOG — connexion</title>
@@ -181,7 +182,7 @@ def _logged_in(cookies):
 
 @app.middleware("http")
 async def _require_login(request: Request, call_next):
-    if request.url.path in _PUBLIC or _logged_in(request.cookies):
+    if request.url.path in _PUBLIC or request.url.path.startswith(_PUBLIC_PREFIX) or _logged_in(request.cookies):
         return await call_next(request)
     if request.url.path.startswith("/api/") and auth.is_admin(request.headers):
         return await call_next(request)                  # panneau admin du WebSDR
@@ -513,6 +514,25 @@ async def sat_tile(z: int, y: int, x: int):
     except Exception as exc:
         raise HTTPException(502, f"Image satellite indisponible : {exc}")
     return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=2592000"})
+
+
+def _listen_map():
+    s = db.get_settings()
+    sol = solar.get_solar() or db.last_snapshot() or {}
+    loc = s.get("swl_locator") or s.get("locator", "")
+    return kc2g.listen_map(loc, sol.get("sfi"))
+
+
+@app.get("/api/listenmap")
+async def get_listen_map():
+    """Zone d'écoute efficace du WebSDR en ce moment."""
+    return await asyncio.to_thread(_listen_map)
+
+
+@app.get("/api/public/listenmap")
+async def get_public_listen_map():
+    """Même carte, sans connexion, pour la page publique « écoute » (aucune donnée du carnet)."""
+    return await asyncio.to_thread(_listen_map)
 
 
 @app.get("/api/openbands")
@@ -1120,6 +1140,12 @@ def analysis(kind: str = "QSO", band: str = ""):
     return {"kind": kind, "band": band, "bands": bands, "total": _bucket_stats(sel),
             "missing_solar": sum(1 for r in sel if r["k_index"] is None),
             "by_kp": by_kp, "by_sfi": by_sfi, "by_hour": by_hour, "by_dir": by_dir, "band_hour": grid}
+
+
+@app.get("/ecoute", include_in_schema=False)
+def public_listen_page():
+    """Page publique « où le WebSDR entend bien en ce moment » (à afficher depuis la page du WebSDR)."""
+    return FileResponse(FRONTEND_DIST / "ecoute.html")
 
 
 # ---------- frontend compilé ----------

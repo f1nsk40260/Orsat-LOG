@@ -186,3 +186,28 @@ def compute(grid, dirs, bands, sfi):
         best.append(row)
     return {"best": best, "dirs": per_dir, "ssn": round(ssn),
             "thresholds_db": [WEAK_DB, ABSORBED_DB], "when": grid["when"].strftime("%H:%M UTC")}
+
+
+
+# ---------- écoute du WebSDR : propagation × diagramme de l'antenne de réception ----------
+LISTEN_GOOD_DB, LISTEN_FAIR_DB = 0.0, -6.0
+
+
+def listen_map(grid, bands, sfi, gain_fn, takeoff_fn):
+    """Qualité d'écoute par case : là où la bande passe (o/e/w), gain de l'antenne de réception à l'angle
+    d'arrivée, diminué de 3 dB en limite de MUF et de 6 dB si l'absorption affaiblit.
+    G = bonne (≥ 0 dBi), M = moyenne (≥ −6), P = faible ; c/a/- inchangés (silence, absorbée, pas de mesure)."""
+    ssn = ssn_from_sfi(sfi)
+    out = {}
+    for band, f in bands:
+        codes = []
+        for c, (code, _db) in zip(grid["cells"], _codes(grid, f, ssn)):
+            if code not in "oew":
+                codes.append(code)
+                continue
+            g = gain_fn(band, takeoff_fn(c["hop"])) - (3 if code == "e" else 0) - (6 if code == "w" else 0)
+            codes.append("G" if g >= LISTEN_GOOD_DB else "M" if g >= LISTEN_FAIR_DB else "P")
+        out[band] = "".join(codes)
+    return {"az_step": MAP_AZ_STEP, "rings": MAP_RINGS, "bands": out,
+            "muf": [None if c["muf"] is None else round(c["muf"], 1) for c in grid["cells"]],
+            "when": grid["when"].strftime("%H:%M UTC"), "ssn": round(ssn)}

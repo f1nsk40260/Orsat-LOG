@@ -8,13 +8,19 @@
   import { renderSatellite, tileZoom } from './satellite.js';
   import { geoAzimuthalEquidistant as azeq } from 'd3-geo';
 
+  // publicView : page publique « écoute » (pas de correspondants, pas d'image satellite, pas de connexion)
+  let { publicView = false } = $props();
+  let mode = $state(publicView ? 'listen' : 'tx');     // 'tx' = émission depuis la station, 'listen' = écoute du WebSDR
   let data = $state(null);
-  let band = $state('20m');
+  let band = $state(publicView ? '40m' : '20m');
   let onlyBand = $state(false);
   let hover = $state('');
 
-  export async function refresh() { data = await api.skipMap().catch(() => ({ ok: false, msg: 'Serveur injoignable.' })); }
-  $effect(() => { refresh(); });
+  export async function refresh() {
+    const get = publicView ? api.publicListenMap : mode === 'listen' ? api.listenMap : api.skipMap;
+    data = await get().catch(() => ({ ok: false, msg: 'Serveur injoignable.' }));
+  }
+  $effect(() => { mode; refresh(); });
 
   const SIZE = 640, C = SIZE / 2, R = 300, EARTH = 6371, KM_MIN = 150, KM_MAX = 5000;
   // zoom à la molette (centré sur le QTH) : rayon affiché en km
@@ -110,6 +116,13 @@
                      a: 'rgba(214,80,80,0.38)', c: 'rgba(0,0,0,0.5)', '-': 'url(#nodata)' };
   const FILL = { o: 'rgba(95,191,107,0.55)', e: 'rgba(224,160,48,0.55)', w: 'rgba(95,191,107,0.28)',
                  a: 'rgba(214,80,80,0.45)', c: 'rgba(10,10,12,0.72)', '-': 'url(#nodata)' };
+  // vue écoute : qualité de réception du WebSDR (propagation × gain de sa loop à l'angle d'arrivée)
+  const FILL_L = { G: 'rgba(95,191,107,0.62)', M: 'rgba(200,200,80,0.5)', P: 'rgba(224,140,48,0.45)',
+                   a: 'rgba(214,80,80,0.45)', c: 'rgba(10,10,12,0.72)', '-': 'url(#nodata)' };
+  const LABEL_L = { G: 'bonne écoute', M: 'écoute moyenne', P: 'écoute faible (antenne peu favorable à cet angle)',
+                    a: 'absorbée (couche D)', c: 'zone de silence (MUF dépassée)', '-': 'pas de mesure' };
+  const fillFor = (code) => (mode === 'listen' ? FILL_L : sat && satImg ? FILL_SAT : FILL)[code] ?? 'transparent';
+  const labelFor = (code) => (mode === 'listen' ? LABEL_L : LABEL)[code] ?? '';
   const LABEL = { o: 'ouverte', e: 'en limite de MUF', w: 'ouverte mais affaiblie (absorption)',
                   a: 'absorbée (couche D)', c: 'zone de silence (MUF dépassée)', '-': 'pas de mesure' };
 
@@ -152,6 +165,7 @@
   }
   const stations = $derived.by(() => {
     if (!data?.ok || !proj) return [];
+    if (mode === 'listen') return [];
     return (data.stations ?? [])
       .filter((s) => !onlyBand || s.band === band)
       .map((s) => {
@@ -173,12 +187,20 @@
     <div class="bands zoom" role="group" aria-label="Rayon affiché" title="Rayon de la carte (molette sur la carte pour zoomer)">
       {#each ZOOMS as [km, l]}<button type="button" class:on={Math.abs(MAX_KM - km) < km * 0.1} onclick={() => (MAX_KM = km)}>{l}</button>{/each}
     </div>
+    {#if !publicView}
+    <div class="bands" role="group" aria-label="Ce que montre la carte">
+      <button type="button" class:on={mode === 'tx'} onclick={() => (mode = 'tx')}
+              title="Propagation depuis la station d'émission : zones de silence et ouvertures">Émission station</button><button
+              type="button" class:on={mode === 'listen'} onclick={() => (mode = 'listen')}
+              title="Où le WebSDR ORSAT entend bien en ce moment : propagation × diagramme de sa loop (NEC)">Écoute ORSAT</button>
+    </div>
     <button type="button" class="tog" class:on={sat} onclick={() => (sat = !sat)}
             title="Fond de carte : dessin des côtes, ou image satellite (Sentinel-2 cloudless)">
       {sat ? 'Vue satellite' : 'Vue carte'}</button>
     <button type="button" class="tog" class:on={onlyBand} onclick={() => (onlyBand = !onlyBand)}
             title="Afficher tous les correspondants du jour, ou seulement ceux de la bande choisie">
       {onlyBand ? `Correspondants : ${band} seulement` : 'Correspondants : toutes bandes'}</button>
+    {/if}
   </div>
 
   {#if data?.ok}
@@ -194,8 +216,8 @@
           {#if sat && satImg}<image href={satImg} x="0" y="0" width={SIZE} height={SIZE} />
           {:else}<path d={path(landShown)} class="land" />{/if}
           {#each cells as c}
-            <path role="presentation" d={c.d} fill={(sat && satImg ? FILL_SAT : FILL)[c.code]} class="cell"
-                  onmouseenter={() => (hover = `${band} · azimut ${c.az}° · ${c.r0}–${c.r1} km : ${LABEL[c.code]}${c.muf ? ` · MUF ${c.muf} MHz` : ''}`)}
+            <path role="presentation" d={c.d} fill={fillFor(c.code)} class="cell"
+                  onmouseenter={() => (hover = `${band} · azimut ${c.az}° · ${c.r0}–${c.r1} km : ${labelFor(c.code)}${c.muf ? ` · MUF ${c.muf} MHz` : ''}`)}
                   onmouseleave={() => (hover = '')} />
           {/each}
           <path d={path(geoGraticule10())} class="grat" />
@@ -224,13 +246,16 @@
         {/each}
       </svg>
       <div class="side">
-        <p class="hover">{hover || 'Survolez la carte ou un correspondant.'}</p>
+        <p class="hover">{hover || (mode === 'listen' ? 'Survolez la carte pour le détail d\'une zone.' : 'Survolez la carte ou un correspondant.')}</p>
         {#if sat && satMsg}<p class="muted">{satMsg}</p>{/if}
         <div class="legend">
-          {#each ['o', 'e', 'w', 'a', 'c'] as k}<span><i style="background:{FILL[k]}"></i>{LABEL[k]}</span>{/each}
+          {#each (mode === 'listen' ? ['G', 'M', 'P', 'a', 'c'] : ['o', 'e', 'w', 'a', 'c']) as k}<span><i style="background:{fillFor(k)}"></i>{labelFor(k)}</span>{/each}
           <span><i class="hatch"></i>pas de mesure (pas d'ionosonde assez proche)</span>
         </div>
-        {#if stations.length}
+        {#if mode === 'listen'}
+          <p class="small">Récepteur : WebSDR ORSAT ({data.locator}). Antenne : {data.antenna}.
+            Chaque case : la bande passe-t-elle depuis là (ionosondes mesurées), et la loop reçoit-elle bien sous cet angle d'arrivée ?</p>
+        {:else if stations.length}
           <h4>Correspondants du jour{sessions.length ? ` · ${sessions.join(', ')}` : ''}</h4>
           <table class="list">
             <tbody>
@@ -243,7 +268,7 @@
         {:else}
           <p class="muted">Aucun correspondant du jour avec une position connue (locator ou QRZ).</p>
         {/if}
-        <p class="src">Projection azimutale équidistante centrée sur le QTH (distances et azimuts vrais depuis chez vous).
+        <p class="src">Projection azimutale équidistante centrée sur {mode === 'listen' ? 'le WebSDR (distances et azimuts vrais depuis le récepteur)' : 'le QTH (distances et azimuts vrais depuis chez vous)'}.
           Molette sur la carte : zoom. Pas de 5°, anneaux de 25 km jusqu'à 300 km, 50 km jusqu'à 1000 km puis 250 km ; au-delà de 3500 km, plusieurs sauts. Même calcul que le tableau « Portée par bande ». Calcul de {data.when}, R {data.ssn}.
           Fond de carte et villes Natural Earth (domaine public), plus détaillés en zoomant.
           {#if sat}Image satellite : Sentinel-2 cloudless 2017 by EOX IT Services GmbH (contient des données Copernicus Sentinel modifiées, 2017), CC BY 4.0.{/if}</p>
@@ -297,4 +322,5 @@
   .mono { font-family: ui-monospace, monospace; color: var(--gold); }
   .src { font-size: 0.76rem; color: var(--muted); margin: 0; }
   .muted { color: var(--muted); font-size: 0.85rem; margin: 0; }
+  .small { font-size: 0.82rem; color: var(--text); margin: 0; }
 </style>

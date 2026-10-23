@@ -31,6 +31,8 @@ export const api = {
   spacewx: () => req('GET', 'api/spacewx'),
   openBands: () => req('GET', 'api/openbands'),
   skipMap: () => req('GET', 'api/skipmap'),
+  listenMap: () => req('GET', 'api/listenmap'),
+  publicListenMap: () => req('GET', 'api/public/listenmap'),
   analysis: (kind = 'QSO', band = '') => req('GET', `api/analysis?kind=${kind}&band=${encodeURIComponent(band)}`),
   weather: () => req('GET', 'api/weather'),
   qsos: (limit = 200) => req('GET', `api/qsos?limit=${limit}`),
