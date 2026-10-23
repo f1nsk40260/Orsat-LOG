@@ -521,6 +521,10 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
   domaine public ; [nom, lat, lon, population], trié par population). Chargé sous 2500 km ; seuil de population
   selon le zoom (3 M → 15 000), 70 noms au plus, sans chevauchement, indicatifs des correspondants prioritaires.
 - Fusion avec PhantomSDR-ORSAT écartée (dépôts séparés : suivi de PhantomSDR-Plus, techniques différentes).
+
+## Fait — v1.19.2 (23/10/2026) : correctif de mise à jour
+- `.gitignore` : `data/` excluait aussi `frontend/src/data/cities.json` (compilation en échec sur le serveur,
+  « Could not resolve './data/cities.json' »). Règle limitée à la racine : `/data/` (base et sauvegardes).
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
