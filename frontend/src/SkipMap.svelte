@@ -148,7 +148,7 @@
           <p class="muted">Aucun correspondant du jour avec une position connue (locator ou QRZ).</p>
         {/if}
         <p class="src">Projection azimutale équidistante centrée sur le QTH (distances et azimuts vrais depuis chez vous).
-          Pas de 10° et anneaux de 50 à 200 km ; au-delà de 3500 km, plusieurs sauts. Calcul de {data.when}, R {data.ssn}.
+          Pas de 5°, anneaux de 50 km jusqu'à 1000 km puis de 250 km ; au-delà de 3500 km, plusieurs sauts. Même calcul que le tableau « Portée par bande ». Calcul de {data.when}, R {data.ssn}.
           Fond de carte Natural Earth.</p>
       </div>
     </div>

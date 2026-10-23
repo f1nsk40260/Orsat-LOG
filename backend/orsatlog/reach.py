@@ -85,64 +85,19 @@ def _cell(freq, muf, db):
     return s
 
 
-def compute(home, dirs, bands, interp, destination, sfi, when=None):
-    """Portée par direction et meilleure direction.
-    interp(point, champ) -> (valeur, ionosondes) ; destination(home, az, km) -> point."""
-    when = when or datetime.now(timezone.utc)
-    ssn = ssn_from_sfi(sfi)
-    per_dir = {}
-    for name, az in dirs:
-        geo_r = {}
-        for key, hop, refl, _lo in RANGES:
-            pt = destination(home, az, refl)
-            fof2, _ = interp(pt, "fof2")
-            m3000, _ = interp(pt, "mufd")
-            hm, _ = interp(pt, "hmf2")
-            muf = m3000 if hop == 3000 else mufd_estimate(fof2, m3000, hop, hm)
-            geo_r[key] = {"muf": muf, "chi": solar_zenith(pt[0], pt[1], when), "hop": hop}
-        rows = []
-        for band, f in bands:
-            row = {"band": band}
-            for key, *_ in RANGES:
-                g = geo_r[key]
-                db = absorption_db(f, g["hop"], g["chi"], ssn)
-                row[key] = {"state": _cell(f, g["muf"], db),
-                            "muf": round(g["muf"], 1) if g["muf"] else None, "db": round(db)}
-            rows.append(row)
-        per_dir[name] = rows
-    # meilleure direction, portée par portée
-    best = []
-    for i, (band, _f) in enumerate(bands):
-        row = {"band": band}
-        for key, *_ in RANGES:
-            cands = [(RANK[per_dir[n][i][key]["state"]], per_dir[n][i][key]["muf"] or 0, n) for n, _ in dirs]
-            r, _m, n = max(cands)
-            row[key] = {**per_dir[n][i][key], "dir": n if r >= 0 else None}
-        best.append(row)
-    for rows in [best, *per_dir.values()]:
-        for row in rows:
-            # zone de silence : fermée (MUF dépassée) près, ouverte plus loin -> « silence < X km »
-            states = [row[k]["state"] for k, *_ in RANGES]
-            first = next((i for i, s in enumerate(states) if s in ("open", "edge", "weak")), None)
-            row["skip"] = (RANGES[first][3] if first and all(s == "closed" for s in states[:first]) else None)
-    return {"best": best, "dirs": per_dir, "ssn": round(ssn),
-            "thresholds_db": [WEAK_DB, ABSORBED_DB], "when": when.strftime("%H:%M UTC")}
-
-
-# ---------- carte azimutale des zones de silence ----------
-MAP_AZ_STEP = 10                                              # degrés
-MAP_RINGS = list(range(50, 1001, 50)) + list(range(1200, 5001, 200))   # bords extérieurs des anneaux, km
+# ---------- calcul unique : grille azimut × distance, dont dérivent la carte ET le tableau ----------
+MAP_AZ_STEP = 5                                                       # degrés (tombe sur N, NE, E…)
+MAP_RINGS = list(range(50, 1001, 50)) + list(range(1250, 5001, 250))  # bords extérieurs, km (100/300/900/2500 inclus)
 MAX_HOP_KM = 3500
 CODE = {"open": "o", "edge": "e", "weak": "w", "absorbed": "a", "closed": "c", None: "-"}
+STATE_OF = {v: k for k, v in CODE.items()}
 
 
-def skip_map(home, bands, interp, destination, sfi, when=None):
-    """Pour chaque azimut (pas de 10°) et chaque anneau de distance : MUF du trajet et absorption,
-    puis l'état de chaque bande, codé une lettre par case (o ouverte, e limite, w affaiblie,
-    a absorbée, c fermée = zone de silence, - pas de mesure). Au-delà de 3500 km : plusieurs sauts
-    égaux, MUF = la plus basse des deux réflexions extrêmes, absorption cumulée."""
+def build_grid(home, interp, destination, when=None):
+    """Pour chaque azimut et chaque anneau : MUF du trajet (distance réelle = milieu de l'anneau).
+    Saut unique jusqu'à 3500 km ; au-delà n sauts égaux, MUF = la plus basse des deux réflexions
+    extrêmes, absorption cumulée sur les n sauts."""
     when = when or datetime.now(timezone.utc)
-    ssn = ssn_from_sfi(sfi)
     cache = {}
 
     def iono(pt):
@@ -152,10 +107,9 @@ def skip_map(home, bands, interp, destination, sfi, when=None):
                         solar_zenith(pt[0], pt[1], when))
         return cache[k]
 
-    azs = list(range(0, 360, MAP_AZ_STEP))
     inner = [0] + MAP_RINGS[:-1]
-    cells = []                         # (muf, [(hop, chi), ...] par saut évalué, nb de sauts)
-    for az in azs:
+    cells = []
+    for az in range(0, 360, MAP_AZ_STEP):
         for lo, hi in zip(inner, MAP_RINGS):
             d = (lo + hi) / 2
             n = math.ceil(d / MAX_HOP_KM)
@@ -163,19 +117,71 @@ def skip_map(home, bands, interp, destination, sfi, when=None):
             ends = [hop / 2] if n == 1 else [hop / 2, d - hop / 2]
             mufs, chis = [], []
             for x in ends:
-                fof2, m3000, hm, chi = iono(destination(home, az + 0.0, x))
-                m = mufd_estimate(fof2, m3000, hop, hm) if fof2 and m3000 else None
-                mufs.append(m)
+                fof2, m3000, hm, chi = iono(destination(home, float(az), x))
+                mufs.append(mufd_estimate(fof2, m3000, hop, hm) if fof2 and m3000 else None)
                 chis.append(chi)
-            muf = None if any(m is None for m in mufs) else min(mufs)
-            cells.append((muf, hop, chis, n))
-    out = {}
-    for band, f in bands:
-        codes = []
-        for muf, hop, chis, n in cells:
-            db = sum(absorption_db(f, hop, c, ssn) for c in chis) * n / len(chis) if muf else None
-            codes.append(CODE[_cell(f, muf, db)])
-        out[band] = "".join(codes)
-    return {"az_step": MAP_AZ_STEP, "rings": MAP_RINGS, "bands": out,
-            "muf": [None if m is None else round(m, 1) for m, *_ in cells],
-            "when": when.strftime("%H:%M UTC"), "ssn": round(ssn)}
+            cells.append({"az": az, "lo": lo, "hi": hi, "hop": hop, "n": n, "chis": chis,
+                          "muf": None if any(m is None for m in mufs) else min(mufs)})
+    return {"cells": cells, "when": when}
+
+
+def _codes(grid, f, ssn):
+    out = []
+    for c in grid["cells"]:
+        db = sum(absorption_db(f, c["hop"], x, ssn) for x in c["chis"]) * c["n"] / len(c["chis"]) if c["muf"] else None
+        out.append((CODE[_cell(f, c["muf"], db)], db))
+    return out
+
+
+def skip_map(grid, bands, sfi):
+    ssn = ssn_from_sfi(sfi)
+    return {"az_step": MAP_AZ_STEP, "rings": MAP_RINGS,
+            "bands": {b: "".join(code for code, _ in _codes(grid, f, ssn)) for b, f in bands},
+            "muf": [None if c["muf"] is None else round(c["muf"], 1) for c in grid["cells"]],
+            "when": grid["when"].strftime("%H:%M UTC"), "ssn": round(ssn)}
+
+
+def compute(grid, dirs, bands, sfi):
+    """Portée par bande, lue dans la même grille que la carte : pour chaque direction et chaque
+    tranche, l'état qui couvre la plus grande part de la tranche ; zone de silence = bord intérieur
+    du premier anneau ouvert, si tout ce qui précède est fermé (MUF dépassée)."""
+    ssn = ssn_from_sfi(sfi)
+    n = len(MAP_RINGS)
+    per_dir = {}
+    for name, az in dirs:
+        a0 = (az // MAP_AZ_STEP) * n
+        rows = []
+        for band, f in bands:
+            codes = _codes({"cells": grid["cells"][a0:a0 + n]}, f, ssn)
+            cells = grid["cells"][a0:a0 + n]
+            row = {"band": band}
+            for key, _hop, _refl, lo in RANGES:
+                hi = next((r[3] for r in RANGES if r[3] > lo), MAP_RINGS[-1])
+                idx = [i for i, c in enumerate(cells) if c["lo"] >= lo and c["hi"] <= hi]
+                cover = {}
+                for i in idx:
+                    cover[codes[i][0]] = cover.get(codes[i][0], 0) + cells[i]["hi"] - cells[i]["lo"]
+                known = {k: v for k, v in cover.items() if k != "-"}      # sans mesure : ignoré s'il y a mieux
+                main = max(known, key=lambda k: (known[k], RANK[STATE_OF[k]])) if known else "-"
+                mid = idx[len(idx) // 2] if idx else None
+                row[key] = {"state": STATE_OF[main],
+                            "muf": round(cells[mid]["muf"], 1) if mid is not None and cells[mid]["muf"] else None,
+                            "db": round(codes[mid][1]) if mid is not None and codes[mid][1] is not None else None}
+            first = next((i for i, (c, _) in enumerate(codes) if c in "oew"), None)
+            row["skip"] = (cells[first]["lo"] if first and all(c == "c" for c, _ in codes[:first]) else None)
+            row["_near_open"] = first == 0
+            rows.append(row)
+        per_dir[name] = rows
+    best = []
+    for i, (band, _f) in enumerate(bands):
+        row = {"band": band}
+        for key, *_ in RANGES:
+            r, _m, nm = max((RANK[per_dir[d][i][key]["state"]], per_dir[d][i][key]["muf"] or 0, d) for d, _ in dirs)
+            row[key] = {**per_dir[nm][i][key], "dir": nm if r >= 0 else None}
+        # silence « toutes directions » : plus petite zone de silence, sauf si une direction passe dès le QTH
+        skips = [per_dir[d][i]["skip"] for d, _ in dirs if per_dir[d][i]["skip"] is not None]
+        near = any(per_dir[d][i]["_near_open"] for d, _ in dirs)
+        row["skip"] = min(skips) if skips and not near else None
+        best.append(row)
+    return {"best": best, "dirs": per_dir, "ssn": round(ssn),
+            "thresholds_db": [WEAK_DB, ABSORBED_DB], "when": grid["when"].strftime("%H:%M UTC")}

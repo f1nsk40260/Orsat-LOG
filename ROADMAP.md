@@ -494,6 +494,13 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
   fond Natural Earth `world-atlas` 110m embarqué), choix de la bande à la souris, correspondants du jour
   placés avec leur état (silence / ouvert…) sur leur bande, liste triée par distance, détail au survol.
 - À venir : choix de la meilleure antenne (inventaire à saisir, dont loops onde entière horizontales).
+
+## Fait — v1.18.1 (23/10/2026) : carte et portée par bande sur un seul calcul
+- `reach.build_grid` (azimut 5°, anneaux 50 km jusqu'à 1000 km puis 250 km, distance réelle de chaque
+  anneau) partagé par `skip_map` et `compute` ; grille en cache dans `kc2g._grid` (renouvelée avec les mesures).
+- Tableau : état d'une tranche = celui qui en couvre la plus grande part sur la direction (cases sans mesure
+  ignorées s'il y a mieux) ; silence = bord intérieur du premier anneau ouvert. Ligne « meilleure direction » :
+  plus petite zone de silence, sauf si une direction passe dès le QTH.
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

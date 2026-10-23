@@ -124,18 +124,24 @@ _map_cache = {"key": None, "data": None}
 
 
 def skip_map(locator, sfi=None):
-    """Carte azimutale des zones de silence (reach.skip_map), recalculée au plus toutes les 15 min."""
+    """Carte azimutale des zones de silence (reach.skip_map), même grille que la portée par bande."""
     home = geo.locator_to_latlon(locator) if geo.valid_locator(locator or "") else None
     if not home:
         return {"ok": False, "msg": "Locator du QTH non réglé (panneau admin)."}
     sts = stations()
     if sts is None:
         return {"ok": False, "msg": "Mesures d'ionosondes (KC2G) momentanément indisponibles."}
-    key = (locator, _cache["t"], sfi)
+    return {"ok": True, "home": [round(home[0], 3), round(home[1], 3)],
+            **reach.skip_map(_grid(home, locator, sts), BANDS, sfi)}
+
+
+def _grid(home, locator, sts):
+    """Grille commune à la carte et au tableau de portée, recalculée quand les mesures changent."""
+    key = (locator, _cache["t"])
     if _map_cache["key"] != key:
-        _map_cache["data"] = reach.skip_map(home, BANDS, lambda pt, f: _interp(sts, pt, f), destination, sfi)
+        _map_cache["data"] = reach.build_grid(home, lambda pt, f: _interp(sts, pt, f), destination)
         _map_cache["key"] = key
-    return {"ok": True, "home": [round(home[0], 3), round(home[1], 3)], **_map_cache["data"]}
+    return _map_cache["data"]
 
 
 def open_bands(locator, sfi=None):
@@ -172,7 +178,7 @@ def open_bands(locator, sfi=None):
             cells.append({"state": best, "via": via if best in ("open", "edge") else None})
         rows.append({"band": band, "freq": f, "cells": cells})
     newest = min((s["age_min"] for s in sts), default=None)
-    portee = reach.compute(home, DIRS, BANDS, lambda pt, f: _interp(sts, pt, f), destination, sfi)
+    portee = reach.compute(_grid(home, locator, sts), DIRS, BANDS, sfi)
     return {"ok": True, "reach": portee, "home": [round(home[0], 2), round(home[1], 2)], "columns": cols, "rows": rows,
             "stations_count": len(sts), "newest_min": newest,
             "computed": datetime.now(timezone.utc).strftime("%H:%M UTC"), "credit": CREDIT}
