@@ -514,6 +514,13 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - Fenêtre « Bandes » : tableau « Meilleure antenne » (là où la bande passe, direction choisie ou meilleure),
   bouton pour exclure les antennes directives, top 4 au survol.
 - À faire éventuellement : marquer « mes antennes » pour ne classer que celles de la station.
+
+## Fait — v1.19.1 (23/10/2026) : carte plus détaillée au zoom
+- Fond Natural Earth 1:10 M (`world-atlas/countries-10m`, ~1 Mo compressé) chargé seulement sous 600 km.
+- Villes : `frontend/src/data/cities.json` (5764 lieux ≥ 15 000 hab., extraits de ne_10m_populated_places_simple,
+  domaine public ; [nom, lat, lon, population], trié par population). Chargé sous 2500 km ; seuil de population
+  selon le zoom (3 M → 15 000), 70 noms au plus, sans chevauchement, indicatifs des correspondants prioritaires.
+- Fusion avec PhantomSDR-ORSAT écartée (dépôts séparés : suivi de PhantomSDR-Plus, techniques différentes).
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

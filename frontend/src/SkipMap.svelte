@@ -26,16 +26,41 @@
   // anneaux repères : environ 5 cercles, pas « rond »
   const ringStep = $derived([25, 50, 100, 200, 250, 500, 1000].find((s) => MAX_KM / s <= 6) ?? 1000);
   const ringKms = $derived(Array.from({ length: Math.floor(MAX_KM / ringStep) }, (_, i) => (i + 1) * ringStep));
-  // fond de carte détaillé (1:50 M) chargé à la demande quand on zoome
-  let fine = $state(null);
+  // fonds de carte détaillés chargés à la demande : 1:50 M sous 1500 km, 1:10 M sous 600 km
+  const topo = (w) => ({ land: feature(w, w.objects.land ?? w.objects.countries), borders: mesh(w, w.objects.countries, (a, b) => a !== b) });
+  let fine = $state(null), finest = $state(null);
   $effect(() => {
-    if (MAX_KM < 1500 && !fine) import('world-atlas/countries-50m.json').then((m) => {
-      const w = m.default;
-      fine = { land: feature(w, w.objects.land ?? w.objects.countries), borders: mesh(w, w.objects.countries, (a, b) => a !== b) };
-    });
+    if (MAX_KM < 1500 && !fine) import('world-atlas/countries-50m.json').then((m) => (fine = topo(m.default)));
+    if (MAX_KM < 600 && !finest) import('world-atlas/countries-10m.json').then((m) => (finest = topo(m.default)));
   });
-  const landShown = $derived(MAX_KM < 1500 && fine ? fine.land : land);
-  const bordersShown = $derived(MAX_KM < 1500 && fine ? fine.borders : borders);
+  const detail = $derived(MAX_KM < 600 && finest ? finest : MAX_KM < 1500 && fine ? fine : null);
+  const landShown = $derived(detail ? detail.land : land);
+  const bordersShown = $derived(detail ? detail.borders : borders);
+
+  // villes (Natural Earth, domaine public) : seuil de population selon le zoom, étiquettes sans chevauchement
+  let cityList = $state(null);
+  $effect(() => {
+    if (MAX_KM <= 2500 && !cityList) import('./data/cities.json').then((m) => (cityList = m.default));
+  });
+  const popMin = $derived(MAX_KM > 2500 ? 3e6 : MAX_KM > 1200 ? 8e5 : MAX_KM > 600 ? 2e5 : MAX_KM > 300 ? 5e4 : 1.5e4);
+  const cities = $derived.by(() => {
+    if (!proj || !data?.ok) return [];
+    const src = cityList ?? [];
+    // les indicatifs des correspondants sont prioritaires : pas de nom de ville par-dessus
+    const placed = stations.map((st) => [st.p[0] + 7 + st.call.length * 3.5, st.p[1], st.call.length * 7 + 14]), out = [];
+    for (const [name, lat, lon, pop] of src) {
+      if (pop < popMin) break;                         // liste triée par population décroissante
+      if (bearingKm(data.home, [lat, lon])[1] > MAX_KM * 0.98) continue;
+      const p = proj([lon, lat]);
+      if (!p) continue;
+      const w = name.length * 6.2 + 8;
+      if (placed.some((q) => Math.abs(q[0] - p[0]) < (q[2] + w) / 2 && Math.abs(q[1] - p[1]) < 13)) continue;
+      placed.push([p[0] + w / 2, p[1], w]);
+      out.push({ name, p, pop });
+      if (out.length >= 70) break;
+    }
+    return out;
+  });
   const land = feature(world, world.objects.land ?? world.objects.countries);
   const borders = mesh(world, world.objects.countries, (a, b) => a !== b);
 
@@ -143,6 +168,10 @@
           {@const p = xy(az, MAX_KM * 1.045)}
           <text x={p[0]} y={p[1] + 4} class="card" text-anchor="middle">{l}</text>
         {/each}
+        {#each cities as c}
+          <circle cx={c.p[0]} cy={c.p[1]} r="2" class="city" />
+          <text x={c.p[0] + 4} y={c.p[1] + 3.5} class="cname">{c.name}</text>
+        {/each}
         <circle cx={C} cy={C} r="4" class="home" />
         {#each stations as s}
           <g class="st" onmouseenter={() => (hover = `${s.call} · ${s.band ?? '?'} · ${s.km} km, azimut ${s.az}°${s.session ? ` · ${s.session}` : ''} : ${LABEL[s.code]} sur sa bande`)}
@@ -173,7 +202,7 @@
         {/if}
         <p class="src">Projection azimutale équidistante centrée sur le QTH (distances et azimuts vrais depuis chez vous).
           Molette sur la carte : zoom. Pas de 5°, anneaux de 25 km jusqu'à 300 km, 50 km jusqu'à 1000 km puis 250 km ; au-delà de 3500 km, plusieurs sauts. Même calcul que le tableau « Portée par bande ». Calcul de {data.when}, R {data.ssn}.
-          Fond de carte Natural Earth.</p>
+          Fond de carte et villes Natural Earth (domaine public), plus détaillés en zoomant.</p>
       </div>
     </div>
   {:else}
@@ -205,6 +234,8 @@
   .rlab { fill: var(--gold-soft); font-size: 10px; pointer-events: none; }
   .card { fill: var(--gold); font-size: 14px; font-weight: 700; }
   .home { fill: var(--gold); stroke: #000; }
+  .city { fill: rgba(230, 226, 211, 0.85); pointer-events: none; }
+  .cname { fill: rgba(230, 226, 211, 0.85); font-size: 10px; pointer-events: none; paint-order: stroke; stroke: rgba(0, 0, 0, 0.8); stroke-width: 2.5px; }
   .st { cursor: help; }
   .dot { stroke: #000; stroke-width: 1; fill: #6eaae6; }
   .dot.c { fill: #fff; stroke: var(--bad); stroke-width: 2.5; }
