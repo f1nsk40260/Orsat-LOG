@@ -12,12 +12,6 @@
   let radio = $state({ connected: false, freq: 0, mode: '', submode: '', ptt: false, device: '' });
   let websdr = $state({ listening: false, connected: false, freq: 0, mode: '', submode: '', ptt: false, device: 'WebSDR' });
   let showCalendar = $state(false);
-  // Fenêtre « Entendu par le WebSDR » (autorun) : ouverte à la demande, pour le jour affiché
-  let showHeard = $state(false);
-  function toggleHeard() {
-    showHeard = !showHeard;
-    if (showHeard) view = 'day';
-  }
   let view = $state('day');              // 'day' = page d'agenda, 'log' = carnet complet
   let utc = $state(new Date());
   let today = $state(dayOf());           // jour UTC en cours
@@ -107,8 +101,6 @@
 
   <div class="right">
     <HeaderClock />
-    <button class:active={showHeard && view === 'day'} onclick={toggleHeard}
-            title="Afficher / masquer ce que le WebSDR a décodé (autorun : FT8, FT4, JS8, WSPR) sur la page d'agenda">📡 Entendu</button>
     <div class="seg" role="group" aria-label="Affichage">
       <button type="button" class:on={view === 'day'} onclick={() => (view = 'day')}
               title="Page d'agenda : saisie, activité, propagation et météo du jour choisi">📅 Agenda</button><button
@@ -119,7 +111,7 @@
 </header>
 
 {#if view === 'day'}
-  <DayPage bind:this={dayPage} {day} {isToday} {radio} {websdr} {settings} {showHeard} onCloseHeard={toggleHeard} />
+  <DayPage bind:this={dayPage} {day} {isToday} {radio} {websdr} {settings} />
 {:else}
   <LogBook onopenday={openDay} />
 {/if}

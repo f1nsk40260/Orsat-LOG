@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, eibi, enrich, geo, heard, ionosonde, qrz, qrzxml, solar, weather
+from . import __version__, adif, auth, backup, eibi, enrich, geo, ionosonde, qrz, qrzxml, solar, weather
 from .db import Database
 from .websdr import Page, WebSdrLink
 
@@ -28,7 +28,14 @@ ROOT = Path(__file__).resolve().parents[2]          # dossier du dépôt (~/Orsa
 FRONTEND_DIST = ROOT / "frontend" / "dist"
 
 db = Database()
-heard_log = heard.Heard(db)        # stations décodées par l'autorun du WebSDR
+# Écoute FT8/WSPR via l'autorun du WebSDR supprimée (v1.13.0) : trop de charge sur le serveur.
+# Purge unique des anciennes tables (jusqu'à ~2 Go) puis récupération de la place.
+with db._lock:
+    if db._con.execute("SELECT 1 FROM sqlite_master WHERE name='heard'").fetchone():
+        db._con.executescript("DROP TABLE IF EXISTS heard; DROP TABLE IF EXISTS heard_sum;"
+                              "DROP TABLE IF EXISTS heard_spool;")
+        db._con.commit()
+        db._con.execute("VACUUM")
 _clients: set[WebSocket] = set()
 
 
@@ -92,21 +99,6 @@ async def _record_weather():
 _enrich_state = {"last": "", "summary": {}}
 
 
-async def _heard_loop():
-    """Relit chaque minute le journal de l'autorun ; FIFO du détail une fois par jour."""
-    await asyncio.sleep(20)
-    last_prune = 0.0
-    while True:
-        try:
-            await asyncio.to_thread(heard_log.ingest)
-            if asyncio.get_running_loop().time() - last_prune > 24 * 3600 or not last_prune:
-                await asyncio.to_thread(heard_log.prune)
-                last_prune = asyncio.get_running_loop().time()
-        except Exception as exc:
-            log.warning("stations entendues (autorun) : %s", exc)
-        await asyncio.sleep(60)
-
-
 async def _enrich_loop():
     """Enrichissement du carnet (enrich.py) : au démarrage, puis une fois par jour."""
     await asyncio.sleep(30)
@@ -128,14 +120,12 @@ async def lifespan(app):
     recorder = asyncio.create_task(_propagation_recorder())
     syncer = asyncio.create_task(qrz_sync.loop())
     enricher = asyncio.create_task(_enrich_loop())
-    listener = asyncio.create_task(_heard_loop())
     saver = asyncio.create_task(backup.daily_task(db))
     yield
     recorder.cancel()
     saver.cancel()
     syncer.cancel()
     enricher.cancel()
-    listener.cancel()
 
 
 app = FastAPI(title="ORSAT-LOG", version=__version__, lifespan=lifespan)
@@ -252,8 +242,7 @@ def admin_status(request: Request):
             "commit_date": git("log", "-1", "--format=%cI"),
             "db_size": DB_PATH.stat().st_size if DB_PATH.exists() else 0, **st,
             "websdr_pages": websdr.state["pages"], "clients": len(_clients),
-            "enrich": {**db.enrich_stats(), **_enrich_state},
-            "heard": heard_log.status()}
+            "enrich": {**db.enrich_stats(), **_enrich_state}}
 
 
 # ---------- synchronisation QRZ.com (panneau admin) ----------
@@ -518,7 +507,6 @@ def qso_context(qso_id: int):
         "snapshot": db.snapshots_around(q["qso_date"], q["time_on"]),
         "same_day_band": db.same_day_band(q["qso_date"], q.get("band"), qso_id),
         "same_call": db.same_call(q["call"], qso_id) if q.get("kind") == "QSO" else [],
-        "heard": heard_log.around(q["qso_date"], q.get("time_on"), q.get("band"), target_ll, q.get("bearing")),
     }
 
 
@@ -841,7 +829,6 @@ def get_day(day: str):
         "entries": entries,
         "propagation": db.day_snapshots(day),
         "archive": _gfz_day(day),
-        "heard": heard_log.day(day),
         "weather": db.day_weather(day),
         "note": db.get_note(day),
         "sessions": db.day_sessions(day),
@@ -852,16 +839,6 @@ def get_day(day: str):
             "max_km": max((e["distance_km"] or 0 for e in entries), default=0),
         },
     }
-
-
-@app.get("/api/day/{day}/heard")
-def day_heard_points(day: str, band: str = "", hour: int | None = None):
-    """Stations décodées par l'autorun ce jour-là, avec position : carte de la fenêtre « Entendu »."""
-    _check_day(day)
-    if hour is not None and not 0 <= hour <= 23:
-        raise HTTPException(400, "Heure invalide")
-    home = heard_log._home()
-    return {"home": home, "points": heard_log.points(day, band, hour)}
 
 
 class NoteIn(BaseModel):

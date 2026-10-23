@@ -368,7 +368,7 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - Ajout : `archive` dans `GET api/day/{day}` (GFZ : 8 Kp, Ap, SFI, SN). Page d'un jour sans relevé
   (historique QRZ depuis 2011) : indices + Kp officiels ; jour avec relevés : Kp définitifs en plus.
 
-## Fait — v1.9.0 (21/10/2026) : le WebSDR comme sonde de propagation (autorun)
+## Fait — v1.9.0 (21/10/2026) : le WebSDR comme sonde de propagation (autorun) — supprimé en v1.13.0
 - PhantomSDR-ORSAT `autorun/spool.js` : chaque station décodée → `autorun-spots/AAAAMMJJ-HH.jsonl`
   ({t, mode, band, call, grid, snr, f[, dbm]}), indépendamment de l'envoi PSK Reporter / WSPRnet ;
   fichiers > 3 jours effacés par l'autorun (si le carnet ne tourne pas).
@@ -426,6 +426,13 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 - La fenêtre ±2 h ne dépasse plus l'instant présent (fenêtre dans le futur → GIRO répondait 504).
 - Serveur GIRO en panne (5xx, délai, réseau) : arrêt après la 1re station, message clair, réessai au ↻.
 
+
+## Fait — v1.13.0 (23/10/2026) : suppression de l'écoute FT8/WSPR (autorun)
+- L'autorun de PhantomSDR-ORSAT chargeait trop le serveur : désactivé côté WebSDR, et fonction
+  **supprimée définitivement** du carnet (`heard.py`, boucle de lecture, `api/day/{day}/heard`,
+  bouton « 📡 Entendu », fenêtre et carte associées, section « Le WebSDR entendait » de la fiche QSO).
+- Au premier démarrage : tables `heard`, `heard_sum`, `heard_spool` supprimées puis `VACUUM`.
+- D'autres sources d'analyse de propagation seront étudiées (sans charge sur le PC ORSAT).
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
@@ -442,7 +449,7 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 6. Spots TCI / DX cluster, croisement RBN / PSKReporter.
 7. Envoi de commandes TCI (cliquer un spot = changer de fréquence).
 8. ~~QRZ~~ (fait v1.3.0).
-9. Suite fiche QSO : éruptions X (GOES), météo pour la VHF, décodages FT8/WSPR du WebSDR. LoTW / eQSL — **uniquement des contacts** (jamais les SWL).
+9. Suite fiche QSO : éruptions X (GOES), météo pour la VHF. LoTW / eQSL — **uniquement des contacts** (jamais les SWL).
 
 ## Sources TCI visées
 - **AetherSDR** (serveur TCI v2.0 : CAT, audio, IQ, CW, spots, événements récepteur ; FlexRadio en priorité,

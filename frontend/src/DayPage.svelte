@@ -5,10 +5,9 @@
   import EntryForm from './EntryForm.svelte';
   import EntriesTable from './EntriesTable.svelte';
   import PropagationPanel from './PropagationPanel.svelte';
-  import HeardPanel from './HeardPanel.svelte';
   import WeatherPanel from './WeatherPanel.svelte';
 
-  let { day, isToday, radio, websdr, settings, showHeard = false, onCloseHeard = null } = $props();
+  let { day, isToday, radio, websdr, settings } = $props();
 
   let page = $state(null);
   let note = $state('');
@@ -187,7 +186,6 @@
   </div>
 </div>
 
-{#if showHeard}<HeardPanel heard={page?.heard} large {day} onclose={onCloseHeard} />{/if}
 
 <style>
   .day {
