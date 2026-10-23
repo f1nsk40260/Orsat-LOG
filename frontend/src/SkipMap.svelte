@@ -20,13 +20,21 @@
   // zoom à la molette (centré sur le QTH) : rayon affiché en km
   let MAX_KM = $state(KM_MAX);
   const scale = $derived(R / (MAX_KM / EARTH));
-  // molette : écouteur NON passif posé à la main (Svelte rend « onwheel » passif, la page défilerait)
+  // molette : écoutée sur toute la page (non passive, en capture) et appliquée si le pointeur est
+  // au-dessus de la carte, quel que soit l'élément visé. Firefox garde la molette sur la fenêtre
+  // qui défilait (« transaction de molette ») : un écouteur posé sur la carte seule ne la recevrait pas.
   let mapEl = $state();
   $effect(() => {
     const el = mapEl;
     if (!el) return;
-    el.addEventListener('wheel', onWheel, { passive: false });
-    return () => el.removeEventListener('wheel', onWheel);
+    const handler = (e) => {
+      const r = el.getBoundingClientRect();
+      if (e.clientX < r.left || e.clientX > r.right || e.clientY < r.top || e.clientY > r.bottom) return;
+      e.stopPropagation();
+      onWheel(e);
+    };
+    window.addEventListener('wheel', handler, { passive: false, capture: true });
+    return () => window.removeEventListener('wheel', handler, { capture: true });
   });
   function onWheel(e) {
     e.preventDefault();

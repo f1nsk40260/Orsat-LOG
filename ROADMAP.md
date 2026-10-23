@@ -540,6 +540,12 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - Svelte 5 pose « onwheel » en écouteur passif : preventDefault ignoré, la fenêtre défilait au lieu de zoomer.
   Écouteur `wheel` posé à la main avec { passive: false } (SkipMap.svelte). Vérifié : 4 crans = 5000 → 2000 km,
   fenêtre immobile.
+
+## Fait — v1.20.2 (23/10/2026) : molette sur la carte (Firefox)
+- Firefox garde la molette sur l'élément qui défilait (« wheel transaction ») : l'écouteur de la carte ne
+  recevait rien juste après un défilement de la fenêtre. Écouteur `wheel` sur window (capture, non passif) :
+  zoom dès que le pointeur est dans le cadre de la carte, quel que soit l'élément visé.
+  Pas de Firefox dans le bac à sable (téléchargement bloqué) : testé sous Chromium, à confirmer sous Firefox.
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
