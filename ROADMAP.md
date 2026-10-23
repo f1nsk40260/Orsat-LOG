@@ -484,6 +484,16 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - Bouton « 📶 Bandes » dans le header : grande fenêtre (fond assombri, ✕ ou clic à côté pour fermer, ↻ pour
   recalculer) avec côte à côte la grille par direction et la portée par bande. Plus dans la page du jour.
 - Météo spatiale déplacée dans la colonne gauche, sous « Propagation du jour ».
+
+## Fait — v1.18.0 (23/10/2026) : carte azimutale des zones de silence
+- `reach.skip_map` : azimuts tous les 10°, 40 anneaux (50 km jusqu'à 1000 km, puis 200 km jusqu'à 5000 km).
+  Saut unique jusqu'à 3500 km, au-delà n sauts égaux (MUF = la plus basse des deux réflexions extrêmes,
+  absorption cumulée). État codé une lettre par case et par bande (o/e/w/a/c/-). Cache 15 min dans
+  `kc2g.skip_map`. `GET api/skipmap` ajoute les correspondants du jour ayant une position (locator ou QRZ).
+- `SkipMap.svelte` (fenêtre « 📶 Bandes ») : projection azimutale équidistante centrée sur le QTH (d3-geo,
+  fond Natural Earth `world-atlas` 110m embarqué), choix de la bande à la souris, correspondants du jour
+  placés avec leur état (silence / ouvert…) sur leur bande, liste triée par distance, détail au survol.
+- À venir : choix de la meilleure antenne (inventaire à saisir, dont loops onde entière horizontales).
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

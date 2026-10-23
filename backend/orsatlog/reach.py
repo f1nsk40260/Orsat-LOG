@@ -127,3 +127,55 @@ def compute(home, dirs, bands, interp, destination, sfi, when=None):
             row["skip"] = (RANGES[first][3] if first and all(s == "closed" for s in states[:first]) else None)
     return {"best": best, "dirs": per_dir, "ssn": round(ssn),
             "thresholds_db": [WEAK_DB, ABSORBED_DB], "when": when.strftime("%H:%M UTC")}
+
+
+# ---------- carte azimutale des zones de silence ----------
+MAP_AZ_STEP = 10                                              # degrés
+MAP_RINGS = list(range(50, 1001, 50)) + list(range(1200, 5001, 200))   # bords extérieurs des anneaux, km
+MAX_HOP_KM = 3500
+CODE = {"open": "o", "edge": "e", "weak": "w", "absorbed": "a", "closed": "c", None: "-"}
+
+
+def skip_map(home, bands, interp, destination, sfi, when=None):
+    """Pour chaque azimut (pas de 10°) et chaque anneau de distance : MUF du trajet et absorption,
+    puis l'état de chaque bande, codé une lettre par case (o ouverte, e limite, w affaiblie,
+    a absorbée, c fermée = zone de silence, - pas de mesure). Au-delà de 3500 km : plusieurs sauts
+    égaux, MUF = la plus basse des deux réflexions extrêmes, absorption cumulée."""
+    when = when or datetime.now(timezone.utc)
+    ssn = ssn_from_sfi(sfi)
+    cache = {}
+
+    def iono(pt):
+        k = (round(pt[0], 1), round(pt[1], 1))
+        if k not in cache:
+            cache[k] = (interp(pt, "fof2")[0], interp(pt, "mufd")[0], interp(pt, "hmf2")[0],
+                        solar_zenith(pt[0], pt[1], when))
+        return cache[k]
+
+    azs = list(range(0, 360, MAP_AZ_STEP))
+    inner = [0] + MAP_RINGS[:-1]
+    cells = []                         # (muf, [(hop, chi), ...] par saut évalué, nb de sauts)
+    for az in azs:
+        for lo, hi in zip(inner, MAP_RINGS):
+            d = (lo + hi) / 2
+            n = math.ceil(d / MAX_HOP_KM)
+            hop = d / n
+            ends = [hop / 2] if n == 1 else [hop / 2, d - hop / 2]
+            mufs, chis = [], []
+            for x in ends:
+                fof2, m3000, hm, chi = iono(destination(home, az + 0.0, x))
+                m = mufd_estimate(fof2, m3000, hop, hm) if fof2 and m3000 else None
+                mufs.append(m)
+                chis.append(chi)
+            muf = None if any(m is None for m in mufs) else min(mufs)
+            cells.append((muf, hop, chis, n))
+    out = {}
+    for band, f in bands:
+        codes = []
+        for muf, hop, chis, n in cells:
+            db = sum(absorption_db(f, hop, c, ssn) for c in chis) * n / len(chis) if muf else None
+            codes.append(CODE[_cell(f, muf, db)])
+        out[band] = "".join(codes)
+    return {"az_step": MAP_AZ_STEP, "rings": MAP_RINGS, "bands": out,
+            "muf": [None if m is None else round(m, 1) for m, *_ in cells],
+            "when": when.strftime("%H:%M UTC"), "ssn": round(ssn)}

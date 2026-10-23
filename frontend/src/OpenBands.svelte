@@ -1,10 +1,13 @@
 <script>
   // Bandes ouvertes en ce moment, par direction (ionosondes via KC2G) — page du jour seulement
   import { api } from './api.js';
+  import SkipMap from './SkipMap.svelte';
 
   let { onclose = null } = $props();
   let data = $state(null);
-  async function refresh() { data = await api.openBands().catch(() => ({ ok: false, msg: 'Serveur injoignable.' })); }
+  let skipMap = $state();
+  async function refresh() { skipMap?.refresh();
+    data = await api.openBands().catch(() => ({ ok: false, msg: 'Serveur injoignable.' })); }
   $effect(() => {
     refresh();
     const t = setInterval(refresh, 15 * 60 * 1000);
@@ -101,6 +104,10 @@
     {/if}
    </div>
    </div>
+    <div class="blk wide">
+      <h3 class="sub">Carte des zones de silence <span>depuis le QTH, jusqu'à 5000 km · une bande à la fois</span></h3>
+      <SkipMap bind:this={skipMap} />
+    </div>
     <p class="src">Distances en km. Onde de sol non calculée. Plafond : MUF mesurée. Plancher : absorption de jour <b>estimée</b> (modèle George-Bradley, R {data.reach?.ssn ?? '—'} déduit du SFI).
       La grille de gauche ne tient compte que de la MUF.
       {data.stations_count} ionosondes, KC2G (GIRO, NOAA, INGV, SWS).</p>
@@ -118,6 +125,7 @@
   .close { margin-left: auto; padding: 0 8px; font-size: 1rem; }
   .close + .close { margin-left: 0; }
   .blocks { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+  .blk.wide { border-top: 1px solid var(--panel-edge); padding-top: 10px; }
   .blk { flex: 1 1 460px; display: flex; flex-direction: column; gap: 8px; }
   table { font-size: 0.9rem !important; }
   td.c { height: 24px !important; }

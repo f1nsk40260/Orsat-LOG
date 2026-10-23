@@ -30,6 +30,7 @@ export const api = {
   solar: () => req('GET', 'api/solar'),
   spacewx: () => req('GET', 'api/spacewx'),
   openBands: () => req('GET', 'api/openbands'),
+  skipMap: () => req('GET', 'api/skipmap'),
   analysis: (kind = 'QSO', band = '') => req('GET', `api/analysis?kind=${kind}&band=${encodeURIComponent(band)}`),
   weather: () => req('GET', 'api/weather'),
   qsos: (limit = 200) => req('GET', `api/qsos?limit=${limit}`),

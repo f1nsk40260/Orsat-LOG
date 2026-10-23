@@ -461,6 +461,28 @@ async def get_spacewx():
     return {"ok": True, **{k: v for k, v in data.items() if k != "flares"}, "flares_24h": big}
 
 
+@app.get("/api/skipmap")
+async def get_skip_map():
+    """Carte azimutale des zones de silence + correspondants du jour (positions connues)."""
+    s = db.get_settings()
+    sol = await asyncio.to_thread(solar.get_solar) or db.last_snapshot() or {}
+    data = await asyncio.to_thread(kc2g.skip_map, s.get("locator", ""), sol.get("sfi"))
+    if data.get("ok"):
+        pts = []
+        for q in db.day_qsos(utc_day()):
+            ll = None
+            if geo.valid_locator(q.get("gridsquare") or ""):
+                ll = geo.locator_to_latlon(q["gridsquare"])
+            elif q.get("lat") is not None and q.get("lon") is not None:
+                ll = (q["lat"], q["lon"])
+            if ll:
+                pts.append({"call": q["call"], "band": q.get("band"), "kind": q.get("kind"),
+                            "session": q.get("session_name"), "lat": ll[0], "lon": ll[1],
+                            "km": q.get("distance_km"), "time": q.get("time_on")})
+        data["stations"] = pts
+    return data
+
+
 @app.get("/api/openbands")
 async def get_open_bands():
     """Bandes ouvertes maintenant par direction depuis le QTH (ionosondes KC2G)."""

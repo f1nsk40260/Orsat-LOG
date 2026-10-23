@@ -120,6 +120,24 @@ def _state(freq, muf):
     return "open" if freq <= 0.85 * muf else "edge" if freq <= muf else "closed"
 
 
+_map_cache = {"key": None, "data": None}
+
+
+def skip_map(locator, sfi=None):
+    """Carte azimutale des zones de silence (reach.skip_map), recalculée au plus toutes les 15 min."""
+    home = geo.locator_to_latlon(locator) if geo.valid_locator(locator or "") else None
+    if not home:
+        return {"ok": False, "msg": "Locator du QTH non réglé (panneau admin)."}
+    sts = stations()
+    if sts is None:
+        return {"ok": False, "msg": "Mesures d'ionosondes (KC2G) momentanément indisponibles."}
+    key = (locator, _cache["t"], sfi)
+    if _map_cache["key"] != key:
+        _map_cache["data"] = reach.skip_map(home, BANDS, lambda pt, f: _interp(sts, pt, f), destination, sfi)
+        _map_cache["key"] = key
+    return {"ok": True, "home": [round(home[0], 3), round(home[1], 3)], **_map_cache["data"]}
+
+
 def open_bands(locator, sfi=None):
     """Grille bandes × directions. Bloquant : appeler via to_thread."""
     home = geo.locator_to_latlon(locator) if geo.valid_locator(locator or "") else None

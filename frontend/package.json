@@ -1,7 +1,7 @@
 {
   "name": "orsat-log-frontend",
   "private": true,
-  "version": "1.17.0",
+  "version": "1.18.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,6 +13,9 @@
     "vite": "^8.3.4"
   },
   "dependencies": {
-    "leaflet": "^1.9.4"
+    "d3-geo": "^3.1.1",
+    "leaflet": "^1.9.4",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
   }
 }
