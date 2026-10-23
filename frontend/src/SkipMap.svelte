@@ -6,10 +6,13 @@
   import world from 'world-atlas/countries-110m.json';
   import { api } from './api.js';
   import { renderSatellite, tileZoom } from './satellite.js';
+  import { TXT, PAGE_LANG } from './ecouteI18n.js';
   import { geoAzimuthalEquidistant as azeq } from 'd3-geo';
 
   // publicView : page publique « écoute » (pas de correspondants, pas d'image satellite, pas de connexion)
   let { publicView = false } = $props();
+  // page publique : textes dans la langue de l'auditeur (?lang=fr|en|es) ; carnet : français
+  const TX = TXT[publicView ? PAGE_LANG : 'fr'];
   let mode = $state(publicView ? 'listen' : 'tx');     // 'tx' = émission depuis la station, 'listen' = écoute du WebSDR
   let data = $state(null);
   let band = $state(publicView ? '40m' : '20m');
@@ -119,8 +122,7 @@
   // vue écoute : qualité de réception du WebSDR (propagation × gain de sa loop à l'angle d'arrivée)
   const FILL_L = { G: 'rgba(95,191,107,0.62)', M: 'rgba(200,200,80,0.5)', P: 'rgba(224,140,48,0.45)',
                    a: 'rgba(214,80,80,0.45)', c: 'rgba(10,10,12,0.72)', '-': 'url(#nodata)' };
-  const LABEL_L = { G: 'bonne écoute', M: 'écoute moyenne', P: 'écoute faible (antenne peu favorable à cet angle)',
-                    a: 'absorbée (couche D)', c: 'zone de silence (MUF dépassée)', '-': 'pas de mesure' };
+  const LABEL_L = TX.labels;
   const fillFor = (code) => (mode === 'listen' ? FILL_L : sat && satImg ? FILL_SAT : FILL)[code] ?? 'transparent';
   const labelFor = (code) => (mode === 'listen' ? LABEL_L : LABEL)[code] ?? '';
   const LABEL = { o: 'ouverte', e: 'en limite de MUF', w: 'ouverte mais affaiblie (absorption)',
@@ -205,7 +207,7 @@
 
   {#if data?.ok}
     <div class="wrap">
-      <svg viewBox="0 0 {SIZE} {SIZE}" class="map" bind:this={mapEl} role="img" aria-label="Carte azimutale des zones de silence sur {band}">
+      <svg viewBox="0 0 {SIZE} {SIZE}" class="map" bind:this={mapEl} role="img" aria-label={mode === 'listen' ? TX.aria(band) : `Carte azimutale des zones de silence sur ${band}`}>
         <defs>
           <clipPath id="disc"><circle cx={C} cy={C} r={R} /></clipPath>
           <pattern id="nodata" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -217,7 +219,7 @@
           {:else}<path d={path(landShown)} class="land" />{/if}
           {#each cells as c}
             <path role="presentation" d={c.d} fill={fillFor(c.code)} class="cell"
-                  onmouseenter={() => (hover = `${band} · azimut ${c.az}° · ${c.r0}–${c.r1} km : ${labelFor(c.code)}${c.muf ? ` · MUF ${c.muf} MHz` : ''}`)}
+                  onmouseenter={() => (hover = mode === 'listen' ? TX.cell(band, c.az, c.r0, c.r1, labelFor(c.code), c.muf) : `${band} · azimut ${c.az}° · ${c.r0}–${c.r1} km : ${labelFor(c.code)}${c.muf ? ` · MUF ${c.muf} MHz` : ''}`)}
                   onmouseleave={() => (hover = '')} />
           {/each}
           <path d={path(geoGraticule10())} class="grat" />
@@ -228,7 +230,7 @@
           <circle cx={C} cy={C} r={(km / MAX_KM) * R} class="ring" />
           <text x={C + 3} y={C - (km / MAX_KM) * R + 11} class="rlab">{km}</text>
         {/each}
-        {#each [['N', 0], ['E', 90], ['S', 180], ['O', 270]] as [l, az]}
+        {#each [['N', 0], ['E', 90], ['S', 180], [TX.west, 270]] as [l, az]}
           {@const p = xy(az, MAX_KM * 1.045)}
           <text x={p[0]} y={p[1] + 4} class="card" text-anchor="middle">{l}</text>
         {/each}
@@ -246,15 +248,16 @@
         {/each}
       </svg>
       <div class="side">
-        <p class="hover">{hover || (mode === 'listen' ? 'Survolez la carte pour le détail d\'une zone.' : 'Survolez la carte ou un correspondant.')}</p>
+        <p class="hover">{hover || (mode === 'listen' ? TX.hover : 'Survolez la carte ou un correspondant.')}</p>
         {#if sat && satMsg}<p class="muted">{satMsg}</p>{/if}
         <div class="legend">
           {#each (mode === 'listen' ? ['G', 'M', 'P', 'a', 'c'] : ['o', 'e', 'w', 'a', 'c']) as k}<span><i style="background:{fillFor(k)}"></i>{labelFor(k)}</span>{/each}
-          <span><i class="hatch"></i>pas de mesure (pas d'ionosonde assez proche)</span>
+          <span><i class="hatch"></i>{mode === 'listen' ? TX.nodata : "pas de mesure (pas d'ionosonde assez proche)"}</span>
         </div>
         {#if mode === 'listen'}
-          <p class="small">Récepteur : WebSDR ORSAT ({data.locator}). Antenne : {data.antenna}.
-            Chaque case : la bande passe-t-elle depuis là (ionosondes mesurées), et la loop reçoit-elle bien sous cet angle d'arrivée ?</p>
+          {#if publicView}<p class="small">{TX.receiver(data.locator)} {TX.how}</p>
+          {:else}<p class="small">Récepteur : WebSDR ORSAT ({data.locator}). Antenne : {data.antenna}.
+            Chaque case : la bande passe-t-elle depuis là (ionosondes mesurées), et la loop reçoit-elle bien sous cet angle d'arrivée ?</p>{/if}
         {:else if stations.length}
           <h4>Correspondants du jour{sessions.length ? ` · ${sessions.join(', ')}` : ''}</h4>
           <table class="list">
@@ -268,14 +271,15 @@
         {:else}
           <p class="muted">Aucun correspondant du jour avec une position connue (locator ou QRZ).</p>
         {/if}
-        <p class="src">Projection azimutale équidistante centrée sur {mode === 'listen' ? 'le WebSDR (distances et azimuts vrais depuis le récepteur)' : 'le QTH (distances et azimuts vrais depuis chez vous)'}.
+        {#if publicView}<p class="src">{TX.note(data.when)}</p>
+        {:else}<p class="src">Projection azimutale équidistante centrée sur {mode === 'listen' ? 'le WebSDR (distances et azimuts vrais depuis le récepteur)' : 'le QTH (distances et azimuts vrais depuis chez vous)'}.
           Molette sur la carte : zoom. Pas de 5°, anneaux de 25 km jusqu'à 300 km, 50 km jusqu'à 1000 km puis 250 km ; au-delà de 3500 km, plusieurs sauts. Même calcul que le tableau « Portée par bande ». Calcul de {data.when}, R {data.ssn}.
           Fond de carte et villes Natural Earth (domaine public), plus détaillés en zoomant.
-          {#if sat}Image satellite : Sentinel-2 cloudless 2017 by EOX IT Services GmbH (contient des données Copernicus Sentinel modifiées, 2017), CC BY 4.0.{/if}</p>
+          {#if sat}Image satellite : Sentinel-2 cloudless 2017 by EOX IT Services GmbH (contient des données Copernicus Sentinel modifiées, 2017), CC BY 4.0.{/if}</p>{/if}
       </div>
     </div>
   {:else}
-    <p class="muted">{data ? data.msg : 'Calcul de la carte…'}</p>
+    <p class="muted">{data ? data.msg : TX.loading}</p>
   {/if}
 </div>
 

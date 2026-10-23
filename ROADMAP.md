@@ -581,6 +581,10 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - Bandeau PhantomSDR-ORSAT : verdict en clair pour la bande écoutée (Fiable ≥ 70 / Correct ≥ 40 / Aléatoire ≥ 15
   / Fermé), mesure réelle à côté, étalonnage constaté dans l'infobulle (affiché à partir de 30 mesures par tranche).
 - Vérifié avec un faux WebSDR parlant le même protocole (signaux injectés à 12, 18 et 30 dB retrouvés).
+
+## Fait — v1.22.1 (23/10/2026) : page publique « écoute » en FR / EN / ES
+- `frontend/src/ecouteI18n.js` : textes de la page publique et de la vue écoute de la carte ; langue lue dans
+  `?lang=fr|en|es` (passée par le bandeau du WebSDR selon la langue de l'auditeur). Le carnet reste en français.
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
