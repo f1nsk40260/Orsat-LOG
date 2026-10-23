@@ -22,7 +22,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 from . import geo
-from . import reach
+from . import antennas, reach
 from .ionosonde import mufd_estimate
 
 log = logging.getLogger("orsatlog")
@@ -179,6 +179,9 @@ def open_bands(locator, sfi=None):
         rows.append({"band": band, "freq": f, "cells": cells})
     newest = min((s["age_min"] for s in sts), default=None)
     portee = reach.compute(_grid(home, locator, sts), DIRS, BANDS, sfi)
+    los = [r[3] for r in reach.RANGES]
+    ranges = [(r[0], r[3], los[i + 1] if i + 1 < len(los) else reach.MAP_RINGS[-1]) for i, r in enumerate(reach.RANGES)]
+    portee["antennas"] = antennas.cached_table(BANDS, ranges)
     return {"ok": True, "reach": portee, "home": [round(home[0], 2), round(home[1], 2)], "columns": cols, "rows": rows,
             "stations_count": len(sts), "newest_min": newest,
             "computed": datetime.now(timezone.utc).strftime("%H:%M UTC"), "credit": CREDIT}

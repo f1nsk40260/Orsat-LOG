@@ -87,7 +87,8 @@ def _cell(freq, muf, db):
 
 # ---------- calcul unique : grille azimut × distance, dont dérivent la carte ET le tableau ----------
 MAP_AZ_STEP = 5                                                       # degrés (tombe sur N, NE, E…)
-MAP_RINGS = list(range(50, 1001, 50)) + list(range(1250, 5001, 250))  # bords extérieurs, km (100/300/900/2500 inclus)
+# bords extérieurs des anneaux, km : fins près du QTH pour le zoom (100/300/900/2500 inclus)
+MAP_RINGS = list(range(25, 301, 25)) + list(range(350, 1001, 50)) + list(range(1250, 5001, 250))
 MAX_HOP_KM = 3500
 CODE = {"open": "o", "edge": "e", "weak": "w", "absorbed": "a", "closed": "c", None: "-"}
 STATE_OF = {v: k for k, v in CODE.items()}

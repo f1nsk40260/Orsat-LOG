@@ -501,6 +501,19 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - Tableau : état d'une tranche = celui qui en couvre la plus grande part sur la direction (cases sans mesure
   ignorées s'il y a mieux) ; silence = bord intérieur du premier anneau ouvert. Ligne « meilleure direction » :
   plus petite zone de silence, sauf si une direction passe dès le QTH.
+
+## Fait — v1.19.0 (23/10/2026) : zoom de la carte et meilleure antenne
+- Carte : zoom à la molette (centré sur le QTH, 150 à 5000 km) et boutons 250 / 600 / 1200 / 2500 / 5000 km ;
+  anneaux repères adaptés au zoom ; fond de carte 1:50 M chargé à la demande sous 1500 km. Grille plus fine
+  près du QTH : anneaux de 25 km jusqu'à 300 km.
+- `antennas.py` : 19 modèles types (dipôles 6/10/15/25 m, V inversé, EFHW, NVIS 3 m, loops onde entière
+  horizontales 7 et 15 m, delta-loop verticale, verticales λ/4 et 5/8 au sol, ground-plane surélevée, loop
+  magnétique, hexbeam, Yagi 3 él. 12/20 m, Yagi 5 él., quad 2 él.). Gain = espace libre + diagramme vertical
+  + image dans un sol moyen (Fresnel, εr 13, σ 5 mS/m) ; verticales au sol : diagramme sol parfait × |1+Γv|/2.
+  Angle de départ par tranche (F2 à 300 km ; DX : 2 à 8°). Classement fixe par bande/tranche, en cache.
+- Fenêtre « Bandes » : tableau « Meilleure antenne » (là où la bande passe, direction choisie ou meilleure),
+  bouton pour exclure les antennes directives, top 4 au survol.
+- À faire éventuellement : marquer « mes antennes » pour ne classer que celles de la station.
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

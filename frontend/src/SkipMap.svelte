@@ -14,8 +14,28 @@
   export async function refresh() { data = await api.skipMap().catch(() => ({ ok: false, msg: 'Serveur injoignable.' })); }
   $effect(() => { refresh(); });
 
-  const SIZE = 640, C = SIZE / 2, R = 300, MAX_KM = 5000, EARTH = 6371;
-  const scale = R / (MAX_KM / EARTH);
+  const SIZE = 640, C = SIZE / 2, R = 300, EARTH = 6371, KM_MIN = 150, KM_MAX = 5000;
+  // zoom à la molette (centré sur le QTH) : rayon affiché en km
+  let MAX_KM = $state(KM_MAX);
+  const scale = $derived(R / (MAX_KM / EARTH));
+  function onWheel(e) {
+    e.preventDefault();
+    MAX_KM = Math.round(Math.min(KM_MAX, Math.max(KM_MIN, MAX_KM * (e.deltaY > 0 ? 1.25 : 0.8))));
+  }
+  const ZOOMS = [[250, '250 km'], [600, '600 km'], [1200, '1200 km'], [2500, '2500 km'], [5000, '5000 km']];
+  // anneaux repères : environ 5 cercles, pas « rond »
+  const ringStep = $derived([25, 50, 100, 200, 250, 500, 1000].find((s) => MAX_KM / s <= 6) ?? 1000);
+  const ringKms = $derived(Array.from({ length: Math.floor(MAX_KM / ringStep) }, (_, i) => (i + 1) * ringStep));
+  // fond de carte détaillé (1:50 M) chargé à la demande quand on zoome
+  let fine = $state(null);
+  $effect(() => {
+    if (MAX_KM < 1500 && !fine) import('world-atlas/countries-50m.json').then((m) => {
+      const w = m.default;
+      fine = { land: feature(w, w.objects.land ?? w.objects.countries), borders: mesh(w, w.objects.countries, (a, b) => a !== b) };
+    });
+  });
+  const landShown = $derived(MAX_KM < 1500 && fine ? fine.land : land);
+  const bordersShown = $derived(MAX_KM < 1500 && fine ? fine.borders : borders);
   const land = feature(world, world.objects.land ?? world.objects.countries);
   const borders = mesh(world, world.objects.countries, (a, b) => a !== b);
 
@@ -46,6 +66,7 @@
     for (let i = 0; i < codes.length; i++) {
       const az = Math.floor(i / n) * step, k = i % n;
       const r0 = k ? data.rings[k - 1] : 0, r1 = data.rings[k];
+      if (r0 >= MAX_KM) continue;
       out.push({ d: sector(az - step / 2, az + step / 2, r0, r1), code: codes[i], az, r0, r1, muf: data.muf[i] });
     }
     return out;
@@ -86,6 +107,9 @@
     <div class="bands" role="group" aria-label="Bande affichée">
       {#each bandList as b}<button type="button" class:on={band === b} onclick={() => (band = b)}>{b}</button>{/each}
     </div>
+    <div class="bands zoom" role="group" aria-label="Rayon affiché" title="Rayon de la carte (molette sur la carte pour zoomer)">
+      {#each ZOOMS as [km, l]}<button type="button" class:on={Math.abs(MAX_KM - km) < km * 0.1} onclick={() => (MAX_KM = km)}>{l}</button>{/each}
+    </div>
     <button type="button" class="tog" class:on={onlyBand} onclick={() => (onlyBand = !onlyBand)}
             title="Afficher tous les correspondants du jour, ou seulement ceux de la bande choisie">
       {onlyBand ? `Correspondants : ${band} seulement` : 'Correspondants : toutes bandes'}</button>
@@ -93,7 +117,7 @@
 
   {#if data?.ok}
     <div class="wrap">
-      <svg viewBox="0 0 {SIZE} {SIZE}" class="map" role="img" aria-label="Carte azimutale des zones de silence sur {band}">
+      <svg viewBox="0 0 {SIZE} {SIZE}" class="map" onwheel={onWheel} role="img" aria-label="Carte azimutale des zones de silence sur {band}">
         <defs>
           <clipPath id="disc"><circle cx={C} cy={C} r={R} /></clipPath>
           <pattern id="nodata" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
@@ -101,17 +125,17 @@
         </defs>
         <circle cx={C} cy={C} r={R} class="sea" />
         <g clip-path="url(#disc)">
-          <path d={path(land)} class="land" />
+          <path d={path(landShown)} class="land" />
           {#each cells as c}
             <path d={c.d} fill={FILL[c.code]} class="cell"
                   onmouseenter={() => (hover = `${band} · azimut ${c.az}° · ${c.r0}–${c.r1} km : ${LABEL[c.code]}${c.muf ? ` · MUF ${c.muf} MHz` : ''}`)}
                   onmouseleave={() => (hover = '')} />
           {/each}
           <path d={path(geoGraticule10())} class="grat" />
-          <path d={path(borders)} class="border" />
-          <path d={path(land)} class="coast" />
+          <path d={path(bordersShown)} class="border" />
+          <path d={path(landShown)} class="coast" />
         </g>
-        {#each [1000, 2000, 3000, 4000, 5000] as km}
+        {#each ringKms as km}
           <circle cx={C} cy={C} r={(km / MAX_KM) * R} class="ring" />
           <text x={C + 3} y={C - (km / MAX_KM) * R + 11} class="rlab">{km}</text>
         {/each}
@@ -148,7 +172,7 @@
           <p class="muted">Aucun correspondant du jour avec une position connue (locator ou QRZ).</p>
         {/if}
         <p class="src">Projection azimutale équidistante centrée sur le QTH (distances et azimuts vrais depuis chez vous).
-          Pas de 5°, anneaux de 50 km jusqu'à 1000 km puis de 250 km ; au-delà de 3500 km, plusieurs sauts. Même calcul que le tableau « Portée par bande ». Calcul de {data.when}, R {data.ssn}.
+          Molette sur la carte : zoom. Pas de 5°, anneaux de 25 km jusqu'à 300 km, 50 km jusqu'à 1000 km puis 250 km ; au-delà de 3500 km, plusieurs sauts. Même calcul que le tableau « Portée par bande ». Calcul de {data.when}, R {data.ssn}.
           Fond de carte Natural Earth.</p>
       </div>
     </div>
@@ -167,7 +191,8 @@
   .tog { border-radius: 999px; padding: 3px 12px; font-size: 0.82rem; }
   .tog.on { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); }
   .wrap { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
-  .map { flex: 0 1 600px; min-width: 320px; height: auto; }
+  .map { flex: 0 1 600px; min-width: 320px; height: auto; cursor: zoom-in; }
+  .zoom button { padding: 3px 8px; font-size: 0.78rem; }
   .side { flex: 1 1 300px; display: flex; flex-direction: column; gap: 8px; }
   .sea { fill: #10141a; stroke: var(--gold-soft); }
   .land { fill: #2a2a24; }
