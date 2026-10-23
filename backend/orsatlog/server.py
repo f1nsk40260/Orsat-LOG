@@ -9,7 +9,7 @@ import logging
 import os
 import signal
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile, WebSocket, WebSocketDisconnect
@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, eibi, enrich, geo, ionosonde, qrz, qrzxml, solar, weather
+from . import __version__, adif, auth, backup, eibi, enrich, geo, ionosonde, kc2g, qrz, qrzxml, solar, spacewx, weather
 from .db import Database
 from .websdr import Page, WebSdrLink
 
@@ -77,6 +77,13 @@ async def _propagation_recorder():
                     db.add_snapshot(utc_day(now), now.strftime("%H%M%S"), data)
         except Exception as exc:
             log.warning("relevé de propagation : %s", exc)
+        try:
+            sw = await asyncio.to_thread(spacewx.get_spacewx)
+            if sw:
+                now = datetime.now(timezone.utc)
+                db.add_spacewx(utc_day(now), now.strftime("%H%M%S"), sw)
+        except Exception as exc:
+            log.warning("relevé de météo spatiale : %s", exc)
         try:
             await _record_weather()
         except Exception as exc:
@@ -442,6 +449,24 @@ async def get_solar():
     return await asyncio.to_thread(solar.get_solar)
 
 
+@app.get("/api/spacewx")
+async def get_spacewx():
+    """Météo spatiale en direct (NOAA SWPC) : Kp estimé, vent solaire, Bz, X, échelles R/S/G."""
+    data = await asyncio.to_thread(spacewx.get_spacewx)
+    if not data:
+        return {"ok": False, "msg": "NOAA SWPC momentanément injoignable."}
+    since = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
+    big = [f for f in data.get("flares") or [] if (f.get("max") or f.get("begin") or "") >= since
+           and spacewx.flare_rank(f.get("cls")) >= 1e-6]
+    return {"ok": True, **{k: v for k, v in data.items() if k != "flares"}, "flares_24h": big}
+
+
+@app.get("/api/openbands")
+async def get_open_bands():
+    """Bandes ouvertes maintenant par direction depuis le QTH (ionosondes KC2G)."""
+    return await asyncio.to_thread(kc2g.open_bands, db.get_settings().get("locator", ""))
+
+
 # ---------- QSO ----------
 class QsoIn(BaseModel):
     kind: str = "QSO"             # QSO = contact réalisé, SWL = écoute
@@ -507,7 +532,28 @@ def qso_context(qso_id: int):
         "snapshot": db.snapshots_around(q["qso_date"], q["time_on"]),
         "same_day_band": db.same_day_band(q["qso_date"], q.get("band"), qso_id),
         "same_call": db.same_call(q["call"], qso_id) if q.get("kind") == "QSO" else [],
+        "spacewx": _spacewx_for(q),
     }
+
+
+def _spacewx_for(q):
+    """Météo spatiale au moment du QSO : relevé NOAA le plus proche et éruptions de -3 h à +30 min.
+    Disponible pour les QSO postérieurs à la mise en service des relevés (v1.14)."""
+    t = (q.get("time_on") or "000000").ljust(6, "0")
+    try:
+        when = datetime.strptime(q["qso_date"] + t, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+    since = db.flares_since()
+    fmt = "%Y-%m-%dT%H:%M:%SZ"
+    if not since or when.strftime(fmt) < since:
+        return {"covered": False, "since": since}
+    flares = db.flares_between((when - timedelta(hours=3)).strftime(fmt), (when + timedelta(minutes=30)).strftime(fmt))
+    for f in flares:
+        peak = datetime.strptime((f.get("peak") or f["begin"])[:19], "%Y-%m-%dT%H:%M:%S").replace(tzinfo=timezone.utc)
+        f["minutes"] = round((peak - when).total_seconds() / 60)       # négatif = avant le QSO
+    return {"covered": True, "near": db.spacewx_near(q["qso_date"], q.get("time_on")),
+            "flares": [f for f in flares if spacewx.flare_rank(f.get("cls")) >= 1e-6]}
 
 
 @app.get("/api/qsos/{qso_id}/iono")
@@ -830,6 +876,10 @@ def get_day(day: str):
         "propagation": db.day_snapshots(day),
         "archive": _gfz_day(day),
         "weather": db.day_weather(day),
+        "spacewx": db.day_spacewx(day),
+        "flares": [f for f in db.flares_between(f"{day[:4]}-{day[4:6]}-{day[6:]}T00:00:00Z",
+                                                f"{day[:4]}-{day[4:6]}-{day[6:]}T23:59:59Z")
+                   if spacewx.flare_rank(f.get("cls")) >= 1e-6],
         "note": db.get_note(day),
         "sessions": db.day_sessions(day),
         "stats": {
@@ -969,6 +1019,52 @@ async def tci_page(ws: WebSocket):
         return
     await ws.accept()
     await websdr.on_page(Page(ws))
+
+
+# ---------- analyse du carnet : où et quand la station passe le mieux ----------
+_BAND_ORDER = ["2190m", "630m", "160m", "80m", "60m", "40m", "30m", "20m", "17m", "15m", "12m", "10m",
+               "6m", "4m", "2m", "70cm", "23cm", "13cm"]
+_SECTORS = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"]
+
+
+def _bucket_stats(rows):
+    km = sorted(r["distance_km"] for r in rows if r["distance_km"])
+    n = len(rows)
+    return {"n": n, "with_km": len(km),
+            "median_km": km[len(km) // 2] if km else None, "max_km": km[-1] if km else None,
+            "dx_pct": round(100 * sum(k > 3000 for k in km) / len(km)) if km else None}
+
+
+@app.get("/api/analysis")
+def analysis(kind: str = "QSO", band: str = ""):
+    """Statistiques du carnet croisées avec Kp, SFI, heure et direction."""
+    if kind not in ("QSO", "SWL"):
+        raise HTTPException(400, "kind = QSO ou SWL")
+    rows = db.analysis_rows(kind)
+    bands = sorted({r["band"] for r in rows if r["band"]},
+                   key=lambda b: _BAND_ORDER.index(b) if b in _BAND_ORDER else 99)
+    sel = [r for r in rows if not band or (r["band"] or "") == band]
+
+    def hour(r):
+        try:
+            return int((r["time_on"] or "")[:2])
+        except ValueError:
+            return None
+
+    kp_b = [("0–1", 0, 2), ("2", 2, 3), ("3", 3, 4), ("4", 4, 5), ("5 et +", 5, 10)]
+    sfi_b = [("< 90", 0, 90), ("90–120", 90, 120), ("120–150", 120, 150), ("150–200", 150, 200), ("≥ 200", 200, 999)]
+    by_kp = [{"label": l, **_bucket_stats([r for r in sel if r["k_index"] is not None and a <= r["k_index"] < b])}
+             for l, a, b in kp_b]
+    by_sfi = [{"label": l, **_bucket_stats([r for r in sel if r["sfi"] is not None and a <= r["sfi"] < b])}
+              for l, a, b in sfi_b]
+    by_hour = [{"hour": h, **_bucket_stats([r for r in sel if hour(r) == h])} for h in range(24)]
+    sector = lambda r: None if r["bearing"] is None else int(((r["bearing"] % 360) + 22.5) // 45) % 8
+    by_dir = [{"label": _SECTORS[i], **_bucket_stats([r for r in sel if sector(r) == i])} for i in range(8)]
+    grid = [{"band": b, "hours": [sum(1 for r in rows if r["band"] == b and hour(r) == h) for h in range(24)]}
+            for b in bands]
+    return {"kind": kind, "band": band, "bands": bands, "total": _bucket_stats(sel),
+            "missing_solar": sum(1 for r in sel if r["k_index"] is None),
+            "by_kp": by_kp, "by_sfi": by_sfi, "by_hour": by_hour, "by_dir": by_dir, "band_hour": grid}
 
 
 # ---------- frontend compilé ----------

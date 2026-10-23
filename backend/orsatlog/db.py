@@ -179,6 +179,13 @@ class Database:
         # v1.6 : ionosphère mesurée (GIRO) mémorisée par QSO ; clé = date, heure et trajet
         self._con.execute("CREATE TABLE IF NOT EXISTS iono_cache (qso_id INTEGER PRIMARY KEY, "
                           "key TEXT, data TEXT, at TEXT DEFAULT (datetime('now')))")
+        # v1.14 : météo spatiale NOAA relevée toutes les 15 min, et éruptions solaires (GOES)
+        self._con.executescript(
+            "CREATE TABLE IF NOT EXISTS spacewx (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, "
+            "time TEXT NOT NULL, kp REAL, bz REAL, bt REAL, speed REAL, density REAL, xray TEXT, "
+            "xray_flux REAL, scales TEXT);"
+            "CREATE INDEX IF NOT EXISTS idx_spacewx_day ON spacewx(day, time);"
+            "CREATE TABLE IF NOT EXISTS flare (begin TEXT PRIMARY KEY, peak TEXT, finish TEXT, cls TEXT);")
         # migration v0.4 -> v0.5 : rattachement à un QSO de groupe
         if "session_id" not in cols:
             self._con.execute("ALTER TABLE qso ADD COLUMN session_id INTEGER")
@@ -309,6 +316,71 @@ class Database:
                 "SELECT * FROM propagation WHERE day = ? ORDER BY abs(cast(time AS INTEGER) - ?) LIMIT 1",
                 (qso_date, int((time_on or "0")[:6] or 0))).fetchone()
         return dict(r) if r else None
+
+    # --- météo spatiale (spacewx.py) ---
+    def add_spacewx(self, day, time, d):
+        with self._lock:
+            self._con.execute(
+                "INSERT INTO spacewx(day, time, kp, bz, bt, speed, density, xray, xray_flux, scales) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?)",
+                (day, time, d.get("kp"), d.get("bz"), d.get("bt"), d.get("speed"), d.get("density"),
+                 d.get("xray"), d.get("xray_flux"), json.dumps(d.get("scales") or {})))
+            for f in d.get("flares") or []:
+                if f.get("begin"):
+                    self._con.execute(
+                        "INSERT INTO flare(begin, peak, finish, cls) VALUES (?,?,?,?) ON CONFLICT(begin) "
+                        "DO UPDATE SET peak = excluded.peak, finish = excluded.finish, cls = excluded.cls",
+                        (f["begin"], f.get("max"), f.get("end"), f.get("cls")))
+            self._con.commit()
+
+    def day_spacewx(self, day):
+        with self._lock:
+            rows = self._con.execute("SELECT * FROM spacewx WHERE day = ? ORDER BY time", (day,)).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            try:
+                d["scales"] = json.loads(d.get("scales") or "{}")
+            except ValueError:
+                d["scales"] = {}
+            out.append(d)
+        return out
+
+    def spacewx_near(self, day, time_on):
+        """Relevé de météo spatiale le plus proche (même jour, à moins de 30 min)."""
+        t = (time_on or "000000").ljust(6, "0")
+        secs = int(t[:2]) * 3600 + int(t[2:4]) * 60
+        with self._lock:
+            r = self._con.execute(
+                "SELECT *, abs((cast(substr(time,1,2) AS INTEGER)*3600 + cast(substr(time,3,2) AS INTEGER)*60) - ?) "
+                "AS dt FROM spacewx WHERE day = ? ORDER BY dt LIMIT 1", (secs, day)).fetchone()
+        if not r or r["dt"] > 1800:
+            return None
+        d = dict(r)
+        try:
+            d["scales"] = json.loads(d.get("scales") or "{}")
+        except ValueError:
+            d["scales"] = {}
+        return d
+
+    def flares_between(self, start_iso, end_iso):
+        """Éruptions dont le pic (ou le début) tombe dans l'intervalle (ISO « …Z »)."""
+        with self._lock:
+            rows = self._con.execute(
+                "SELECT * FROM flare WHERE coalesce(peak, begin) BETWEEN ? AND ? ORDER BY begin",
+                (start_iso, end_iso)).fetchall()
+        return [dict(r) for r in rows]
+
+    def flares_since(self):
+        with self._lock:
+            r = self._con.execute("SELECT min(begin) AS b FROM flare").fetchone()
+        return r["b"] if r else None
+
+    # --- analyse du carnet ---
+    def analysis_rows(self, kind="QSO"):
+        with self._lock:
+            return [dict(r) for r in self._con.execute(
+                "SELECT band, time_on, distance_km, bearing, sfi, k_index FROM qso WHERE kind = ?", (kind,))]
 
     # --- ionosphère (ionosonde.py) ---
     def iono_get(self, qso_id, key):

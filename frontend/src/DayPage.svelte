@@ -6,6 +6,8 @@
   import EntriesTable from './EntriesTable.svelte';
   import PropagationPanel from './PropagationPanel.svelte';
   import WeatherPanel from './WeatherPanel.svelte';
+  import SpaceWeatherPanel from './SpaceWeatherPanel.svelte';
+  import OpenBands from './OpenBands.svelte';
 
   let { day, isToday, radio, websdr, settings } = $props();
 
@@ -124,6 +126,7 @@
       {/if}
     {/if}
     <PropagationPanel snapshots={page?.propagation ?? []} archive={page?.archive} {isToday} />
+    {#if isToday}<OpenBands />{/if}
   </div>
 
   <!-- colonne centrale : saisie + activité du jour -->
@@ -182,6 +185,7 @@
       {/if}
     </section>
 
+    <SpaceWeatherPanel records={page?.spacewx ?? []} flares={page?.flares ?? []} {isToday} />
     <WeatherPanel snapshots={page?.weather ?? []} {isToday} />
   </div>
 </div>
@@ -193,6 +197,7 @@
     padding: 14px; height: calc(100vh - 62px); min-height: 0;
   }
   .col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .col.left, .col.right { overflow-y: auto; }
   .activity { flex: 1; display: flex; flex-direction: column; min-height: 0; }
   .count { color: var(--muted); font-weight: 400; margin-left: 8px; text-transform: none; letter-spacing: 0; }
   .archived { color: var(--muted); font-style: italic; }

@@ -291,6 +291,19 @@
             <p class="snap">Relevé du carnet à {t4(ctx.snapshot.time)} UTC : SFI {ctx.snapshot.sfi ?? '—'}, A {ctx.snapshot.a_index ?? '—'},
               K {ctx.snapshot.k_index ?? '—'}{ctx.snapshot.xray ? `, X ${ctx.snapshot.xray}` : ''}{ctx.snapshot.geomagfield ? ` — ${ctx.snapshot.geomagfield}` : ''}</p>
           {/if}
+          {#if ctx.spacewx?.covered}
+            {@const n = ctx.spacewx.near}
+            <p class="snap">
+              {#if n}Météo spatiale à {t4(n.time)} UTC : Kp {n.kp ?? '—'}, Bz {n.bz ?? '—'} nT, vent {n.speed != null ? Math.round(n.speed) : '—'} km/s, X {n.xray || '—'}{n.scales?.R?.scale ? `, R${n.scales.R.scale}` : ''}.{/if}
+              {#if ctx.spacewx.flares.length}
+                <b class="fl">Éruption{ctx.spacewx.flares.length > 1 ? 's' : ''} :</b>
+                {#each ctx.spacewx.flares as f, i}{i ? ', ' : ''}<b class:fl={'MX'.includes(f.cls?.[0])}>{f.cls}</b> {f.minutes < 0 ? `${-f.minutes} min avant` : f.minutes === 0 ? 'au moment' : `${f.minutes} min après`}{/each}
+                {#if ctx.spacewx.flares.some((f) => 'MX'.includes(f.cls?.[0]) && f.minutes <= 0 && f.minutes > -60)} — absorption probable côté jour.{/if}
+              {:else}
+                Pas d'éruption notable dans les 3 h précédentes.
+              {/if}
+            </p>
+          {/if}
           <p class="src">{ctx.solar.source === 'GFZ' ? 'Indices : archive GFZ Potsdam (CC BY 4.0).' : entry.solar_src === 'hamqsl' ? 'Indices relevés à la saisie (hamqsl.com).' : 'Pas d’indices pour cette date.'}</p>
         </section>
 
@@ -425,6 +438,7 @@
   .map { height: 430px; border: 1px solid var(--panel-edge); border-radius: 6px; background: #0b0d12; }
   .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.75rem; color: var(--muted); margin: 6px 0 8px; }
   .sw { display: inline-block; width: 18px; height: 8px; border-radius: 2px; margin-right: 5px; vertical-align: middle; }
+  .fl { color: var(--warn); }
   .sw.gold { background: #cfb53b; height: 3px; }
   .sw.grey { background: rgba(207, 181, 59, 0.35); }
   b.g { color: var(--gold); }

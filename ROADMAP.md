@@ -433,6 +433,25 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
   bouton « 📡 Entendu », fenêtre et carte associées, section « Le WebSDR entendait » de la fiche QSO).
 - Au premier démarrage : tables `heard`, `heard_sum`, `heard_spool` supprimées puis `VACUUM`.
 - D'autres sources d'analyse de propagation seront étudiées (sans charge sur le PC ORSAT).
+
+## Fait — v1.14.0 (23/10/2026) : météo spatiale, bandes ouvertes, analyse du carnet
+Remplace l'écoute FT8/WSPR supprimée : uniquement des sources publiques, quelques requêtes par heure.
+PSK Reporter écarté pour l'instant (choix de l'opérateur).
+- `spacewx.py` (NOAA SWPC, JSON) : Kp estimé 1 min, Bz/Bt (rtsw_mag_1m, source active), vent solaire
+  (rtsw_wind_1m), flux X GOES → classe, éruptions 7 j, échelles R/S/G. Lu par le relevé de 15 min,
+  enregistré dans `spacewx` ; éruptions gardées dans `flare` (clé = début). `GET api/spacewx`.
+  Page du jour : panneau « Météo spatiale » (direct aujourd'hui, relevés enregistrés les jours passés,
+  frise de Bz). Fiche QSO : relevé le plus proche (±30 min) + éruptions de −3 h à +30 min
+  (QSO postérieurs à la v1.14 seulement).
+- `kc2g.py` (prop.kc2g.com/api/stations.json, ionosondes GIRO/NOAA/INGV/SWS, cache 15 min, mesures
+  < 90 min, cs ≥ 25) : grille bandes 160 m–6 m × « proche » (saut 600 km) + 8 directions (saut 3000 km,
+  réflexion à 1500 km, MUF(3000) interpolée 1/d² dans 1500 km). Es = 5 × foEs à 1000 km, retenu
+  à partir du 17 m. Ouverte < 85 % MUF, limite ≤ 100 %. `GET api/openbands`. Panneau « Bandes ouvertes »
+  (page du jour). Limite haute : absorption de jour non comptée. La MUF du trajet d'un QSO reste
+  celle de GIRO (fiche QSO, v1.12).
+- Vue « 📊 Analyse » (header) : contacts ou écoutes, filtre de bande ; distance médiane / max / part
+  > 3000 km selon Kp, SFI et direction (8 secteurs), par heure UTC, grille bande × heure. `GET api/analysis`.
+- Vérifié dans Chromium avec des données NOAA / KC2G simulées (bac à sable sans accès à ces sites).
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
@@ -449,7 +468,7 @@ relevés propagation/météo en continu, mutualisation avec PhantomSDR-ORSAT.
 6. Spots TCI / DX cluster, croisement RBN / PSKReporter.
 7. Envoi de commandes TCI (cliquer un spot = changer de fréquence).
 8. ~~QRZ~~ (fait v1.3.0).
-9. Suite fiche QSO : éruptions X (GOES), météo pour la VHF. LoTW / eQSL — **uniquement des contacts** (jamais les SWL).
+9. Suite fiche QSO : météo pour la VHF. (Éruptions X : fait v1.14.0.) LoTW / eQSL — **uniquement des contacts** (jamais les SWL).
 
 ## Sources TCI visées
 - **AetherSDR** (serveur TCI v2.0 : CAT, audio, IQ, CW, spots, événements récepteur ; FlexRadio en priorité,

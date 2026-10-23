@@ -6,6 +6,7 @@
   import HeaderClock from './HeaderClock.svelte';
   import DayPage from './DayPage.svelte';
   import LogBook from './LogBook.svelte';
+  import Analysis from './Analysis.svelte';
   import Calendar from './Calendar.svelte';
 
   let settings = $state({});
@@ -105,13 +106,17 @@
       <button type="button" class:on={view === 'day'} onclick={() => (view = 'day')}
               title="Page d'agenda : saisie, activité, propagation et météo du jour choisi">📅 Agenda</button><button
               type="button" class:on={view === 'log'} onclick={() => (view = 'log')}
-              title="Tous les QSO et toutes les écoutes, avec recherche et exports">📖 Carnet complet</button>
+              title="Tous les QSO et toutes les écoutes, avec recherche et exports">📖 Carnet complet</button><button
+              type="button" class:on={view === 'analysis'} onclick={() => (view = 'analysis')}
+              title="Où et quand la station passe le mieux : distances selon le Kp, le SFI, l'heure et la direction">📊 Analyse</button>
     </div>
   </div>
 </header>
 
 {#if view === 'day'}
   <DayPage bind:this={dayPage} {day} {isToday} {radio} {websdr} {settings} />
+{:else if view === 'analysis'}
+  <Analysis />
 {:else}
   <LogBook onopenday={openDay} />
 {/if}
