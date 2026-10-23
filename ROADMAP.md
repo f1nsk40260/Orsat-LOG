@@ -562,6 +562,11 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
   carte d'écoute seule, sans correspondants ni image satellite ; publics : /ecoute, /assets/*,
   api/public/listenmap. Vérifié : carnet, réglages, cartes privées et tuiles restent en 401 sans connexion.
 - À faire : bouton sur la page du WebSDR (dépôt PhantomSDR-ORSAT) ouvrant /log/ecoute ; orientation de la loop.
+
+## Fait — v1.21.1 (23/10/2026) : probabilité de réception pour le bandeau du WebSDR
+- `GET api/public/listenbanner?radius=800` (public) : par bande, % pondéré par la surface dans le disque
+  autour du WebSDR (bonne 1 / moyenne 0,6 / faible 0,25 / silence ou absorbée 0 ; cases sans mesure écartées).
+  Utilisé par le bandeau de PhantomSDR-ORSAT (même origine : /log/api/public/listenbanner).
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

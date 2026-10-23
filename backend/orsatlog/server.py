@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, eibi, enrich, geo, ionosonde, kc2g, qrz, qrzxml, solar, spacewx, weather
+from . import __version__, adif, auth, backup, eibi, enrich, geo, ionosonde, kc2g, qrz, qrzxml, reach, solar, spacewx, weather
 from .db import DATA_DIR, Database
 from .websdr import Page, WebSdrLink
 
@@ -140,7 +140,7 @@ app = FastAPI(title="ORSAT-LOG", version=__version__, lifespan=lifespan)
 
 # ---------- accès protégé ----------
 # Pages et appels accessibles sans session : la connexion elle-même.
-_PUBLIC = {"/login", "/favicon.ico", "/ecoute", "/ecoute.html", "/api/public/listenmap"}
+_PUBLIC = {"/login", "/favicon.ico", "/ecoute", "/ecoute.html", "/api/public/listenmap", "/api/public/listenbanner"}
 _PUBLIC_PREFIX = ("/assets/",)      # fichiers compilés de l'interface (aucune donnée du carnet)
 
 _LOGIN_HTML = """<!doctype html><html lang="fr"><head><meta charset="utf-8">
@@ -533,6 +533,17 @@ async def get_listen_map():
 async def get_public_listen_map():
     """Même carte, sans connexion, pour la page publique « écoute » (aucune donnée du carnet)."""
     return await asyncio.to_thread(_listen_map)
+
+
+@app.get("/api/public/listenbanner")
+async def get_public_listen_banner(radius: int = 800):
+    """Bandeau du WebSDR : probabilité de réception (%) par bande dans un rayon autour d'ORSAT."""
+    radius = max(100, min(3000, radius))
+    m = await asyncio.to_thread(_listen_map)
+    if not m.get("ok"):
+        return m
+    return {"ok": True, "radius_km": radius, "when": m["when"], "locator": m["locator"],
+            "bands": reach.listen_probability(m, radius)}
 
 
 @app.get("/api/openbands")

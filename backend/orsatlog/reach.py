@@ -211,3 +211,29 @@ def listen_map(grid, bands, sfi, gain_fn, takeoff_fn):
     return {"az_step": MAP_AZ_STEP, "rings": MAP_RINGS, "bands": out,
             "muf": [None if c["muf"] is None else round(c["muf"], 1) for c in grid["cells"]],
             "when": grid["when"].strftime("%H:%M UTC"), "ssn": round(ssn)}
+
+
+
+BANNER_SCORE = {"G": 1.0, "M": 0.6, "P": 0.25}
+
+
+def listen_probability(lmap, radius_km=800):
+    """Probabilité de réception par bande dans un disque autour du récepteur : moyenne, pondérée par la
+    surface des cases, des scores bonne 1 / moyenne 0,6 / faible 0,25 / silence ou absorbée 0.
+    Les cases sans mesure sont écartées ; None si aucune case n'est mesurée."""
+    rings = lmap["rings"]
+    inner = [0] + rings[:-1]
+    n = len(rings)
+    out = {}
+    for band, codes in lmap["bands"].items():
+        tot = acc = 0.0
+        for i, code in enumerate(codes):
+            k = i % n
+            lo, hi = inner[k], min(rings[k], radius_km)
+            if lo >= radius_km or code == "-":
+                continue
+            w = hi * hi - lo * lo                 # surface de la portion d'anneau (même angle pour toutes)
+            tot += w
+            acc += w * BANNER_SCORE.get(code, 0.0)
+        out[band] = None if tot == 0 else round(100 * acc / tot)
+    return out
