@@ -186,6 +186,13 @@ class Database:
             "xray_flux REAL, scales TEXT);"
             "CREATE INDEX IF NOT EXISTS idx_spacewx_day ON spacewx(day, time);"
             "CREATE TABLE IF NOT EXISTS flare (begin TEXT PRIMARY KEY, peak TEXT, finish TEXT, cls TEXT);")
+        # v1.22 : mesures réelles du WebSDR (snr.py) avec la prévision du moment, pour l'étalonnage
+        self._con.executescript(
+            "CREATE TABLE IF NOT EXISTS snr_obs (id INTEGER PRIMARY KEY AUTOINCREMENT, day TEXT NOT NULL, "
+            "time TEXT NOT NULL, band TEXT NOT NULL, floor_db REAL, signals INTEGER, best_snr REAL, "
+            "occupancy INTEGER, pred_pct INTEGER);"
+            "CREATE INDEX IF NOT EXISTS idx_snr_day ON snr_obs(day, time);"
+            "CREATE INDEX IF NOT EXISTS idx_snr_band ON snr_obs(band, day);")
         # migration v0.4 -> v0.5 : rattachement à un QSO de groupe
         if "session_id" not in cols:
             self._con.execute("ALTER TABLE qso ADD COLUMN session_id INTEGER")
@@ -375,6 +382,35 @@ class Database:
         with self._lock:
             r = self._con.execute("SELECT min(begin) AS b FROM flare").fetchone()
         return r["b"] if r else None
+
+    # --- mesures réelles du WebSDR (snr.py) ---
+    def add_snr(self, day, time, results, preds):
+        with self._lock:
+            for band, r in results.items():
+                self._con.execute(
+                    "INSERT INTO snr_obs(day, time, band, floor_db, signals, best_snr, occupancy, pred_pct) "
+                    "VALUES (?,?,?,?,?,?,?,?)",
+                    (day, time, band, r["floor"], r["signals"], r["best_snr"], r["occupancy"], preds.get(band)))
+            self._con.commit()
+
+    def snr_calibration(self, since_day, snr_min=10.0):
+        """Par tranche de prévision : nombre de mesures et part « exploitable » (au moins un signal
+        de SNR ≥ snr_min dB), toutes bandes confondues."""
+        buckets = [("70–100", 70, 101), ("40–70", 40, 70), ("15–40", 15, 40), ("0–15", 0, 15)]
+        out = []
+        with self._lock:
+            for label, lo, hi in buckets:
+                r = self._con.execute(
+                    "SELECT count(*) AS n, sum(best_snr >= ?) AS ok FROM snr_obs "
+                    "WHERE day >= ? AND pred_pct >= ? AND pred_pct < ?", (snr_min, since_day, lo, hi)).fetchone()
+                n = r["n"] or 0
+                out.append({"range": label, "n": n, "rate": round(100 * (r["ok"] or 0) / n) if n else None})
+        return out
+
+    def prune_snr(self, before_day):
+        with self._lock:
+            self._con.execute("DELETE FROM snr_obs WHERE day < ?", (before_day,))
+            self._con.commit()
 
     # --- analyse du carnet ---
     def analysis_rows(self, kind="QSO"):

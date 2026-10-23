@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, eibi, enrich, geo, ionosonde, kc2g, qrz, qrzxml, reach, solar, spacewx, weather
+from . import __version__, adif, auth, backup, eibi, enrich, geo, ionosonde, kc2g, qrz, qrzxml, reach, snr, solar, spacewx, weather
 from .db import DATA_DIR, Database
 from .websdr import Page, WebSdrLink
 
@@ -128,9 +128,11 @@ async def lifespan(app):
     syncer = asyncio.create_task(qrz_sync.loop())
     enricher = asyncio.create_task(_enrich_loop())
     saver = asyncio.create_task(backup.daily_task(db))
+    meter = asyncio.create_task(snr.loop(_store_snr))
     yield
     recorder.cancel()
     saver.cancel()
+    meter.cancel()
     syncer.cancel()
     enricher.cancel()
 
@@ -250,7 +252,8 @@ def admin_status(request: Request):
             "commit_date": git("log", "-1", "--format=%cI"),
             "db_size": DB_PATH.stat().st_size if DB_PATH.exists() else 0, **st,
             "websdr_pages": websdr.state["pages"], "clients": len(_clients),
-            "enrich": {**db.enrich_stats(), **_enrich_state}}
+            "enrich": {**db.enrich_stats(), **_enrich_state},
+            "snr": {"at": snr.state.get("at"), "error": snr.state.get("error"), "url": snr.state.get("url")}}
 
 
 # ---------- synchronisation QRZ.com (panneau admin) ----------
@@ -535,6 +538,30 @@ async def get_public_listen_map():
     return await asyncio.to_thread(_listen_map)
 
 
+SNR_KEEP_DAYS = 400
+CALIB_DAYS = 30
+
+
+async def _store_snr(results):
+    """Enregistre une mesure réelle avec la prévision du moment (pour l'étalonnage)."""
+    now = datetime.now(timezone.utc)
+    try:
+        m = await asyncio.to_thread(_listen_map)
+        preds = reach.listen_probability(m, 800) if m.get("ok") else {}
+    except Exception:
+        preds = {}
+    db.add_snr(utc_day(now), now.strftime("%H%M%S"), results, preds)
+    if now.hour == 3 and now.minute < 6:
+        db.prune_snr((now - timedelta(days=SNR_KEEP_DAYS)).strftime("%Y%m%d"))
+
+
+def _measured():
+    st = snr.state
+    if not st.get("last") or not st.get("at"):
+        return None
+    return {"at": st["at"], "bands": st["last"]}
+
+
 @app.get("/api/public/listenbanner")
 async def get_public_listen_banner(radius: int = 800):
     """Bandeau du WebSDR : probabilité de réception (%) par bande dans un rayon autour d'ORSAT."""
@@ -542,8 +569,10 @@ async def get_public_listen_banner(radius: int = 800):
     m = await asyncio.to_thread(_listen_map)
     if not m.get("ok"):
         return m
+    since = (datetime.now(timezone.utc) - timedelta(days=CALIB_DAYS)).strftime("%Y%m%d")
     return {"ok": True, "radius_km": radius, "when": m["when"], "locator": m["locator"],
-            "bands": reach.listen_probability(m, radius)}
+            "bands": reach.listen_probability(m, radius), "measured": _measured(),
+            "calibration": {"days": CALIB_DAYS, "snr_min": 10, "buckets": db.snr_calibration(since)}}
 
 
 @app.get("/api/openbands")

@@ -2,3 +2,5 @@ fastapi>=0.110
 uvicorn>=0.29
 websockets>=12
 python-multipart
+zstandard        # mesure du WebSDR : lignes de chute d'eau compressées zstd
+cbor2            # ... codées en CBOR

@@ -567,6 +567,20 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `GET api/public/listenbanner?radius=800` (public) : par bande, % pondéré par la surface dans le disque
   autour du WebSDR (bonne 1 / moyenne 0,6 / faible 0,25 / silence ou absorbée 0 ; cases sans mesure écartées).
   Utilisé par le bandeau de PhantomSDR-ORSAT (même origine : /log/api/public/listenbanner).
+
+## Fait — v1.22.0 (23/10/2026) : mesure réelle du WebSDR (SNR) et étalonnage de la prévision
+- `snr.py` : connexion locale à la chute d'eau de PhantomSDR-ORSAT (ws://127.0.0.1:<port>/waterfall, port lu
+  dans config.toml à côté d'admin_config.json). Toutes les 5 min, ~3 s par bande amateur (commande « window ») ;
+  lignes zstd → CBOR {l, r, data int8 en dB}. Par bande : bruit (20e centile du spectre moyen en puissance),
+  signaux (groupes ≥ 10 dB au-dessus du bruit), meilleur SNR, occupation (≥ 6 dB). Aucun décodage ni son.
+  Dépendances : zstandard, cbor2.
+- Table `snr_obs` (gardée 400 jours) : mesure + couverture prévue au même moment (`reach.listen_probability`).
+  `db.snr_calibration` : par tranche de couverture (70–100, 40–70, 15–40, 0–15 %), part des mesures avec un
+  signal exploitable (SNR ≥ 10 dB), sur 30 jours.
+- `api/public/listenbanner` ajoute `measured` (dernière mesure) et `calibration`. `api/info` : état de la mesure.
+- Bandeau PhantomSDR-ORSAT : verdict en clair pour la bande écoutée (Fiable ≥ 70 / Correct ≥ 40 / Aléatoire ≥ 15
+  / Fermé), mesure réelle à côté, étalonnage constaté dans l'infobulle (affiché à partir de 30 mesures par tranche).
+- Vérifié avec un faux WebSDR parlant le même protocole (signaux injectés à 12, 18 et 30 dB retrouvés).
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
