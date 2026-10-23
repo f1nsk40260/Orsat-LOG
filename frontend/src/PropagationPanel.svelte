@@ -48,12 +48,12 @@
   <h2 class="panel-title">Propagation du jour</h2>
 
   {#if latest}
-    <div class="indices">
+    <div class="indices" class:four={!latest.xray}>
       <div title={tipSfi(latest.sfi)}><span>SFI</span><b>{latest.sfi ?? '—'}</b></div>
-      <div title={tipA(latest.a_index)}><span>A</span><b>{latest.a_index ?? '—'}</b></div>
-      <div title={tipK(latest.k_index)}><span>K</span><b class={kClass(latest.k_index)}>{latest.k_index ?? '—'}</b></div>
+      <div title={tipA(latest.a_index)}><span>A 24 h</span><b>{latest.a_index ?? '—'}</b></div>
+      <div title={tipK(latest.k_index)}><span>K 3 h</span><b class={kClass(latest.k_index)}>{latest.k_index ?? '—'}</b></div>
       <div title={tipSn(latest.sunspots)}><span>Taches</span><b>{latest.sunspots ?? '—'}</b></div>
-      <div title={tipXray(latest.xray)}><span>X-ray</span><b>{latest.xray || '—'}</b></div>
+      {#if latest.xray}<div title={tipXray(latest.xray)}><span>X-ray</span><b>{latest.xray}</b></div>{/if}
     </div>
     {#if latest.geomagfield}
       <div class="geomag" title={tipGeomag(latest.geomagfield)}>Champ géomagnétique : {latest.geomagfield}</div>
@@ -100,7 +100,7 @@
     {/if}
   {:else if !archive}
     <p class="muted">
-      {isToday ? 'Premier relevé en cours… (hamqsl.com, toutes les 15 min)' : 'Aucun relevé de propagation ce jour-là.'}
+      {isToday ? 'Premier relevé en cours… (NOAA, toutes les 15 min)' : 'Aucun relevé de propagation ce jour-là.'}
     </p>
   {/if}
 

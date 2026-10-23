@@ -74,7 +74,7 @@ async def _propagation_recorder():
                 new_hour = (not last or last["day"] != utc_day(now)
                             or last["time"][:2] != now.strftime("%H"))
                 if not last or last.get("source_time") != data.get("updated") or new_hour:
-                    db.add_snapshot(utc_day(now), now.strftime("%H%M%S"), data)
+                    db.add_snapshot(utc_day(now), now.strftime("%H%M%S"), data, source=solar.SOURCE)
         except Exception as exc:
             log.warning("relevé de propagation : %s", exc)
         try:
@@ -641,7 +641,7 @@ async def add_qso(q: QsoIn):
     sol = await asyncio.to_thread(solar.get_solar) or db.last_snapshot()
     if sol:
         rec["sfi"], rec["a_index"], rec["k_index"] = sol["sfi"], sol["a_index"], sol["k_index"]
-        rec["solar_src"] = "hamqsl"
+        rec["solar_src"] = solar.SOURCE
 
     if kind == "QSO":
         rec["qrz_state"] = "pending"           # à envoyer vers QRZ.com

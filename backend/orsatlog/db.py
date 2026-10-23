@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS propagation (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     day         TEXT NOT NULL,      -- AAAAMMJJ (UTC)
     time        TEXT NOT NULL,      -- HHMMSS (UTC)
-    source      TEXT,               -- ex. hamqsl
+    source      TEXT,               -- noaa (hamqsl avant la v1.15)
     source_time TEXT,               -- horodatage annoncé par la source
     sfi         REAL,
     a_index     REAL,
@@ -167,7 +167,7 @@ class Database:
         # migration v1.3 -> v1.4 : enrichissement pour l'analyse (voir enrich.py)
         #   my_gridsquare : QTH d'où le QSO a été fait (IN93LR puis IN93KU pour F1NSK)
         #   country, dxcc, cont, cqz, ituz, lat, lon : correspondant (fournis par QRZ.com)
-        #   confirmed : 'LoTW', 'QSL', 'eQSL' ou '' ; solar_src : 'hamqsl' (relevé direct) ou 'GFZ' (archive)
+        #   confirmed : 'LoTW', 'QSL', 'eQSL' ou '' ; solar_src : 'noaa' (relevé direct ; 'hamqsl' avant v1.15) ou 'GFZ' (archive)
         for col, ddl in (("my_gridsquare", "TEXT"), ("country", "TEXT"), ("dxcc", "INTEGER"),
                          ("cont", "TEXT"), ("cqz", "INTEGER"), ("ituz", "INTEGER"), ("lat", "REAL"),
                          ("lon", "REAL"), ("confirmed", "TEXT"), ("solar_src", "TEXT")):
@@ -515,7 +515,7 @@ class Database:
             ).fetchall()
         return [dict(r) for r in rows]
 
-    def add_snapshot(self, day, time, data, source="hamqsl"):
+    def add_snapshot(self, day, time, data, source="noaa"):
         with self._lock:
             self._con.execute(
                 "INSERT INTO propagation(day, time, source, source_time, sfi, a_index, k_index, "

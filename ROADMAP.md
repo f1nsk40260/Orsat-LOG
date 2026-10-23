@@ -452,6 +452,17 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - Vue « 📊 Analyse » (header) : contacts ou écoutes, filtre de bande ; distance médiane / max / part
   > 3000 km selon Kp, SFI et direction (8 secteurs), par heure UTC, grille bande × heure. `GET api/analysis`.
 - Vérifié dans Chromium avec des données NOAA / KC2G simulées (bac à sable sans accès à ces sites).
+
+## Fait — v1.15.0 (23/10/2026) : plus de hamqsl.com, indices lus directement à la NOAA
+- `solar.py` réécrit : SFI (json/f107_cm_flux.json, mesure la plus récente), K officiel du dernier
+  créneau de 3 h et A = moyenne des 8 derniers « a_running » (products/noaa-planetary-k-index.json),
+  taches (json/solar-cycle/swpc_observed_ssn.json, lu 2 fois par jour). Champ géomagnétique déduit du K
+  (calme / instable / actif / tempête Gn). Même format qu'avant : table `propagation` (source = 'noaa'),
+  indices figés à la saisie d'un QSO (solar_src = 'noaa').
+- L'état des bandes jour/nuit (formule hamqsl) disparaît : remplacé par « Bandes ouvertes » (ionosondes).
+  Les anciens relevés hamqsl restent affichés tels quels sur les jours passés.
+- Panneau « Propagation du jour » : SFI, A 24 h, K 3 h, taches. Le X-ray n'est plus qu'en météo spatiale
+  (direct) : fin des écarts entre les deux panneaux.
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

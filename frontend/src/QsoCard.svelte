@@ -304,7 +304,7 @@
               {/if}
             </p>
           {/if}
-          <p class="src">{ctx.solar.source === 'GFZ' ? 'Indices : archive GFZ Potsdam (CC BY 4.0).' : entry.solar_src === 'hamqsl' ? 'Indices relevés à la saisie (hamqsl.com).' : 'Pas d’indices pour cette date.'}</p>
+          <p class="src">{ctx.solar.source === 'GFZ' ? 'Indices : archive GFZ Potsdam (CC BY 4.0).' : entry.solar_src === 'noaa' ? 'Indices relevés à la saisie (NOAA SWPC).' : entry.solar_src === 'hamqsl' ? 'Indices relevés à la saisie (hamqsl.com).' : 'Pas d’indices pour cette date.'}</p>
         </section>
 
         {#if entry.kind === 'SWL' && entry.freq}

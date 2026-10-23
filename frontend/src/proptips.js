@@ -69,11 +69,10 @@ export function tipXray(v) {
 }
 
 export function tipGeomag(v) {
-  return `État du champ géomagnétique annoncé par hamqsl.com (calme, instable, actif, tempête…).\n`
-    + `Résumé en clair des indices K et A.` + (v ? `\n\nActuellement : ${v}.` : '');
+  return `État du champ géomagnétique déduit de l'indice K officiel (calme, instable, actif, tempête G1 à G5).` + (v ? `\n\nActuellement : ${v}.` : '');
 }
 
-export const TIP_BANDS = `État des bandes calculé par hamqsl.com (N0NBH) à partir du SFI et de l'indice K, de jour et de nuit.\n`
+export const TIP_BANDS = `Ancien relevé (avant la v1.15) : état des bandes calculé par hamqsl.com à partir du SFI et de l'indice K.\n`
   + `C'est une estimation générale, pas une mesure : la fiche d'un QSO donne la fréquence maximale utilisable (MUF) mesurée par les ionosondes.`;
 
 export const TIP_FOF2 = `foF2 — fréquence critique de la couche F2, en MHz.\n`

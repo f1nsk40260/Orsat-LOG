@@ -75,7 +75,7 @@
           </td>
           <td title={q.my_gridsquare && q.kind !== 'SWL' ? `depuis ${q.my_gridsquare}` : ''}>{q.distance_km != null ? `${q.distance_km} km` : ''}</td>
           <td>{q.bearing != null ? `${q.bearing}°` : ''}</td>
-          <td title={q.sfi == null && q.k_index == null ? '' : (q.solar_src === 'GFZ' ? `Archive GFZ Potsdam : SFI du jour, K du créneau de 3 h${q.a_index != null ? `, A ${q.a_index}` : ''}` : 'Relevé hamqsl au moment de la saisie')
+          <td title={q.sfi == null && q.k_index == null ? '' : (q.solar_src === 'GFZ' ? `Archive GFZ Potsdam : SFI du jour, K du créneau de 3 h${q.a_index != null ? `, A ${q.a_index}` : ''}` : (q.solar_src === 'hamqsl' ? 'Relevé hamqsl au moment de la saisie' : 'Relevé NOAA au moment de la saisie'))
                 + (q.sfi != null ? '\n\n' + tipSfi(q.sfi) : '') + (q.k_index != null ? '\n\n' + tipK(q.k_index) : '')}
               class:archive={q.solar_src === 'GFZ'}>{q.sfi != null ? Math.round(q.sfi) : ''}{q.k_index != null ? ` / ${+(+q.k_index).toFixed(1)}` : ''}</td>
           <td>{q.kind === 'SWL' ? q.qth : q.name}</td>
