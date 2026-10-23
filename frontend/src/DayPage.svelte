@@ -7,7 +7,6 @@
   import PropagationPanel from './PropagationPanel.svelte';
   import WeatherPanel from './WeatherPanel.svelte';
   import SpaceWeatherPanel from './SpaceWeatherPanel.svelte';
-  import OpenBands from './OpenBands.svelte';
 
   let { day, isToday, radio, websdr, settings } = $props();
 
@@ -126,7 +125,7 @@
       {/if}
     {/if}
     <PropagationPanel snapshots={page?.propagation ?? []} archive={page?.archive} {isToday} />
-    {#if isToday}<OpenBands />{/if}
+    <SpaceWeatherPanel records={page?.spacewx ?? []} flares={page?.flares ?? []} {isToday} />
   </div>
 
   <!-- colonne centrale : saisie + activité du jour -->
@@ -185,7 +184,6 @@
       {/if}
     </section>
 
-    <SpaceWeatherPanel records={page?.spacewx ?? []} flares={page?.flares ?? []} {isToday} />
     <WeatherPanel snapshots={page?.weather ?? []} {isToday} />
   </div>
 </div>

@@ -479,6 +479,11 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `reach.RANGES` : ≤ 100 km (saut 100, NVIS), 100–300 (saut 200, NVIS), 300–900 (saut 600), 900–2500 (1500),
   > 2500 (3000). Zone de silence = « < X km » (borne basse de la première tranche ouverte, toutes les
   précédentes fermées par la MUF). Onde de sol non calculée.
+
+## Fait — v1.17.0 (23/10/2026) : fenêtre « Bandes » depuis le header
+- Bouton « 📶 Bandes » dans le header : grande fenêtre (fond assombri, ✕ ou clic à côté pour fermer, ↻ pour
+  recalculer) avec côte à côte la grille par direction et la portée par bande. Plus dans la page du jour.
+- Météo spatiale déplacée dans la colonne gauche, sous « Propagation du jour ».
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

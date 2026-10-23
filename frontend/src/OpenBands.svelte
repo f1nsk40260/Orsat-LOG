@@ -2,6 +2,7 @@
   // Bandes ouvertes en ce moment, par direction (ionosondes via KC2G) — page du jour seulement
   import { api } from './api.js';
 
+  let { onclose = null } = $props();
   let data = $state(null);
   async function refresh() { data = await api.openBands().catch(() => ({ ok: false, msg: 'Serveur injoignable.' })); }
   $effect(() => {
@@ -37,9 +38,15 @@
   }
 </script>
 
+<div class="backdrop" onclick={onclose} role="presentation"></div>
 <section class="panel ob">
-  <h2 class="panel-title">Bandes ouvertes <span class="count">{data?.ok ? data.computed : ''}</span></h2>
+  <h2 class="panel-title">Bandes ouvertes et portée par bande <span class="count">{data?.ok ? `calcul de ${data.computed}` : ''}</span>
+    <button class="ghost close" onclick={refresh} title="Recalculer maintenant">↻</button>
+    <button class="ghost close" onclick={onclose} title="Fermer">✕</button></h2>
   {#if data?.ok}
+   <div class="blocks">
+   <div class="blk">
+    <h3 class="sub">Par direction <span>MUF seule · clic sur une direction pour la portée</span></h3>
     <table>
       <thead>
         <tr>
@@ -70,6 +77,8 @@
       <span><i class="open"></i>ouverte</span><span><i class="edge"></i>en limite</span>
       <span><i class="closed"></i>fermée</span><span><i class="open es"></i>par Es</span>
     </div>
+   </div>
+   <div class="blk">
     {#if reachRows.length}
       <h3 class="sub">Portée par bande <span>{sel ? `vers ${sel}` : 'meilleure direction'}</span>
         {#if sel}<button class="ghost tiny" onclick={() => (sel = null)} title="Revenir à la meilleure direction">✕</button>{/if}</h3>
@@ -90,8 +99,10 @@
         <span><i class="weak"></i>affaiblie</span><span><i class="absorbed"></i>absorbée</span>
       </div>
     {/if}
+   </div>
+   </div>
     <p class="src">Distances en km. Onde de sol non calculée. Plafond : MUF mesurée. Plancher : absorption de jour <b>estimée</b> (modèle George-Bradley, R {data.reach?.ssn ?? '—'} déduit du SFI).
-      La grille du haut ne tient compte que de la MUF.
+      La grille de gauche ne tient compte que de la MUF.
       {data.stations_count} ionosondes, KC2G (GIRO, NOAA, INGV, SWS).</p>
   {:else}
     <p class="muted">{data ? data.msg : 'Calcul en cours…'}</p>
@@ -99,7 +110,21 @@
 </section>
 
 <style>
-  .ob { display: flex; flex-direction: column; gap: 6px; }
+  .backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, 0.55); }
+  .ob { position: fixed; z-index: 21; top: 70px; left: 50%; transform: translateX(-50%);
+        width: min(1180px, calc(100vw - 32px)); max-height: calc(100vh - 90px); overflow-y: auto;
+        display: flex; flex-direction: column; gap: 10px; background: #1e1d18; box-shadow: 0 8px 30px rgba(0, 0, 0, 0.7); }
+  .ob .panel-title { display: flex; align-items: center; gap: 8px; }
+  .close { margin-left: auto; padding: 0 8px; font-size: 1rem; }
+  .close + .close { margin-left: 0; }
+  .blocks { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
+  .blk { flex: 1 1 460px; display: flex; flex-direction: column; gap: 8px; }
+  table { font-size: 0.9rem !important; }
+  td.c { height: 24px !important; }
+  td.skip { font-size: 0.82rem !important; }
+  table.reach th { font-size: 0.8rem !important; }
+  .legend { font-size: 0.82rem !important; }
+  .src { font-size: 0.8rem !important; }
   .count { color: var(--muted); font-weight: 400; margin-left: 8px; text-transform: none; letter-spacing: 0; }
   table { border-collapse: separate; border-spacing: 2px; width: 100%; font-size: 0.74rem; }
   th { color: var(--gold-soft); font-weight: 600; text-align: center; cursor: help; padding: 0; }
@@ -116,7 +141,7 @@
   .absorbed { background: rgba(214, 80, 80, 0.45); }
   th.pick { cursor: pointer; }
   th.pick:hover, th.pick.sel { color: #1a1606; background: var(--gold); border-radius: 3px; }
-  .sub { margin: 6px 0 0; font-size: 0.78rem; color: var(--gold); letter-spacing: 0.06em; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+  .sub { margin: 0; font-size: 0.85rem; color: var(--gold); letter-spacing: 0.06em; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
   .sub span { color: var(--muted); text-transform: none; letter-spacing: 0; font-weight: 400; }
   .tiny { padding: 0 5px; font-size: 0.75rem; }
   table.reach td.c { height: 13px; }

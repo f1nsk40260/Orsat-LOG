@@ -7,12 +7,14 @@
   import DayPage from './DayPage.svelte';
   import LogBook from './LogBook.svelte';
   import Analysis from './Analysis.svelte';
+  import OpenBands from './OpenBands.svelte';
   import Calendar from './Calendar.svelte';
 
   let settings = $state({});
   let radio = $state({ connected: false, freq: 0, mode: '', submode: '', ptt: false, device: '' });
   let websdr = $state({ listening: false, connected: false, freq: 0, mode: '', submode: '', ptt: false, device: 'WebSDR' });
   let showCalendar = $state(false);
+  let showBands = $state(false);     // fenêtre « Bandes ouvertes et portée par bande »
   let view = $state('day');              // 'day' = page d'agenda, 'log' = carnet complet
   let utc = $state(new Date());
   let today = $state(dayOf());           // jour UTC en cours
@@ -102,6 +104,8 @@
 
   <div class="right">
     <HeaderClock />
+    <button class="bands-btn" class:on={showBands} onclick={() => (showBands = !showBands)}
+            title="Bandes ouvertes maintenant par direction, et portée par bande (ionosondes mesurées)">📶 Bandes</button>
     <div class="seg" role="group" aria-label="Affichage">
       <button type="button" class:on={view === 'day'} onclick={() => (view = 'day')}
               title="Page d'agenda : saisie, activité, propagation et météo du jour choisi">📅 Agenda</button><button
@@ -120,6 +124,8 @@
 {:else}
   <LogBook onopenday={openDay} />
 {/if}
+
+{#if showBands}<OpenBands onclose={() => (showBands = false)} />{/if}
 
 {#if showCalendar}
   <Calendar {day} {today} onpick={openDay} onclose={() => (showCalendar = false)} />
@@ -152,6 +158,8 @@
 
   .right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
   /* Choix Agenda / Carnet : deux boutons accolés, celui affiché en or (comme TU / LOCAL) */
+  .bands-btn { border-radius: 999px; padding: 5px 14px; }
+  .bands-btn.on { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); font-weight: 600; }
   .seg { display: inline-flex; border: 1px solid rgba(207, 181, 59, 0.6); border-radius: 999px; overflow: hidden; }
   .seg button { border: 0; border-radius: 0; background: rgba(0, 0, 0, 0.3); padding: 5px 14px; }
   .seg button + button { border-left: 1px solid rgba(207, 181, 59, 0.3); }
