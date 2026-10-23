@@ -272,6 +272,5 @@
   .actions { display: flex; justify-content: flex-end; align-items: center; gap: 10px; }
   .actions .del { margin-right: auto; color: var(--bad); }
   .error { color: var(--bad); font-size: 0.85rem; }
-  .keys { color: var(--muted); font-size: 0.75rem; margin: 8px 0 0; text-align: right; }
   @media (max-width: 560px) { .g3, .g2 { grid-template-columns: 1fr; } }
 </style>

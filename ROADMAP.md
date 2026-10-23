@@ -525,6 +525,16 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 ## Fait — v1.19.2 (23/10/2026) : correctif de mise à jour
 - `.gitignore` : `data/` excluait aussi `frontend/src/data/cities.json` (compilation en échec sur le serveur,
   « Could not resolve './data/cities.json' »). Règle limitée à la racine : `/data/` (base et sauvegardes).
+
+## Fait — v1.20.0 (23/10/2026) : vue satellite de la carte des zones de silence
+- `GET api/sattile/{z}/{y}/{x}.jpg` : tuiles Sentinel-2 cloudless 2017 (EOX, CC BY 4.0, WMTS
+  s2cloudless-2017_3857, Web Mercator) téléchargées par le carnet et gardées dans `data/tiles/`
+  (même origine pour la page, pas de nouveau téléchargement d'une zone déjà vue).
+- `frontend/src/satellite.js` : reprojection pixel par pixel en azimutale équidistante (projection inverse
+  d3-geo → pixel Mercator), à 2× la résolution affichée, niveau de tuiles selon l'échelle (2 à 13),
+  recalcul 250 ms après un zoom. Bouton « Vue carte / Vue satellite » ; zones colorées plus transparentes
+  sur l'image. Vérifié avec des tuiles de test (bac à sable sans accès à EOX).
+- Plus aucun avertissement à la compilation (sélecteurs CSS inutiles, rôles ARIA, seuil de taille relevé).
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

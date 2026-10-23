@@ -164,7 +164,6 @@
   .seg button { border: 0; border-radius: 0; background: rgba(0, 0, 0, 0.3); padding: 5px 14px; }
   .seg button + button { border-left: 1px solid rgba(207, 181, 59, 0.3); }
   .seg button.on { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); font-weight: 600; }
-  button.active { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); font-weight: 600; }
   :global(.ok) { color: var(--ok); } :global(.warn) { color: var(--warn); } :global(.bad) { color: var(--bad); }
   .station.setup { color: var(--warn); font-family: inherit; font-size: 0.82rem; }
 </style>

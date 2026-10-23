@@ -19,7 +19,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import __version__, adif, auth, backup, eibi, enrich, geo, ionosonde, kc2g, qrz, qrzxml, solar, spacewx, weather
-from .db import Database
+from .db import DATA_DIR, Database
 from .websdr import Page, WebSdrLink
 
 log = logging.getLogger("orsatlog")
@@ -481,6 +481,38 @@ async def get_skip_map():
                             "km": q.get("distance_km"), "time": q.get("time_on")})
         data["stations"] = pts
     return data
+
+
+# ---------- images satellite pour la carte des zones de silence ----------
+# Sentinel-2 cloudless 2017 (EOX IT Services, données Copernicus modifiées, CC BY 4.0), tuiles Web Mercator.
+# Le carnet les télécharge et les garde : la page reste en même origine, une zone vue ne se recharge pas.
+SAT_URL = "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2017_3857/default/g/{z}/{y}/{x}.jpg"
+SAT_DIR = DATA_DIR / "tiles"
+
+
+def _sat_tile(z, y, x):
+    path = SAT_DIR / str(z) / str(y) / f"{x}.jpg"
+    if not path.exists():
+        import urllib.request
+        req = urllib.request.Request(SAT_URL.format(z=z, y=y, x=x), headers={"User-Agent": "ORSAT-LOG"})
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            body = resp.read()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(".part")
+        tmp.write_bytes(body)
+        tmp.replace(path)
+    return path
+
+
+@app.get("/api/sattile/{z}/{y}/{x}.jpg")
+async def sat_tile(z: int, y: int, x: int):
+    if not (0 <= z <= 14 and 0 <= x < 2 ** z and 0 <= y < 2 ** z):
+        raise HTTPException(400, "Tuile hors limites")
+    try:
+        path = await asyncio.to_thread(_sat_tile, z, y, x)
+    except Exception as exc:
+        raise HTTPException(502, f"Image satellite indisponible : {exc}")
+    return FileResponse(path, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=2592000"})
 
 
 @app.get("/api/openbands")

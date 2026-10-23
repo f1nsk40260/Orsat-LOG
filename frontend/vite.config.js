@@ -5,6 +5,8 @@ import { svelte } from '@sveltejs/vite-plugin-svelte';
 export default defineConfig({
   plugins: [svelte()],
   base: './',            // chemins relatifs : marche à la racine comme derrière /log/
+  // fonds de carte détaillés (jusqu'à 3,7 Mo) : chargés à la demande au zoom, gros par nature
+  build: { chunkSizeWarningLimit: 4000 },
   server: {
     proxy: {
       '/api': 'http://127.0.0.1:8740',

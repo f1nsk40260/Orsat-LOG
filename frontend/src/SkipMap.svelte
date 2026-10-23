@@ -5,6 +5,8 @@
   import { feature, mesh } from 'topojson-client';
   import world from 'world-atlas/countries-110m.json';
   import { api } from './api.js';
+  import { renderSatellite, tileZoom } from './satellite.js';
+  import { geoAzimuthalEquidistant as azeq } from 'd3-geo';
 
   let data = $state(null);
   let band = $state('20m');
@@ -70,6 +72,26 @@
     : null);
   const path = $derived(proj ? geoPath(proj) : null);
 
+  // vue satellite : image reprojetée (2× la résolution affichée), recalculée après chaque zoom
+  let sat = $state(false), satImg = $state(null), satMsg = $state('');
+  let satTimer = null, satSeq = 0;
+  $effect(() => {
+    if (!sat || !data?.ok) return;
+    const km = MAX_KM, home = data.home, seq = ++satSeq;
+    clearTimeout(satTimer);
+    satMsg = 'Chargement de l\'image satellite…';
+    satTimer = setTimeout(async () => {
+      const k = 2, p2 = azeq().rotate([-home[1], -home[0]]).scale((R * k) / (km / EARTH)).translate([C * k, C * k])
+        .clipAngle((km / EARTH) * 180 / Math.PI);
+      const z = tileZoom((km * 1000) / (R * k), home[0]);
+      const res = await renderSatellite(p2, SIZE * k, C * k, C * k, R * k, z);
+      if (seq !== satSeq) return;                   // un autre zoom est passé entre-temps
+      satImg = res.url;
+      satMsg = res.missing ? `${res.missing} image(s) sur ${res.total} indisponible(s) pour l'instant.` : '';
+    }, 250);
+  });
+  const FILL_SAT = { o: 'rgba(95,191,107,0.38)', e: 'rgba(224,160,48,0.42)', w: 'rgba(95,191,107,0.2)',
+                     a: 'rgba(214,80,80,0.38)', c: 'rgba(0,0,0,0.5)', '-': 'url(#nodata)' };
   const FILL = { o: 'rgba(95,191,107,0.55)', e: 'rgba(224,160,48,0.55)', w: 'rgba(95,191,107,0.28)',
                  a: 'rgba(214,80,80,0.45)', c: 'rgba(10,10,12,0.72)', '-': 'url(#nodata)' };
   const LABEL = { o: 'ouverte', e: 'en limite de MUF', w: 'ouverte mais affaiblie (absorption)',
@@ -135,6 +157,9 @@
     <div class="bands zoom" role="group" aria-label="Rayon affiché" title="Rayon de la carte (molette sur la carte pour zoomer)">
       {#each ZOOMS as [km, l]}<button type="button" class:on={Math.abs(MAX_KM - km) < km * 0.1} onclick={() => (MAX_KM = km)}>{l}</button>{/each}
     </div>
+    <button type="button" class="tog" class:on={sat} onclick={() => (sat = !sat)}
+            title="Fond de carte : dessin des côtes, ou image satellite (Sentinel-2 cloudless)">
+      {sat ? 'Vue satellite' : 'Vue carte'}</button>
     <button type="button" class="tog" class:on={onlyBand} onclick={() => (onlyBand = !onlyBand)}
             title="Afficher tous les correspondants du jour, ou seulement ceux de la bande choisie">
       {onlyBand ? `Correspondants : ${band} seulement` : 'Correspondants : toutes bandes'}</button>
@@ -150,9 +175,10 @@
         </defs>
         <circle cx={C} cy={C} r={R} class="sea" />
         <g clip-path="url(#disc)">
-          <path d={path(landShown)} class="land" />
+          {#if sat && satImg}<image href={satImg} x="0" y="0" width={SIZE} height={SIZE} />
+          {:else}<path d={path(landShown)} class="land" />{/if}
           {#each cells as c}
-            <path d={c.d} fill={FILL[c.code]} class="cell"
+            <path role="presentation" d={c.d} fill={(sat && satImg ? FILL_SAT : FILL)[c.code]} class="cell"
                   onmouseenter={() => (hover = `${band} · azimut ${c.az}° · ${c.r0}–${c.r1} km : ${LABEL[c.code]}${c.muf ? ` · MUF ${c.muf} MHz` : ''}`)}
                   onmouseleave={() => (hover = '')} />
           {/each}
@@ -174,7 +200,7 @@
         {/each}
         <circle cx={C} cy={C} r="4" class="home" />
         {#each stations as s}
-          <g class="st" onmouseenter={() => (hover = `${s.call} · ${s.band ?? '?'} · ${s.km} km, azimut ${s.az}°${s.session ? ` · ${s.session}` : ''} : ${LABEL[s.code]} sur sa bande`)}
+          <g class="st" role="presentation" onmouseenter={() => (hover = `${s.call} · ${s.band ?? '?'} · ${s.km} km, azimut ${s.az}°${s.session ? ` · ${s.session}` : ''} : ${LABEL[s.code]} sur sa bande`)}
              onmouseleave={() => (hover = '')}>
             <circle cx={s.p[0]} cy={s.p[1]} r="5" class="dot {s.code}" />
             <text x={s.p[0] + 7} y={s.p[1] + 4} class="call">{s.call}</text>
@@ -183,6 +209,7 @@
       </svg>
       <div class="side">
         <p class="hover">{hover || 'Survolez la carte ou un correspondant.'}</p>
+        {#if sat && satMsg}<p class="muted">{satMsg}</p>{/if}
         <div class="legend">
           {#each ['o', 'e', 'w', 'a', 'c'] as k}<span><i style="background:{FILL[k]}"></i>{LABEL[k]}</span>{/each}
           <span><i class="hatch"></i>pas de mesure (pas d'ionosonde assez proche)</span>
@@ -202,7 +229,8 @@
         {/if}
         <p class="src">Projection azimutale équidistante centrée sur le QTH (distances et azimuts vrais depuis chez vous).
           Molette sur la carte : zoom. Pas de 5°, anneaux de 25 km jusqu'à 300 km, 50 km jusqu'à 1000 km puis 250 km ; au-delà de 3500 km, plusieurs sauts. Même calcul que le tableau « Portée par bande ». Calcul de {data.when}, R {data.ssn}.
-          Fond de carte et villes Natural Earth (domaine public), plus détaillés en zoomant.</p>
+          Fond de carte et villes Natural Earth (domaine public), plus détaillés en zoomant.
+          {#if sat}Image satellite : Sentinel-2 cloudless 2017 by EOX IT Services GmbH (contient des données Copernicus Sentinel modifiées, 2017), CC BY 4.0.{/if}</p>
       </div>
     </div>
   {:else}
