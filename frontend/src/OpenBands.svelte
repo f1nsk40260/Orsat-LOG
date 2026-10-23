@@ -10,7 +10,17 @@
     return () => clearInterval(t);
   });
 
-  const STATE = { open: 'ouverte', edge: 'en limite', closed: 'fermée' };
+  const STATE = { open: 'ouverte', edge: 'en limite', closed: 'fermée', weak: 'ouverte mais affaiblie', absorbed: 'absorbée (couche D)' };
+  // portée par bande : meilleure direction, ou celle choisie d'un clic sur l'en-tête de la grille
+  let sel = $state(null);
+  const reachRows = $derived(data?.ok && data.reach ? (sel ? data.reach.dirs[sel] : data.reach.best) : []);
+  const RANGES = [['short', 'Courte', '0–800 km'], ['medium', 'Moyenne', '800–2500 km'], ['long', 'Longue', '2500 km et +']];
+  function reachTip(row, key, label) {
+    const c = row[key];
+    if (!c.state) return `${row.band} ${label} : pas d'ionosonde assez proche.`;
+    return `${row.band} · ${label}${c.dir && !sel ? ` · meilleure direction ${c.dir}` : ''} : ${STATE[c.state]}`
+      + `\nMUF ${c.muf ?? '—'} MHz · absorption estimée ${c.db} dB`;
+  }
   function cellTip(row, col, cell) {
     const where = col.az == null ? 'proche (saut de 600 km)' : `vers ${col.dir} (${col.az}°, saut de 3000 km)`;
     if (!cell.state) return `${row.band} ${where} : pas d'ionosonde assez proche du point de réflexion.`;
@@ -33,7 +43,11 @@
       <thead>
         <tr>
           <th></th>
-          {#each data.columns as c}<th title={colTip(c)}>{c.az == null ? '◎' : c.dir}</th>{/each}
+          {#each data.columns as c}
+            {#if c.az == null}<th title={colTip(c)}>◎</th>
+            {:else}<th class="pick" class:sel={sel === c.dir} title={colTip(c) + '\n\nClic : portée par bande dans cette direction (re-clic : meilleure direction)'}
+                       onclick={() => (sel = sel === c.dir ? null : c.dir)}>{c.dir}</th>{/if}
+          {/each}
         </tr>
         <tr class="muf">
           <th>MUF</th>
@@ -55,7 +69,28 @@
       <span><i class="open"></i>ouverte</span><span><i class="edge"></i>en limite</span>
       <span><i class="closed"></i>fermée</span><span><i class="open es"></i>par Es</span>
     </div>
-    <p class="src">Limite haute selon la MUF mesurée ; l'absorption de jour sur les bandes basses n'est pas comptée.
+    {#if reachRows.length}
+      <h3 class="sub">Portée par bande <span>{sel ? `vers ${sel}` : 'meilleure direction'}</span>
+        {#if sel}<button class="ghost tiny" onclick={() => (sel = null)} title="Revenir à la meilleure direction">✕</button>{/if}</h3>
+      <table class="reach">
+        <thead><tr><th></th>{#each RANGES as [, l, d]}<th title={d}>{l}</th>{/each}<th></th></tr></thead>
+        <tbody>
+          {#each reachRows as row}
+            <tr>
+              <td class="b">{row.band}</td>
+              {#each RANGES as [k, l, d]}<td class="c {row[k].state ?? 'none'}" title={reachTip(row, k, `${l.toLowerCase()} (${d})`)}></td>{/each}
+              <td class="skip" title={row.skip ? 'Zone de silence : la bande passe au loin mais pas à courte distance' : ''}>{row.skip ? 'silence' : ''}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+      <div class="legend">
+        <span><i class="open"></i>ouverte</span><span><i class="edge"></i>limite</span>
+        <span><i class="weak"></i>affaiblie</span><span><i class="absorbed"></i>absorbée</span>
+      </div>
+    {/if}
+    <p class="src">Plafond : MUF mesurée. Plancher : absorption de jour <b>estimée</b> (modèle George-Bradley, R {data.reach?.ssn ?? '—'} déduit du SFI).
+      La grille du haut ne tient compte que de la MUF.
       {data.stations_count} ionosondes, KC2G (GIRO, NOAA, INGV, SWS).</p>
   {:else}
     <p class="muted">{data ? data.msg : 'Calcul en cours…'}</p>
@@ -76,6 +111,15 @@
   .closed { background: rgba(255, 255, 255, 0.05); }
   .none { background: repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0 3px, transparent 3px 6px); }
   .es { box-shadow: inset 0 0 0 2px var(--gold); }
+  .weak { background: repeating-linear-gradient(45deg, rgba(95, 191, 107, 0.6) 0 3px, rgba(95, 191, 107, 0.2) 3px 6px); }
+  .absorbed { background: rgba(214, 80, 80, 0.45); }
+  th.pick { cursor: pointer; }
+  th.pick:hover, th.pick.sel { color: #1a1606; background: var(--gold); border-radius: 3px; }
+  .sub { margin: 6px 0 0; font-size: 0.78rem; color: var(--gold); letter-spacing: 0.06em; text-transform: uppercase; display: flex; align-items: center; gap: 6px; }
+  .sub span { color: var(--muted); text-transform: none; letter-spacing: 0; font-weight: 400; }
+  .tiny { padding: 0 5px; font-size: 0.75rem; }
+  table.reach td.c { height: 13px; }
+  td.skip { color: var(--warn); font-size: 0.68rem; text-align: left; width: 1%; white-space: nowrap; }
   .legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.72rem; }
   .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
   .src { font-size: 0.7rem; color: var(--muted); margin: 0; }

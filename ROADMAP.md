@@ -463,6 +463,17 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
   Les anciens relevés hamqsl restent affichés tels quels sur les jours passés.
 - Panneau « Propagation du jour » : SFI, A 24 h, K 3 h, taches. Le X-ray n'est plus qu'en météo spatiale
   (direct) : fin des écarts entre les deux panneaux.
+
+## Fait — v1.16.0 (23/10/2026) : portée par bande (courte / moyenne / longue) et absorption de jour
+- `reach.py`, appelé par `kc2g.open_bands` (champ `reach` de `api/openbands`) : par direction, MUF pour
+  des sauts de 500 km (réflexion à 250 km), 1500 km (750 km) et 3000 km (1500 km = MUF(3000) mesurée),
+  loi de la sécante étalonnée (ionosonde.mufd_estimate). « Zone de silence » = courte fermée, moyenne
+  ou longue ouverte.
+- Absorption couche D **estimée** (George & Bradley / UIT-R P.533) : A = 677,2·sec(i)·I/((f+1,2)^1,98+10,2),
+  I = (1+0,0037R)(cos 0,881χ)^1,3, χ au point de réflexion, R déduit du SFI (NOAA). < 20 dB normale,
+  20–40 affaiblie, > 40 absorbée. Nulle de nuit.
+- Panneau « Bandes ouvertes » : tableau « Portée par bande » (meilleure direction par défaut ; clic sur un
+  en-tête de direction de la grille pour la choisir, re-clic ou ✕ pour revenir). La grille du haut reste MUF seule.
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

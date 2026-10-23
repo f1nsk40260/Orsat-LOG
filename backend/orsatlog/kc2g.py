@@ -22,6 +22,7 @@ import urllib.request
 from datetime import datetime, timedelta, timezone
 
 from . import geo
+from . import reach
 from .ionosonde import mufd_estimate
 
 log = logging.getLogger("orsatlog")
@@ -119,7 +120,7 @@ def _state(freq, muf):
     return "open" if freq <= 0.85 * muf else "edge" if freq <= muf else "closed"
 
 
-def open_bands(locator):
+def open_bands(locator, sfi=None):
     """Grille bandes × directions. Bloquant : appeler via to_thread."""
     home = geo.locator_to_latlon(locator) if geo.valid_locator(locator or "") else None
     if not home:
@@ -153,6 +154,7 @@ def open_bands(locator):
             cells.append({"state": best, "via": via if best in ("open", "edge") else None})
         rows.append({"band": band, "freq": f, "cells": cells})
     newest = min((s["age_min"] for s in sts), default=None)
-    return {"ok": True, "home": [round(home[0], 2), round(home[1], 2)], "columns": cols, "rows": rows,
+    portee = reach.compute(home, DIRS, BANDS, lambda pt, f: _interp(sts, pt, f), destination, sfi)
+    return {"ok": True, "reach": portee, "home": [round(home[0], 2), round(home[1], 2)], "columns": cols, "rows": rows,
             "stations_count": len(sts), "newest_min": newest,
             "computed": datetime.now(timezone.utc).strftime("%H:%M UTC"), "credit": CREDIT}

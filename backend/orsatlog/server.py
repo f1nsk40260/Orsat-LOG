@@ -464,7 +464,8 @@ async def get_spacewx():
 @app.get("/api/openbands")
 async def get_open_bands():
     """Bandes ouvertes maintenant par direction depuis le QTH (ionosondes KC2G)."""
-    return await asyncio.to_thread(kc2g.open_bands, db.get_settings().get("locator", ""))
+    sol = await asyncio.to_thread(solar.get_solar) or db.last_snapshot() or {}
+    return await asyncio.to_thread(kc2g.open_bands, db.get_settings().get("locator", ""), sol.get("sfi"))
 
 
 # ---------- QSO ----------
