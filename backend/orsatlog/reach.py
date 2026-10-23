@@ -1,9 +1,12 @@
 """Portée par bande : courte, moyenne ou longue distance, et absorption de jour (estimation).
 
-Plafond — MUF mesurée (ionosondes KC2G), pour trois longueurs de saut :
-  courte  0–800 km    saut de 500 km,  réflexion à 250 km du QTH
-  moyenne 800–2500 km saut de 1500 km, réflexion à 750 km
-  longue  ≥ 2500 km   saut de 3000 km, réflexion à 1500 km (au-delà : plusieurs sauts)
+Plafond — MUF mesurée (ionosondes KC2G), pour cinq tranches de distance (saut représentatif) :
+  0–100 km      saut de 100 km  (NVIS, quasi vertical : MUF ≈ foF2), réflexion à 50 km
+  100–300 km    saut de 200 km  (NVIS), réflexion à 100 km
+  300–900 km    saut de 600 km,  réflexion à 300 km
+  900–2500 km   saut de 1500 km, réflexion à 750 km
+  ≥ 2500 km     saut de 3000 km, réflexion à 1500 km (au-delà : plusieurs sauts)
+L'onde de sol (quelques dizaines de km sur les bandes basses) n'est pas calculée.
 MUF(saut) = loi de la sécante étalonnée sur la MUF(3000) de l'ionogramme (ionosonde.mufd_estimate).
 
 Plancher — absorption dans la couche D (MODÈLE, pas une mesure) : formule de George & Bradley
@@ -24,7 +27,9 @@ EARTH_R = 6371.0
 F_H = 1.2
 D_LAYER_KM = 100.0
 WEAK_DB, ABSORBED_DB = 20.0, 40.0
-RANGES = [("short", 500, 250), ("medium", 1500, 750), ("long", 3000, 1500)]   # (clé, saut, réflexion)
+# (clé, saut km, distance du point de réflexion km, borne basse de la tranche km)
+RANGES = [("d100", 100, 50, 0), ("d300", 200, 100, 100), ("d900", 600, 300, 300),
+          ("d2500", 1500, 750, 900), ("dx", 3000, 1500, 2500)]
 RANK = {"open": 3, "edge": 2, "weak": 1, "absorbed": 0, "closed": 0, None: -1}
 
 
@@ -88,7 +93,7 @@ def compute(home, dirs, bands, interp, destination, sfi, when=None):
     per_dir = {}
     for name, az in dirs:
         geo_r = {}
-        for key, hop, refl in RANGES:
+        for key, hop, refl, _lo in RANGES:
             pt = destination(home, az, refl)
             fof2, _ = interp(pt, "fof2")
             m3000, _ = interp(pt, "mufd")
@@ -116,8 +121,9 @@ def compute(home, dirs, bands, interp, destination, sfi, when=None):
         best.append(row)
     for rows in [best, *per_dir.values()]:
         for row in rows:
-            open_ = lambda k: row[k]["state"] in ("open", "edge", "weak")
-            # zone de silence : la bande passe au loin mais pas près
-            row["skip"] = row["short"]["state"] == "closed" and (open_("medium") or open_("long"))
+            # zone de silence : fermée (MUF dépassée) près, ouverte plus loin -> « silence < X km »
+            states = [row[k]["state"] for k, *_ in RANGES]
+            first = next((i for i, s in enumerate(states) if s in ("open", "edge", "weak")), None)
+            row["skip"] = (RANGES[first][3] if first and all(s == "closed" for s in states[:first]) else None)
     return {"best": best, "dirs": per_dir, "ssn": round(ssn),
             "thresholds_db": [WEAK_DB, ABSORBED_DB], "when": when.strftime("%H:%M UTC")}

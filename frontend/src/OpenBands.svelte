@@ -14,7 +14,8 @@
   // portée par bande : meilleure direction, ou celle choisie d'un clic sur l'en-tête de la grille
   let sel = $state(null);
   const reachRows = $derived(data?.ok && data.reach ? (sel ? data.reach.dirs[sel] : data.reach.best) : []);
-  const RANGES = [['short', 'Courte', '0–800 km'], ['medium', 'Moyenne', '800–2500 km'], ['long', 'Longue', '2500 km et +']];
+  const RANGES = [['d100', '≤100', '0 à 100 km (NVIS)'], ['d300', '≤300', '100 à 300 km (NVIS)'], ['d900', '≤900', '300 à 900 km'],
+                  ['d2500', '≤2500', '900 à 2500 km'], ['dx', '>2500', '2500 km et plus']];
   function reachTip(row, key, label) {
     const c = row[key];
     if (!c.state) return `${row.band} ${label} : pas d'ionosonde assez proche.`;
@@ -73,13 +74,13 @@
       <h3 class="sub">Portée par bande <span>{sel ? `vers ${sel}` : 'meilleure direction'}</span>
         {#if sel}<button class="ghost tiny" onclick={() => (sel = null)} title="Revenir à la meilleure direction">✕</button>{/if}</h3>
       <table class="reach">
-        <thead><tr><th></th>{#each RANGES as [, l, d]}<th title={d}>{l}</th>{/each}<th></th></tr></thead>
+        <thead><tr><th></th>{#each RANGES as [, l, d]}<th title={d}>{l}</th>{/each}<th title="Zone de silence : distance en dessous de laquelle la bande est muette">silence</th></tr></thead>
         <tbody>
           {#each reachRows as row}
             <tr>
               <td class="b">{row.band}</td>
-              {#each RANGES as [k, l, d]}<td class="c {row[k].state ?? 'none'}" title={reachTip(row, k, `${l.toLowerCase()} (${d})`)}></td>{/each}
-              <td class="skip" title={row.skip ? 'Zone de silence : la bande passe au loin mais pas à courte distance' : ''}>{row.skip ? 'silence' : ''}</td>
+              {#each RANGES as [k, l, d]}<td class="c {row[k].state ?? 'none'}" title={reachTip(row, k, d)}></td>{/each}
+              <td class="skip" title={row.skip ? `Zone de silence : rien en dessous de ${row.skip} km, la bande passe plus loin` : ''}>{row.skip ? `< ${row.skip}` : ''}</td>
             </tr>
           {/each}
         </tbody>
@@ -89,7 +90,7 @@
         <span><i class="weak"></i>affaiblie</span><span><i class="absorbed"></i>absorbée</span>
       </div>
     {/if}
-    <p class="src">Plafond : MUF mesurée. Plancher : absorption de jour <b>estimée</b> (modèle George-Bradley, R {data.reach?.ssn ?? '—'} déduit du SFI).
+    <p class="src">Distances en km. Onde de sol non calculée. Plafond : MUF mesurée. Plancher : absorption de jour <b>estimée</b> (modèle George-Bradley, R {data.reach?.ssn ?? '—'} déduit du SFI).
       La grille du haut ne tient compte que de la MUF.
       {data.stations_count} ionosondes, KC2G (GIRO, NOAA, INGV, SWS).</p>
   {:else}
@@ -119,6 +120,7 @@
   .sub span { color: var(--muted); text-transform: none; letter-spacing: 0; font-weight: 400; }
   .tiny { padding: 0 5px; font-size: 0.75rem; }
   table.reach td.c { height: 13px; }
+  table.reach th { font-size: 0.64rem; white-space: nowrap; font-weight: 500; }
   td.skip { color: var(--warn); font-size: 0.68rem; text-align: left; width: 1%; white-space: nowrap; }
   .legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 0.72rem; }
   .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }

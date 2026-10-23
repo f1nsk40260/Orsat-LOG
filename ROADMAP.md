@@ -474,6 +474,11 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
   20–40 affaiblie, > 40 absorbée. Nulle de nuit.
 - Panneau « Bandes ouvertes » : tableau « Portée par bande » (meilleure direction par défaut ; clic sur un
   en-tête de direction de la grille pour la choisir, re-clic ou ✕ pour revenir). La grille du haut reste MUF seule.
+
+## Fait — v1.16.1 (23/10/2026) : portée en 5 tranches de distance
+- `reach.RANGES` : ≤ 100 km (saut 100, NVIS), 100–300 (saut 200, NVIS), 300–900 (saut 600), 900–2500 (1500),
+  > 2500 (3000). Zone de silence = « < X km » (borne basse de la première tranche ouverte, toutes les
+  précédentes fermées par la MUF). Onde de sol non calculée.
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
