@@ -535,6 +535,11 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
   recalcul 250 ms après un zoom. Bouton « Vue carte / Vue satellite » ; zones colorées plus transparentes
   sur l'image. Vérifié avec des tuiles de test (bac à sable sans accès à EOX).
 - Plus aucun avertissement à la compilation (sélecteurs CSS inutiles, rôles ARIA, seuil de taille relevé).
+
+## Fait — v1.20.1 (23/10/2026) : molette sur la carte
+- Svelte 5 pose « onwheel » en écouteur passif : preventDefault ignoré, la fenêtre défilait au lieu de zoomer.
+  Écouteur `wheel` posé à la main avec { passive: false } (SkipMap.svelte). Vérifié : 4 crans = 5000 → 2000 km,
+  fenêtre immobile.
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

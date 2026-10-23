@@ -20,6 +20,14 @@
   // zoom à la molette (centré sur le QTH) : rayon affiché en km
   let MAX_KM = $state(KM_MAX);
   const scale = $derived(R / (MAX_KM / EARTH));
+  // molette : écouteur NON passif posé à la main (Svelte rend « onwheel » passif, la page défilerait)
+  let mapEl = $state();
+  $effect(() => {
+    const el = mapEl;
+    if (!el) return;
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  });
   function onWheel(e) {
     e.preventDefault();
     MAX_KM = Math.round(Math.min(KM_MAX, Math.max(KM_MIN, MAX_KM * (e.deltaY > 0 ? 1.25 : 0.8))));
@@ -167,7 +175,7 @@
 
   {#if data?.ok}
     <div class="wrap">
-      <svg viewBox="0 0 {SIZE} {SIZE}" class="map" onwheel={onWheel} role="img" aria-label="Carte azimutale des zones de silence sur {band}">
+      <svg viewBox="0 0 {SIZE} {SIZE}" class="map" bind:this={mapEl} role="img" aria-label="Carte azimutale des zones de silence sur {band}">
         <defs>
           <clipPath id="disc"><circle cx={C} cy={C} r={R} /></clipPath>
           <pattern id="nodata" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
