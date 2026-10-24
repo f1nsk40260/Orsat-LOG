@@ -33,15 +33,47 @@ PERIOD_S = 5 * 60
 state = {"last": None, "error": "", "at": None, "url": ""}
 
 
-def waterfall_url():
-    """ws://127.0.0.1:<port>/waterfall, port du [server] de PhantomSDR (config.toml près d'admin_config.json)."""
-    port = 9001
+def waterfall_candidates():
+    """Adresses possibles de la chute d'eau, dans l'ordre où le proxy de PhantomSDR-ORSAT cherche lui-même
+    spectrumserver : station.conf (PORT_SDR) puis admin_config.json (public_port, sdr_host, prioritaire),
+    puis config.toml ([server] port), et en dernier recours le port public du proxy (proxy_port), qui
+    relaie aussi /waterfall."""
+    import re
+    root = auth.ADMIN_CONFIG.parent
+    cfg = {}
     try:
-        cfg = tomllib.loads((auth.ADMIN_CONFIG.parent / "config.toml").read_text())
-        port = int(cfg.get("server", {}).get("port", port))
+        for line in (root / "station.conf").read_text().splitlines():
+            m = re.match(r'\s*([A-Z_]+)=["\']?(\d+)["\']?\s*(#.*)?$', line)
+            if m and m.group(1) in ("PORT_SDR", "PORT_PUBLIC"):
+                cfg[{"PORT_SDR": "public_port", "PORT_PUBLIC": "proxy_port"}[m.group(1)]] = int(m.group(2))
+    except OSError:
+        pass
+    try:
+        cfg.update(json.loads(auth.ADMIN_CONFIG.read_text()))
+    except (OSError, ValueError):
+        pass
+    host = cfg.get("sdr_host") or "127.0.0.1"
+    ports = []
+    if cfg.get("public_port") and cfg.get("public_port") != cfg.get("proxy_port"):
+        ports.append(int(cfg["public_port"]))
+    try:
+        ports.append(int(tomllib.loads((root / "config.toml").read_text()).get("server", {}).get("port")))
     except Exception:
         pass
-    return f"ws://127.0.0.1:{port}/waterfall"
+    if cfg.get("proxy_port"):
+        ports.append(int(cfg["proxy_port"]))
+    ports.append(9001)
+    seen, out = set(), []
+    for port in ports:
+        if port and port not in seen:
+            seen.add(port)
+            out.append(f"ws://{'127.0.0.1' if host in ('localhost', '::1') else host}:{port}/waterfall")
+    return out
+
+
+def waterfall_url():
+    """Dernière adresse qui a fonctionné, sinon la première candidate."""
+    return state.get("url_ok") or waterfall_candidates()[0]
 
 
 def analyse(rows):
@@ -73,12 +105,31 @@ def analyse(rows):
 
 
 async def measure(url=None):
-    """Un passage sur toutes les bandes. Renvoie {bande: résultat} (bandes hors du spectre ignorées)."""
+    """Un passage sur toutes les bandes. Sans adresse imposée : essaie les adresses candidates jusqu'à
+    trouver la chute d'eau, et retient celle qui répond."""
+    if url:
+        return await _measure_at(url)
+    errors = []
+    urls = [state["url_ok"]] if state.get("url_ok") else []
+    urls += [u for u in waterfall_candidates() if u not in urls]
+    for u in urls:
+        try:
+            res = await _measure_at(u)
+            state["url_ok"] = u
+            return res
+        except (OSError, asyncio.TimeoutError) as exc:      # port fermé ou muet : adresse suivante
+            errors.append(f"{u} : {exc}")
+            if state.get("url_ok") == u:
+                state["url_ok"] = None
+    raise ConnectionError("chute d'eau introuvable — " + " ; ".join(errors))
+
+
+async def _measure_at(url):
+    """Un passage sur toutes les bandes à cette adresse. Renvoie {bande: résultat}."""
     import cbor2
     import websockets
     import zstandard
 
-    url = url or waterfall_url()
     state["url"] = url
     out = {}
     async with websockets.connect(url, max_size=None, open_timeout=10, ping_interval=None) as ws:

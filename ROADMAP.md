@@ -593,6 +593,12 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
   IP = 0,4 × prévision + 0,6 × mesure, sinon prévision seule.
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
+
+## Fait — v1.23.1 (24/10/2026) : mesure réelle — recherche automatique de la chute d'eau
+- Sur le serveur, `[Errno 111] 127.0.0.1:9001` : le port de spectrumserver n'est pas celui de config.toml.
+  `snr.waterfall_candidates()` reprend l'ordre du proxy de PhantomSDR-ORSAT : station.conf (PORT_SDR), puis
+  admin_config.json (public_port, sdr_host, prioritaire), puis config.toml, puis le port public du proxy
+  (proxy_port, qui relaie /waterfall), puis 9001. La première adresse qui répond est retenue (`url_ok`).
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :
