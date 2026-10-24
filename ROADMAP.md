@@ -594,6 +594,20 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.24.0 (24/10/2026) : conseil de partenaire pour la diversité du WebSDR
+- `backend/orsatlog/partners.py`, route publique `/api/public/diversity` (sans connexion).
+- Partenaires lus dans `diversity_partners.json` de PhantomSDR-ORSAT (rubrique admin « Réception en diversité »),
+  liste par défaut sinon. Pour chaque bande : part (pondérée par la surface, jusqu'à 3000 km) de la zone entendue
+  par ORSAT que le partenaire entend aussi (cartes des zones de silence depuis les deux locators, mêmes
+  ionosondes KC2G, propagation seule) × facteur d'éloignement (0 sous 100 km, 1 dès 300 km).
+  ≥ 55 % et meilleur : « ★ Conseillé » ; ≥ 30 % : « Possible » ; sinon « Peu utile ». Cache 10 min.
+- Disponibilité : chaque partenaire sondé toutes les 10 min (page d'accueil, /status pour un KiwiSDR) ;
+  hors ligne = jamais conseillé, carte grisée sur le WebSDR.
+- **Séparé de l'IP d'ORSAT** : lecture seule des cartes de propagation, rien en base, rien dans
+  performance_index ni la mesure SNR.
+- À venir (étape 2) : statistiques réelles des séances de diversité (part du temps sur le partenaire, gain de SNR,
+  échecs) envoyées par le WebSDR, puis mêlées à la prévision.
+
 ## Fait — v1.23.1 (24/10/2026) : mesure réelle — recherche automatique de la chute d'eau
 - Sur le serveur, `[Errno 111] 127.0.0.1:9001` : le port de spectrumserver n'est pas celui de config.toml.
   `snr.waterfall_candidates()` reprend l'ordre du proxy de PhantomSDR-ORSAT : station.conf (PORT_SDR), puis

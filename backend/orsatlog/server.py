@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, eibi, enrich, geo, ionosonde, kc2g, qrz, qrzxml, reach, snr, solar, spacewx, weather
+from . import __version__, adif, auth, backup, eibi, enrich, geo, ionosonde, kc2g, partners, qrz, qrzxml, reach, snr, solar, spacewx, weather
 from .db import DATA_DIR, Database
 from .websdr import Page, WebSdrLink
 
@@ -129,7 +129,9 @@ async def lifespan(app):
     enricher = asyncio.create_task(_enrich_loop())
     saver = asyncio.create_task(backup.daily_task(db))
     meter = asyncio.create_task(snr.loop(_store_snr))
+    prober = asyncio.create_task(partners.health_loop())
     yield
+    prober.cancel()
     recorder.cancel()
     saver.cancel()
     meter.cancel()
@@ -142,7 +144,7 @@ app = FastAPI(title="ORSAT-LOG", version=__version__, lifespan=lifespan)
 
 # ---------- accès protégé ----------
 # Pages et appels accessibles sans session : la connexion elle-même.
-_PUBLIC = {"/login", "/favicon.ico", "/ecoute", "/ecoute.html", "/api/public/listenmap", "/api/public/listenbanner"}
+_PUBLIC = {"/login", "/favicon.ico", "/ecoute", "/ecoute.html", "/api/public/listenmap", "/api/public/listenbanner", "/api/public/diversity"}
 _PUBLIC_PREFIX = ("/assets/",)      # fichiers compilés de l'interface (aucune donnée du carnet)
 
 _LOGIN_HTML = """<!doctype html><html lang="fr"><head><meta charset="utf-8">
@@ -582,6 +584,15 @@ async def get_public_listen_banner(radius: int = 800):
             "ip": reach.performance_index(m, meas["bands"] if meas else None),
             "measure_error": snr.state.get("error") or ("" if snr.state.get("ts") else "pas encore de mesure"),
             "calibration": {"days": CALIB_DAYS, "snr_min": 10, "buckets": db.snr_calibration(since)}}
+
+
+@app.get("/api/public/diversity")
+async def get_public_diversity():
+    """Conseil de partenaire pour la réception en diversité du WebSDR : recouvrement des zones entendues,
+    par bande, et disponibilité. Calcul séparé : n'entre jamais dans l'indice de performance d'ORSAT."""
+    s = db.get_settings()
+    sol = await asyncio.to_thread(solar.get_solar) or db.last_snapshot() or {}
+    return await asyncio.to_thread(partners.compute, s.get("swl_locator") or s.get("locator", ""), sol.get("sfi"))
 
 
 @app.get("/api/openbands")
