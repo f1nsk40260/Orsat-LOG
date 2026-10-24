@@ -1,3 +1,3 @@
 """ORSAT-LOG — carnet de trafic avec connexion TCI, orienté propagation."""
 
-__version__ = "1.22.1"
+__version__ = "1.23.0"

@@ -547,7 +547,8 @@ async def _store_snr(results):
     now = datetime.now(timezone.utc)
     try:
         m = await asyncio.to_thread(_listen_map)
-        preds = reach.listen_probability(m, 800) if m.get("ok") else {}
+        # prévision de l'indice de performance (sans la mesure) : c'est elle qu'on étalonne
+        preds = {b: v["pred"] for b, v in reach.performance_index(m).items()} if m.get("ok") else {}
     except Exception:
         preds = {}
     db.add_snr(utc_day(now), now.strftime("%H%M%S"), results, preds)
@@ -555,9 +556,14 @@ async def _store_snr(results):
         db.prune_snr((now - timedelta(days=SNR_KEEP_DAYS)).strftime("%Y%m%d"))
 
 
+MEASURE_FRESH_S = 15 * 60
+
+
 def _measured():
+    """Dernière mesure réelle du WebSDR, seulement si elle date de moins de 15 min."""
+    import time as _t
     st = snr.state
-    if not st.get("last") or not st.get("at"):
+    if not st.get("last") or not st.get("ts") or _t.time() - st["ts"] > MEASURE_FRESH_S:
         return None
     return {"at": st["at"], "bands": st["last"]}
 
@@ -570,8 +576,11 @@ async def get_public_listen_banner(radius: int = 800):
     if not m.get("ok"):
         return m
     since = (datetime.now(timezone.utc) - timedelta(days=CALIB_DAYS)).strftime("%Y%m%d")
+    meas = _measured()
     return {"ok": True, "radius_km": radius, "when": m["when"], "locator": m["locator"],
-            "bands": reach.listen_probability(m, radius), "measured": _measured(),
+            "bands": reach.listen_probability(m, radius), "measured": meas,
+            "ip": reach.performance_index(m, meas["bands"] if meas else None),
+            "measure_error": snr.state.get("error") or ("" if snr.state.get("ts") else "pas encore de mesure"),
             "calibration": {"days": CALIB_DAYS, "snr_min": 10, "buckets": db.snr_calibration(since)}}
 
 

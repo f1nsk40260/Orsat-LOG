@@ -585,6 +585,14 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 ## Fait — v1.22.1 (23/10/2026) : page publique « écoute » en FR / EN / ES
 - `frontend/src/ecouteI18n.js` : textes de la page publique et de la vue écoute de la carte ; langue lue dans
   `?lang=fr|en|es` (passée par le bandeau du WebSDR selon la langue de l'auditeur). Le carnet reste en français.
+
+## Fait — v1.23.0 (24/10/2026) : indice de performance (IP) du WebSDR
+- `reach.performance_index` : par bande, note de chaque tranche (≤100, ≤300, ≤900, ≤2500, >2500 km ; cases pondérées
+  par la surface dans la tranche) ; prévision = 0,7 × meilleure tranche + 0,3 × moyenne ; zone = tranche la mieux
+  notée si ≥ 50 (loc / reg / eu / dx). Mesure réelle (snr.py, < 15 min) : 70 × SNR (6→30 dB) + 30 × signaux (→10) ;
+  IP = 0,4 × prévision + 0,6 × mesure, sinon prévision seule.
+- `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
+  porte désormais sur la prévision de l'IP.
 ## Deux PC (question F1NSK 20/10) — sans objet depuis le serveur central
 - Code : aucun souci (GitHub). 2e PC = clé SSH sans phrase de passe + `git clone` + `./update.sh` une fois.
 - **Données : base SQLite locale à chaque PC → carnets divergents.** Solutions proposées, choix en attente :

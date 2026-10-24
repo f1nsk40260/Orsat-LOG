@@ -139,7 +139,7 @@ async def loop(on_result):
     while True:
         try:
             res = await measure()
-            state.update(last=res, error="", at=time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()))
+            state.update(last=res, error="", at=time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime()), ts=time.time())
             if res:
                 await on_result(res)
         except Exception as exc:

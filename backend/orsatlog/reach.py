@@ -237,3 +237,63 @@ def listen_probability(lmap, radius_km=800):
             acc += w * BANNER_SCORE.get(code, 0.0)
         out[band] = None if tot == 0 else round(100 * acc / tot)
     return out
+
+
+
+# ---------- indice de performance (IP) du WebSDR, par bande ----------
+# Tranches de distance à poids égal : une bande ouverte seulement en DX garde une note honnête.
+IP_TRANCHES = [("d100", 0, 100, "loc"), ("d300", 100, 300, "loc"), ("d900", 300, 900, "reg"),
+               ("d2500", 900, 2500, "eu"), ("dx", 2500, 5000, "dx")]
+IP_PRED_W, IP_MEAS_W = 0.4, 0.6          # poids prévision / mesure réelle (quand elle est récente)
+
+
+def measure_score(m):
+    """Mesure réelle d'une bande -> 0..100 : meilleur SNR (6 dB -> 0, 30 dB -> 70) + nombre de signaux (10 -> 30)."""
+    if not m or not m.get("signals"):
+        return 0.0
+    snr = max(0.0, min(1.0, ((m.get("best_snr") or 0) - 6) / 24))
+    return 70 * snr + 30 * min(1.0, m["signals"] / 10)
+
+
+def performance_index(lmap, measured=None):
+    """Par bande : {ip, pred, meas, zone, tranches{clé: 0..100|None}}.
+    note d'une tranche = score des cases pondéré par la surface (bonne 1, moyenne 0,6, faible 0,25,
+    silence/absorbée 0) ; pred = 0,7 × meilleure tranche + 0,3 × moyenne des tranches ;
+    zone = tranche la mieux notée (≥ 50).
+    ip = 0,4·pred + 0,6·mesure si une mesure récente existe, sinon pred."""
+    rings = lmap["rings"]
+    inner = [0] + rings[:-1]
+    n = len(rings)
+    out = {}
+    for band, codes in lmap["bands"].items():
+        acc = {t[0]: [0.0, 0.0] for t in IP_TRANCHES}
+        for i, code in enumerate(codes):
+            k = i % n
+            lo, hi = inner[k], rings[k]
+            if code == "-":
+                continue
+            for key, tlo, thi, _z in IP_TRANCHES:
+                a, b = max(lo, tlo), min(hi, thi)
+                if b > a:
+                    w = b * b - a * a
+                    acc[key][0] += w
+                    acc[key][1] += w * BANNER_SCORE.get(code, 0.0)
+        tr = {k: (round(100 * v[1] / v[0]) if v[0] else None) for k, v in acc.items()}
+        known = [v for v in tr.values() if v is not None]
+        # une bande ne s'ouvre jamais sur toutes les distances (zone de silence) : la meilleure tranche
+        # compte pour 70 %, l'étendue (moyenne des tranches) pour 30 %
+        pred = round(0.7 * max(known) + 0.3 * sum(known) / len(known)) if known else None
+        best = max(((tr[k], z) for k, _a, _b, z in IP_TRANCHES if tr[k] is not None), default=(None, None))
+        zone = best[1] if best[0] is not None and best[0] >= 50 else None
+        m = (measured or {}).get(band)
+        meas = round(measure_score(m)) if m is not None else None
+        if pred is None and meas is None:
+            ip = None
+        elif meas is None:
+            ip = pred
+        elif pred is None:
+            ip = meas
+        else:
+            ip = round(IP_PRED_W * pred + IP_MEAS_W * meas)
+        out[band] = {"ip": ip, "pred": pred, "meas": meas, "zone": zone, "tranches": tr}
+    return out
