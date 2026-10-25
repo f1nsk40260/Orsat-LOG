@@ -146,11 +146,13 @@ app = FastAPI(title="ORSAT-LOG", version=__version__, lifespan=lifespan)
 
 # ---------- accès protégé ----------
 # Pages et appels accessibles sans session : la connexion elle-même.
-_PUBLIC = {"/login", "/favicon.ico", "/ecoute", "/ecoute.html", "/api/public/listenmap", "/api/public/listenbanner", "/api/public/diversity"}
+_PUBLIC = {"/login", "/favicon.ico", "/orsat-log-icon.svg", "/orsat-log-icon-32.png", "/orsat-log-icon-192.png",
+           "/orsat-log-icon-512.png", "/apple-touch-icon.png", "/ecoute", "/ecoute.html", "/api/public/listenmap", "/api/public/listenbanner", "/api/public/diversity"}
 _PUBLIC_PREFIX = ("/assets/",)      # fichiers compilés de l'interface (aucune donnée du carnet)
 
 _LOGIN_HTML = """<!doctype html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1"><title>ORSAT-LOG — connexion</title>
+<link rel="icon" type="image/svg+xml" href="orsat-log-icon.svg"><link rel="icon" type="image/png" sizes="32x32" href="orsat-log-icon-32.png">
 <style>
 :root{color-scheme:dark}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0d0d0f;
 color:#e6e2d3;font-family:system-ui,sans-serif}
@@ -167,6 +169,7 @@ border:1px solid rgb(207,181,59);color:#111;background:linear-gradient(180deg,#e
 .err{color:#d65050;font-size:.85rem;margin-top:12px;min-height:1em}
 </style></head><body>
 <form method="post" action="login">
+<img src="orsat-log-icon.svg" alt="" width="72" height="72" style="display:block;margin:0 auto 12px">
 <h1>ORSAT<small>-LOG</small></h1><p>Carnet de trafic — accès réservé</p>
 <label for="pw">Mot de passe</label><input id="pw" name="password" type="password" autocomplete="current-password" autofocus>
 <button type="submit">Ouvrir le carnet</button><div class="err">__ERR__</div>

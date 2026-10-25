@@ -594,6 +594,11 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.25.1 (25/10/2026) : logo ORSAT-LOG
+- Logo « carnet ouvert » (`docs/branding/orsat-log-icon.svg`), même famille que celui d'ORSAT SDR.
+- Icônes d'onglet (SVG, PNG 32/192/512, apple-touch, favicon.ico) dans `frontend/public/`, publiques ;
+  logo dans l'en-tête du carnet et sur la page de connexion.
+
 ## Fait — v1.25.0 (25/10/2026) : absorption de la couche D mesurée
 - `backend/orsatlog/dlayer.py`. Le modèle George & Bradley (soleil calme) est désormais corrigé par la mesure :
   1. **Éruptions** : flux X GOES en temps réel, modèle D-RAP NOAA (HAF = 10·log10(flux) + 65 MHz au point

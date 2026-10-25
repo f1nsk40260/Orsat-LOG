@@ -80,6 +80,7 @@
 
 <header class="topbar">
   <div class="brand">
+    <img class="logo-ico" src="./orsat-log-icon.svg" alt="" width="30" height="30" />
     <span class="logo">ORSAT</span><span class="logo-sub">-LOG</span>
     {#if settings.callsign}
       <span class="station mono">{settings.callsign}{settings.locator ? ` · ${settings.locator}` : ''}</span>
@@ -144,6 +145,7 @@
     position: relative; z-index: 5;
   }
   .brand { display: flex; align-items: baseline; gap: 4px; white-space: nowrap; }
+  .logo-ico { width: 30px; height: 30px; margin-right: 8px; align-self: center; flex: none; }
   .logo { color: var(--gold); font-size: 1.5rem; font-weight: 700; letter-spacing: 0.1em; }
   .logo-sub { color: var(--gold-soft); font-size: 1.1rem; font-weight: 600; }
   .station { margin-left: 14px; color: var(--text); }
