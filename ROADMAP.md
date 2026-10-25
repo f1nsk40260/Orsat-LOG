@@ -594,6 +594,20 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.25.0 (25/10/2026) : absorption de la couche D mesurée
+- `backend/orsatlog/dlayer.py`. Le modèle George & Bradley (soleil calme) est désormais corrigé par la mesure :
+  1. **Éruptions** : flux X GOES en temps réel, modèle D-RAP NOAA (HAF = 10·log10(flux) + 65 MHz au point
+     subsolaire, × cos(χ)^0,75 ; (HAF/f)^1,5 dB par traversée × sécante), à partir de C1.
+  2. **fmin des ionosondes** (GIRO, getbest `fmin,foF2`) : Roquetes, El Arenosillo, Dourbes, Rome, Chilton,
+     Fairford, Pruhonice, Gibilmanna. Facteur (fmin / médiane des 15 jours à la même demi-heure)², borné
+     0,5–8, interpolé (1/d², 1500 km) ; ionogramme de jour sans aucun écho = black-out (×8) ; nuit = ×1.
+     Relevé toutes les 15 min (16 jours d'historique au premier passage). Sans données : facteur 1.
+  3. Case sans MUF (ionosonde muette) mais absorption mesurée > 40 dB : « absorbée » et non plus « pas de mesure ».
+- Affichage : ligne « Couche D mesurée » dans la météo spatiale (facteurs par station, infobulle détaillée,
+  éruption en cours) ; bandeau d'alerte dans la fenêtre Bandes quand l'absorption est renforcée.
+- Effet voulu sur la prévision de l'IP (plus juste pendant les éruptions) ; la mesure SNR n'est pas touchée.
+- À vérifier sur le serveur : que GIRO publie bien la fmin de ces stations en temps quasi réel (infobulle).
+
 ## Fait — v1.24.0 (24/10/2026) : conseil de partenaire pour la diversité du WebSDR
 - `backend/orsatlog/partners.py`, route publique `/api/public/diversity` (sans connexion).
 - Partenaires lus dans `diversity_partners.json` de PhantomSDR-ORSAT (rubrique admin « Réception en diversité »),

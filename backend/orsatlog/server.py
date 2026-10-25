@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, eibi, enrich, geo, ionosonde, kc2g, partners, qrz, qrzxml, reach, snr, solar, spacewx, weather
+from . import __version__, adif, auth, backup, dlayer, eibi, enrich, geo, ionosonde, kc2g, partners, qrz, qrzxml, reach, snr, solar, spacewx, weather
 from .db import DATA_DIR, Database
 from .websdr import Page, WebSdrLink
 
@@ -130,7 +130,9 @@ async def lifespan(app):
     saver = asyncio.create_task(backup.daily_task(db))
     meter = asyncio.create_task(snr.loop(_store_snr))
     prober = asyncio.create_task(partners.health_loop())
+    dlay = asyncio.create_task(dlayer.loop())
     yield
+    dlay.cancel()
     prober.cancel()
     recorder.cancel()
     saver.cancel()
@@ -464,7 +466,11 @@ async def get_spacewx():
     since = (datetime.now(timezone.utc) - timedelta(hours=24)).strftime("%Y-%m-%dT%H:%M:%SZ")
     big = [f for f in data.get("flares") or [] if (f.get("max") or f.get("begin") or "") >= since
            and spacewx.flare_rank(f.get("cls")) >= 1e-6]
-    return {"ok": True, **{k: v for k, v in data.items() if k != "flares"}, "flares_24h": big}
+    try:
+        dl = await asyncio.to_thread(dlayer.summary)
+    except Exception:
+        dl = None
+    return {"ok": True, **{k: v for k, v in data.items() if k != "flares"}, "flares_24h": big, "dlayer": dl}
 
 
 @app.get("/api/skipmap")

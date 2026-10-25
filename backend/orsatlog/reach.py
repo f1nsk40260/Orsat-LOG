@@ -22,6 +22,7 @@ import math
 from datetime import datetime, timezone
 
 from .ionosonde import mufd_estimate
+from . import dlayer
 
 EARTH_R = 6371.0
 F_H = 1.2
@@ -116,21 +117,69 @@ def build_grid(home, interp, destination, when=None):
             n = math.ceil(d / MAX_HOP_KM)
             hop = d / n
             ends = [hop / 2] if n == 1 else [hop / 2, d - hop / 2]
-            mufs, chis = [], []
+            mufs, chis, pts = [], [], []
             for x in ends:
-                fof2, m3000, hm, chi = iono(destination(home, float(az), x))
+                pt = destination(home, float(az), x)
+                fof2, m3000, hm, chi = iono(pt)
                 mufs.append(mufd_estimate(fof2, m3000, hop, hm) if fof2 and m3000 else None)
                 chis.append(chi)
-            cells.append({"az": az, "lo": lo, "hi": hi, "hop": hop, "n": n, "chis": chis,
+                pts.append((round(pt[0], 1), round(pt[1], 1)))
+            cells.append({"az": az, "lo": lo, "hi": hi, "hop": hop, "n": n, "chis": chis, "pts": pts,
                           "muf": None if any(m is None for m in mufs) else min(mufs)})
     return {"cells": cells, "when": when}
 
 
+# ---------- absorption MESURÉE (dlayer.py) : éruption GOES et fmin des ionosondes ----------
+_ctx = {"t": 0.0, "h0": None, "cls": None, "at": None, "fac": {}}
+
+
+def _abs_ctx():
+    """Éruption en cours et facteurs fmin, relus au plus une fois par minute."""
+    import time as _t
+    if _t.time() - _ctx["t"] > 60:
+        try:
+            h0, cls = dlayer.haf0()
+        except Exception:
+            h0, cls = None, None
+        if dlayer.state["at"] != _ctx["at"]:
+            _ctx["fac"] = {}
+        _ctx.update(t=_t.time(), h0=h0, cls=cls, at=dlayer.state["at"])
+    return _ctx
+
+
+def _factor(pt):
+    f = _ctx["fac"].get(pt)
+    if f is None:
+        f = _ctx["fac"][pt] = dlayer.factor_at(pt)
+    return f
+
+
+def dlayer_info():
+    """Ce qui a corrigé le modèle (affiché dans le carnet)."""
+    ctx = _abs_ctx()
+    facs = [st for st in dlayer.state["stations"].values() if st.get("factor") is not None]
+    return {"swf_class": ctx["cls"] if ctx["h0"] else None, "haf_mhz": round(ctx["h0"], 1) if ctx["h0"] else None,
+            "fmin_stations": len(facs), "fmin_max": max((st["factor"] for st in facs), default=None)}
+
+
 def _codes(grid, f, ssn):
+    ctx = _abs_ctx()
     out = []
     for c in grid["cells"]:
-        db = sum(absorption_db(f, c["hop"], x, ssn) for x in c["chis"]) * c["n"] / len(c["chis"]) if c["muf"] else None
-        out.append((CODE[_cell(f, c["muf"], db)], db))
+        pts = c.get("pts") or [None] * len(c["chis"])
+        tot, measured = 0.0, False
+        for x, pt in zip(c["chis"], pts):
+            fac = _factor(pt) if pt else 1.0
+            swf = 2 * dlayer.swf_db(f, _sec_d(c["hop"]), x, ctx["h0"])
+            tot += absorption_db(f, c["hop"], x, ssn) * fac + swf
+            measured = measured or swf > 1 or fac >= 1.5
+        db = tot * c["n"] / len(c["chis"])
+        if c["muf"]:
+            out.append((CODE[_cell(f, c["muf"], db)], db))
+        elif measured and db > ABSORBED_DB:
+            out.append((CODE["absorbed"], db))      # MUF inconnue (ionosonde muette) mais absorption mesurée
+        else:
+            out.append((CODE[None], None))
     return out
 
 
@@ -139,7 +188,7 @@ def skip_map(grid, bands, sfi):
     return {"az_step": MAP_AZ_STEP, "rings": MAP_RINGS,
             "bands": {b: "".join(code for code, _ in _codes(grid, f, ssn)) for b, f in bands},
             "muf": [None if c["muf"] is None else round(c["muf"], 1) for c in grid["cells"]],
-            "when": grid["when"].strftime("%H:%M UTC"), "ssn": round(ssn)}
+            "when": grid["when"].strftime("%H:%M UTC"), "ssn": round(ssn), "dlayer": dlayer_info()}
 
 
 def compute(grid, dirs, bands, sfi):
@@ -185,7 +234,8 @@ def compute(grid, dirs, bands, sfi):
         row["skip"] = min(skips) if skips and not near else None
         best.append(row)
     return {"best": best, "dirs": per_dir, "ssn": round(ssn),
-            "thresholds_db": [WEAK_DB, ABSORBED_DB], "when": grid["when"].strftime("%H:%M UTC")}
+            "thresholds_db": [WEAK_DB, ABSORBED_DB], "when": grid["when"].strftime("%H:%M UTC"),
+            "dlayer": dlayer_info()}
 
 
 
@@ -210,7 +260,7 @@ def listen_map(grid, bands, sfi, gain_fn, takeoff_fn):
         out[band] = "".join(codes)
     return {"az_step": MAP_AZ_STEP, "rings": MAP_RINGS, "bands": out,
             "muf": [None if c["muf"] is None else round(c["muf"], 1) for c in grid["cells"]],
-            "when": grid["when"].strftime("%H:%M UTC"), "ssn": round(ssn)}
+            "when": grid["when"].strftime("%H:%M UTC"), "ssn": round(ssn), "dlayer": dlayer_info()}
 
 
 

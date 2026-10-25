@@ -62,6 +62,11 @@
     <button class="ghost close" onclick={refresh} title="Recalculer maintenant">↻</button>
     <button class="ghost close" onclick={onclose} title="Fermer">✕</button></h2>
   {#if data?.ok}
+   {@const dl = data.reach?.dlayer}
+   {#if dl && (dl.haf_mhz || (dl.fmin_max ?? 0) >= 1.5)}
+     <p class="dl-warn" title="Le calcul tient compte de l'absorption de la couche D mesurée : flux X des satellites GOES (modèle D-RAP de la NOAA) et fmin des ionosondes. Détail dans la météo spatiale.">
+       ⚠ Absorption renforcée en ce moment{dl.haf_mhz ? ` : éruption ${dl.swf_class}, bandes absorbées côté jour jusqu'à ~${dl.haf_mhz} MHz` : ''}{(dl.fmin_max ?? 0) >= 1.5 ? ` · ionosondes : absorption ×${dl.fmin_max} au plus` : ''}</p>
+   {/if}
    <div class="blocks">
    <div class="blk">
     <h3 class="sub">Par direction <span>MUF seule · clic sur une direction pour la portée</span></h3>
@@ -158,6 +163,8 @@
 </section>
 
 <style>
+  .dl-warn { margin: 4px 0 8px; padding: 5px 10px; border-radius: 6px; font-size: 0.82rem; cursor: help;
+             color: var(--bad); border: 1px solid var(--bad); background: rgba(200, 60, 60, 0.12); }
   .backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, 0.55); }
   .ob { position: fixed; z-index: 21; top: 70px; left: 50%; transform: translateX(-50%);
         width: min(1180px, calc(100vw - 32px)); max-height: calc(100vh - 90px); overflow-y: auto;

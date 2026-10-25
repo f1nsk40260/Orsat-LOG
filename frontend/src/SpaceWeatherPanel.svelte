@@ -35,6 +35,18 @@
   const TIP_SCALES = 'Échelles NOAA : R = coupures radio (éruptions), S = tempête de protons\n'
     + '(absorption aux pôles), G = tempête géomagnétique. 0 = rien, 1 mineur … 5 extrême.';
 
+  // couche D mesurée (dlayer.py) : éruption GOES et fmin des ionosondes, sur la page du jour
+  const dl = $derived(isToday && live?.ok ? live.dlayer : null);
+  const fminSt = $derived(dl?.fmin?.stations ?? []);
+  const fminOk = $derived(fminSt.filter((s) => s.factor != null));
+  const facClass = (f) => (f == null ? 'muted' : f >= 3 ? 'bad' : f >= 1.5 ? 'warn' : 'ok');
+  const fminTip = $derived(fminSt.length
+    ? 'Absorption de la couche D mesurée par les ionosondes (fmin, GIRO / ARTIST).\n'
+      + 'Facteur = (fmin du moment ÷ fmin habituelle à cette heure)² ; ×1 = normal, il corrige le calcul des bandes.\n\n'
+      + fminSt.map((s) => `${s.name} : ${s.factor != null ? '×' + s.factor : '—'}${s.fmin != null ? ` (fmin ${s.fmin} MHz${s.ref ? `, habituelle ${s.ref}` : ''})` : ''}${s.note ? ' — ' + s.note : ''}`).join('\n')
+      + (dl.fmin.at ? `\n\nRelevé ${dl.fmin.at}` : '') + (dl.fmin.error ? `\nErreurs : ${dl.fmin.error}` : '')
+    : 'Absorption de la couche D mesurée par les ionosondes (fmin) : premier relevé en cours.');
+
   // frise de Bz sur la journée (relevés enregistrés)
   const W = 290, H = 54, PADL = 18;
   const bzPts = $derived(records.filter((x) => x.bz != null));
@@ -70,6 +82,15 @@
         {#each bzPts as x}<circle cx={xOf(x.time)} cy={yOf(x.bz)} r="5" fill="transparent"><title>{fmtTime(x.time)} UTC — Bz {x.bz} nT, Kp {x.kp ?? '—'}, vent {x.speed ?? '—'} km/s</title></circle>{/each}
       </svg>
     {/if}
+    {#if dl}
+      <div class="dlay" title={fminTip}>
+        <span class="lbl">Couche D mesurée</span>
+        {#if dl.swf?.haf_mhz}<span class="fl bad" title="Éruption en cours ({dl.swf.class}) : absorption côté jour jusqu'à environ {dl.swf.haf_mhz} MHz (modèle D-RAP de la NOAA), ajoutée au calcul des bandes">éruption {dl.swf.class} · ≤ {dl.swf.haf_mhz} MHz</span>{/if}
+        {#if fminOk.length}
+          {#each fminOk as s}<span class="fl {facClass(s.factor)}">{s.name} ×{s.factor}</span>{/each}
+        {:else}<span class="muted">{fminSt.length ? 'fmin indisponible' : 'premier relevé en cours…'}</span>{/if}
+      </div>
+    {/if}
     <div class="flares">
       <span class="lbl">Éruptions {isToday ? 'des dernières 24 h' : 'du jour'} (C et plus)</span>
       {#if shownFlares?.length}
@@ -98,6 +119,7 @@
   .flares { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; font-size: 0.78rem; }
   .lbl { color: var(--muted); font-size: 0.72rem; width: 100%; }
   .fl { border: 1px solid var(--panel-edge); border-radius: 10px; padding: 0 7px; cursor: help; }
+  .dlay { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; font-size: 0.78rem; cursor: help; }
   .chart { width: 100%; height: auto; }
   .zero { stroke: rgba(207, 181, 59, 0.25); stroke-dasharray: 3 3; }
   .bz { fill: none; stroke: var(--gold); stroke-width: 1.6; }
