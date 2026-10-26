@@ -42,9 +42,12 @@
   });
   const condFr = { Good: 'Bonne', Fair: 'Moyenne', Poor: 'Mauvaise' };
   const condClass = { Good: 'ok', Fair: 'warn', Poor: 'bad' };
+  let big = $state(false);   // vue agrandie au centre de la page
 </script>
 
-<section class="panel prop">
+{#if big}<div class="zoom-backdrop" onclick={() => (big = false)} role="presentation"></div>{/if}
+<section class="panel prop zoomable" class:big>
+  <button class="ghost zoom-btn" onclick={() => (big = !big)} title={big ? 'Fermer' : 'Agrandir'}>{big ? '✕' : '⤢'}</button>
   <h2 class="panel-title">Propagation du jour</h2>
 
   {#if latest}
@@ -151,4 +154,8 @@
   .bands td, .bands th { padding: 3px 6px; }
   .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
   .muted { color: var(--muted); }
+  /* vue agrandie */
+  .big .indices span { font-size: 0.9rem; } .big .indices b { font-size: 1.9rem; }
+  .big .lbl, .big .geomag, .big .bands { font-size: 1.05rem; }
+  .big .legend { font-size: 0.95rem; } .big .src { font-size: 0.9rem; }
 </style>

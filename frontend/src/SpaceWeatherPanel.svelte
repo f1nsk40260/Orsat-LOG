@@ -53,9 +53,12 @@
   const xOf = (t) => PADL + ((+t.slice(0, 2) + +t.slice(2, 4) / 60) / 24) * (W - PADL - 6);
   const yOf = (bz) => H / 2 - Math.max(-20, Math.min(20, bz)) * (H / 2 - 4) / 20;
   const bzPath = $derived(bzPts.map((x, i) => `${i ? 'L' : 'M'}${xOf(x.time).toFixed(1)},${yOf(x.bz).toFixed(1)}`).join(' '));
+  let big = $state(false);   // vue agrandie au centre de la page
 </script>
 
-<section class="panel sw">
+{#if big}<div class="zoom-backdrop" onclick={() => (big = false)} role="presentation"></div>{/if}
+<section class="panel sw zoomable" class:big>
+  <button class="ghost zoom-btn" onclick={() => (big = !big)} title={big ? 'Fermer' : 'Agrandir'}>{big ? '✕' : '⤢'}</button>
   <h2 class="panel-title">Météo spatiale <span class="count">NOAA</span></h2>
   {#if cur}
     <div class="tiles">
@@ -127,4 +130,8 @@
   .src { font-size: 0.7rem; color: var(--muted); margin: 0; }
   .ok { color: var(--ok) !important; } .warn { color: var(--warn) !important; } .bad { color: var(--bad) !important; }
   .muted { color: var(--muted); font-size: 0.8rem; }
+  /* vue agrandie */
+  .big .tiles span { font-size: 0.9rem; } .big .tiles b { font-size: 1.8rem; }
+  .big .scales, .big .flares, .big .dlay { font-size: 1.05rem; }
+  .big .lbl, .big .src, .big .muted { font-size: 0.95rem; }
 </style>
