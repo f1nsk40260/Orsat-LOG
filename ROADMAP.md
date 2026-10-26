@@ -594,6 +594,20 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.26.0 (26/10/2026) : orages (Blitzortung) et QRN
+- Écoute permanente du flux public Blitzortung.org (`lightning.py`, WebSocket ws1/ws7/ws8, décodage LZW de la carte).
+  Rien de brut stocké : comptage par tranche de 5 min (monde, < 500 km, < 2000 km, 8 secteurs, impact le plus proche)
+  → table `lightning` (400 jours). Impacts des 30 dernières min (< 3000 km) gardés en mémoire pour la carte.
+- Centre des distances : locator SWL (récepteur ORSAT), sinon locator de la station.
+- Le bruit de fond par bande existait déjà (mesure réelle v1.22, table `snr_obs`, 10 bandes) : réutilisé, rien de mesuré en plus.
+  Nouveau : écart au bruit « habituel » (médiane des 30 derniers jours à la même heure UTC).
+- `GET /api/lightning` : 15 dernières min + bruit actuel et son écart ; `GET /api/day/{jour}` : `lightning` et `noise`.
+- Panneau « Orages et QRN » (page du jour, colonne droite) : orage le plus proche, rose des 8 secteurs, comptages,
+  écart de bruit 160/80/40/20/10 m, courbe 24 h foudre (barres) + bruit 160/80/40 m (lignes).
+- Réglage `blitzortung` (1 par défaut, 0 = coupé sans redémarrage) : interrupteur à ajouter dans le panneau admin ORSAT.
+- Non testé en réel depuis l'atelier de Claude (Internet bloqué) : à vérifier sur le PC ORSAT.
+- Suite prévue : cellules orageuses sur la carte du carnet, puis vue d'analyse bruit/foudre/Kp/pression.
+
 ## Fait — v1.25.1 (25/10/2026) : logo ORSAT-LOG
 - Logo « carnet ouvert » (`docs/branding/orsat-log-icon.svg`), même famille que celui d'ORSAT SDR.
 - Icônes d'onglet (SVG, PNG 32/192/512, apple-touch, favicon.ico) dans `frontend/public/`, publiques ;

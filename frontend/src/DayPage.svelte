@@ -6,6 +6,7 @@
   import EntriesTable from './EntriesTable.svelte';
   import PropagationPanel from './PropagationPanel.svelte';
   import WeatherPanel from './WeatherPanel.svelte';
+  import LightningPanel from './LightningPanel.svelte';
   import SpaceWeatherPanel from './SpaceWeatherPanel.svelte';
 
   let { day, isToday, radio, websdr, settings } = $props();
@@ -185,6 +186,7 @@
     </section>
 
     <WeatherPanel snapshots={page?.weather ?? []} {isToday} />
+    <LightningPanel buckets={page?.lightning ?? []} noise={page?.noise ?? []} {isToday} />
   </div>
 </div>
 

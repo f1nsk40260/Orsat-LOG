@@ -35,6 +35,7 @@ export const api = {
   publicListenMap: () => req('GET', 'api/public/listenmap'),
   analysis: (kind = 'QSO', band = '') => req('GET', `api/analysis?kind=${kind}&band=${encodeURIComponent(band)}`),
   weather: () => req('GET', 'api/weather'),
+  lightning: () => req('GET', 'api/lightning'),
   qsos: (limit = 200) => req('GET', `api/qsos?limit=${limit}`),
   addQso: (q) => req('POST', 'api/qsos', q),
   updateQso: (id, q) => req('PUT', `api/qsos/${id}`, q),

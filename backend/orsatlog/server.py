@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, dlayer, eibi, enrich, geo, ionosonde, kc2g, partners, qrz, qrzxml, reach, snr, solar, spacewx, weather
+from . import __version__, adif, auth, backup, dlayer, eibi, enrich, geo, ionosonde, kc2g, lightning, partners, qrz, qrzxml, reach, snr, solar, spacewx, weather
 from .db import DATA_DIR, Database
 from .websdr import Page, WebSdrLink
 
@@ -131,7 +131,9 @@ async def lifespan(app):
     meter = asyncio.create_task(snr.loop(_store_snr))
     prober = asyncio.create_task(partners.health_loop())
     dlay = asyncio.create_task(dlayer.loop())
+    storms = asyncio.create_task(lightning.loop(_storm_center, _store_lightning, _storms_enabled))
     yield
+    storms.cancel()
     dlay.cancel()
     prober.cancel()
     recorder.cancel()
@@ -568,6 +570,69 @@ async def _store_snr(results):
 
 
 MEASURE_FRESH_S = 15 * 60
+
+# ---------- foudre (Blitzortung) et QRN ----------
+LIGHTNING_KEEP_DAYS = 400
+NOISE_BASE_DAYS = 30
+_center_cache = {"loc": None, "ll": None}
+
+
+_storm_cfg = {"at": 0.0, "on": True, "loc": ""}
+
+
+def _storm_settings():
+    """Réglages relus au plus toutes les 30 s (appelés à chaque impact : pas de requête SQLite à chaque fois)."""
+    import time as _t
+    if _t.time() - _storm_cfg["at"] > 30:
+        s = db.get_settings()
+        _storm_cfg.update(at=_t.time(), on=s.get("blitzortung", "1") == "1",
+                          loc=s.get("swl_locator") or s.get("locator", ""))
+    return _storm_cfg
+
+
+def _storms_enabled():
+    return _storm_settings()["on"]
+
+
+def _storm_center():
+    """Position du récepteur (locator SWL, sinon celui de la station) : centre des distances d'orage."""
+    loc = _storm_settings()["loc"]
+    if loc != _center_cache["loc"]:
+        _center_cache.update(loc=loc, ll=geo.locator_to_latlon(loc) if geo.valid_locator(loc) else None)
+    return _center_cache["ll"]
+
+
+async def _store_lightning(b):
+    at = datetime.fromtimestamp(b["start"], timezone.utc)
+    await asyncio.to_thread(db.add_lightning, utc_day(at), at.strftime("%H%M%S"), b)
+    if at.hour == 3 and at.minute == 0:
+        await asyncio.to_thread(db.prune_lightning, (at - timedelta(days=LIGHTNING_KEEP_DAYS)).strftime("%Y%m%d"))
+
+
+def _noise_now():
+    """Dernière mesure du bruit de fond par bande, et son écart au bruit habituel à cette heure (30 j)."""
+    meas = _measured()
+    if not meas:
+        return None
+    now = datetime.now(timezone.utc)
+    base = db.noise_baseline((now - timedelta(days=NOISE_BASE_DAYS)).strftime("%Y%m%d"), now.hour)
+    bands = {}
+    for band, r in meas["bands"].items():
+        ref = base.get(band)
+        bands[band] = {"floor": r["floor"], "normal": ref,
+                       "excess": round(r["floor"] - ref, 1) if ref is not None else None}
+    return {"at": meas["at"], "bands": bands}
+
+
+@app.get("/api/lightning")
+def get_lightning():
+    """Foudre des 15 dernières minutes autour du récepteur, avec le bruit de fond mesuré par ORSAT."""
+    if not _storms_enabled():
+        return {"ok": False, "status": {"enabled": False}, "noise": _noise_now()}
+    out = lightning.live()
+    out["noise"] = _noise_now()
+    out["center"] = _storm_center()
+    return out
 
 
 def _measured():
@@ -1021,6 +1086,8 @@ def get_day(day: str):
         "archive": _gfz_day(day),
         "weather": db.day_weather(day),
         "spacewx": db.day_spacewx(day),
+        "lightning": db.day_lightning(day),
+        "noise": db.day_noise(day),
         "flares": [f for f in db.flares_between(f"{day[:4]}-{day[4:6]}-{day[6:]}T00:00:00Z",
                                                 f"{day[:4]}-{day[4:6]}-{day[6:]}T23:59:59Z")
                    if spacewx.flare_rank(f.get("cls")) >= 1e-6],

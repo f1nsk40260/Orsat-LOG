@@ -20,6 +20,7 @@ DEFAULT_SETTINGS = {
     "tci_trx": "0",
     "tci_enabled": "1",
     "weathercloud": "9224966553",
+    "blitzortung": "1",            # 1 = écoute de la foudre en temps réel (Blitzortung.org)
     # Synchronisation avec le logbook QRZ.com (réglée dans le panneau admin)
     "qrz_api_key": "",
     "qrz_sync": "0",               # 1 = synchronisation automatique
@@ -193,6 +194,10 @@ class Database:
             "occupancy INTEGER, pred_pct INTEGER);"
             "CREATE INDEX IF NOT EXISTS idx_snr_day ON snr_obs(day, time);"
             "CREATE INDEX IF NOT EXISTS idx_snr_band ON snr_obs(band, day);")
+        # v1.26 : foudre (Blitzortung) comptée par tranche de 5 min (lightning.py)
+        self._con.executescript(
+            "CREATE TABLE IF NOT EXISTS lightning (day TEXT NOT NULL, time TEXT NOT NULL, total INTEGER, "
+            "n500 INTEGER, n2000 INTEGER, sectors TEXT, near_km INTEGER, near_az INTEGER, PRIMARY KEY(day, time));")
         # migration v0.4 -> v0.5 : rattachement à un QSO de groupe
         if "session_id" not in cols:
             self._con.execute("ALTER TABLE qso ADD COLUMN session_id INTEGER")
@@ -406,6 +411,50 @@ class Database:
                 n = r["n"] or 0
                 out.append({"range": label, "n": n, "rate": round(100 * (r["ok"] or 0) / n) if n else None})
         return out
+
+    def day_noise(self, day):
+        """Bruit de fond mesuré (dB) par bande et par relevé, pour les courbes de la page du jour."""
+        with self._lock:
+            rows = self._con.execute("SELECT time, band, floor_db FROM snr_obs WHERE day = ? AND floor_db IS NOT NULL "
+                                     "ORDER BY time", (day,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def noise_baseline(self, since_day, hour):
+        """Bruit « normal » : médiane du bruit de fond par bande à cette heure UTC, depuis since_day."""
+        with self._lock:
+            rows = self._con.execute("SELECT band, floor_db FROM snr_obs WHERE day >= ? AND substr(time, 1, 2) = ? "
+                                     "AND floor_db IS NOT NULL", (since_day, f"{hour:02d}")).fetchall()
+        by = {}
+        for r in rows:
+            by.setdefault(r["band"], []).append(r["floor_db"])
+        out = {}
+        for band, v in by.items():
+            if len(v) >= 6:                        # au moins une demi-heure de mesures sur la période
+                v.sort()
+                out[band] = v[len(v) // 2]
+        return out
+
+    # --- foudre (lightning.py) ---
+    def add_lightning(self, day, time, b):
+        with self._lock, self._con:
+            self._con.execute(
+                "INSERT OR REPLACE INTO lightning(day, time, total, n500, n2000, sectors, near_km, near_az) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (day, time, b["total"], b["n500"], b["n2000"], json.dumps(b["sectors"]), b["near_km"], b["near_az"]))
+
+    def day_lightning(self, day):
+        with self._lock:
+            rows = self._con.execute("SELECT * FROM lightning WHERE day = ? ORDER BY time", (day,)).fetchall()
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["sectors"] = json.loads(d["sectors"] or "[]")
+            out.append(d)
+        return out
+
+    def prune_lightning(self, before_day):
+        with self._lock, self._con:
+            self._con.execute("DELETE FROM lightning WHERE day < ?", (before_day,))
 
     def prune_snr(self, before_day):
         with self._lock:
