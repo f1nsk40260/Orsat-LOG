@@ -33,6 +33,7 @@ export const api = {
   skipMap: () => req('GET', 'api/skipmap'),
   listenMap: () => req('GET', 'api/listenmap'),
   publicListenMap: () => req('GET', 'api/public/listenmap'),
+  analysisQrn: (days = 90) => req('GET', `api/analysis/qrn?days=${days}`),
   analysis: (kind = 'QSO', band = '') => req('GET', `api/analysis?kind=${kind}&band=${encodeURIComponent(band)}`),
   weather: () => req('GET', 'api/weather'),
   lightning: () => req('GET', 'api/lightning'),

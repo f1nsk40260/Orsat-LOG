@@ -434,6 +434,17 @@ class Database:
                 out[band] = v[len(v) // 2]
         return out
 
+    def qrn_rows(self, since_day):
+        """Matière de l'analyse du bruit (qrn.py) : mesures de bruit, foudre, Kp et pression depuis since_day."""
+        with self._lock:
+            q = lambda sql: [tuple(r) for r in self._con.execute(sql, (since_day,)).fetchall()]
+            return {
+                "noise": q("SELECT day, time, band, floor_db FROM snr_obs WHERE day >= ? AND floor_db IS NOT NULL"),
+                "storm": q("SELECT day, time, total, n500, n2000 FROM lightning WHERE day >= ?"),
+                "kp": q("SELECT day, time, kp FROM spacewx WHERE day >= ? AND kp IS NOT NULL ORDER BY day, time"),
+                "bar": q("SELECT day, time, bar FROM weather WHERE day >= ? AND bar IS NOT NULL ORDER BY day, time"),
+            }
+
     # --- foudre (lightning.py) ---
     def add_lightning(self, day, time, b):
         with self._lock, self._con:

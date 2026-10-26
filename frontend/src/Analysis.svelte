@@ -10,8 +10,24 @@
   $effect(() => {
     const k = kind, b = band;
     error = '';
+    if (k === 'QRN') return;
     api.analysis(k, b).then((d) => (data = d)).catch((e) => (error = e.message));
   });
+
+  // bruit de fond d'ORSAT selon la foudre, le Kp et la pression
+  let days = $state(90);
+  let qrn = $state(null);
+  $effect(() => {
+    if (kind !== 'QRN') return;
+    const d = days;
+    error = '';
+    api.analysisQrn(d).then((r) => (qrn = r)).catch((e) => (error = e.message));
+  });
+  const exColor = (e) => {
+    if (e == null) return 'transparent';
+    const a = Math.min(0.85, Math.abs(e) / 8);
+    return e > 0 ? `rgba(214, 80, 80, ${a})` : `rgba(140, 185, 230, ${a})`;
+  };
 
   const km = (v) => (v == null ? '—' : `${v.toLocaleString('fr-FR')}`);
   const maxN = (list) => Math.max(1, ...list.map((x) => x.n));
@@ -33,8 +49,17 @@
       <button type="button" class:on={kind === 'QSO'} onclick={() => { kind = 'QSO'; band = ''; }}
               title="Contacts réalisés (QSO et QSO de groupe)">Contacts</button><button
               type="button" class:on={kind === 'SWL'} onclick={() => { kind = 'SWL'; band = ''; }}
-              title="Écoutes SWL">Écoutes SWL</button>
+              title="Écoutes SWL">Écoutes SWL</button><button
+              type="button" class:on={kind === 'QRN'} onclick={() => (kind = 'QRN')}
+              title="Bruit de fond mesuré par ORSAT selon la foudre, le Kp et la pression">Bruit / QRN</button>
     </div>
+    {#if kind === 'QRN'}
+      <div class="seg" role="group" aria-label="Période">
+        {#each [[30, '30 j'], [90, '90 j'], [365, '1 an']] as [d, l]}<button type="button" class:on={days === d} onclick={() => (days = d)}>{l}</button>{/each}
+      </div>
+      {#if qrn}<span class="tot"><b>{qrn.n.toLocaleString('fr-FR')}</b> mesures de bruit · foudre connue pour {qrn.with_storm.toLocaleString('fr-FR')}
+        · Kp pour {qrn.with_kp.toLocaleString('fr-FR')} · pression pour {qrn.with_bar.toLocaleString('fr-FR')}</span>{/if}
+    {:else}
     <label>Bande
       <select bind:value={band}>
         <option value="">toutes</option>
@@ -46,11 +71,41 @@
         médiane <b>{km(data.total.median_km)} km</b> · max <b>{km(data.total.max_km)} km</b>
         {#if data.missing_solar}<span class="muted"> · {data.missing_solar} sans indices solaires</span>{/if}</span>
     {/if}
+    {/if}
   </div>
 
   {#if error}<p class="err">{error}</p>{/if}
 
-  {#if data}
+  {#if kind === 'QRN'}
+    {#if qrn && !qrn.n}
+      <p class="muted">Pas encore assez de mesures de bruit sur cette période.</p>
+    {:else if qrn}
+      <p class="muted small">Chaque case : écart moyen du bruit de fond mesuré par ORSAT par rapport à son niveau habituel à la même heure UTC
+        (rouge = plus de bruit, bleu = moins). Une case vide = moins d'une heure de mesures. Survolez une case pour le nombre de mesures.</p>
+      <div class="cols">
+        {#each qrn.tables as t}
+          <section class="panel">
+            <h2 class="panel-title" title={t.tip}>{t.title}</h2>
+            <table>
+              <thead><tr><th></th>{#each qrn.bands as b}<th>{b}</th>{/each}</tr></thead>
+              <tbody>
+                {#each t.rows as r}
+                  <tr>
+                    <td class="lab">{r.label}</td>
+                    {#each r.cells as c}
+                      <td class="ex" style="background:{exColor(c.excess)}" title="{c.band} · {r.label} : {c.n} mesure(s)">
+                        {c.excess == null ? '' : `${c.excess > 0 ? '+' : ''}${c.excess}`}</td>
+                    {/each}
+                  </tr>
+                {/each}
+              </tbody>
+            </table>
+            <p class="tip">{t.tip}</p>
+          </section>
+        {/each}
+      </div>
+    {/if}
+  {:else if data}
     <div class="cols">
       {#each TABLES as t}
         {@const list = data[t.key]}
@@ -139,4 +194,7 @@
   .seg button + button { border-left: 1px solid rgba(207, 181, 59, 0.3); }
   .seg button.on { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); font-weight: 600; }
   .err { color: var(--bad); }
+  td.ex { text-align: center; cursor: help; }
+  .tip { color: var(--muted); font-size: 0.72rem; margin: 6px 0 0; }
+  .small { font-size: 0.8rem; margin: 0; }
 </style>

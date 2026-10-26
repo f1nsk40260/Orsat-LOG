@@ -177,6 +177,25 @@
       })
       .filter((s) => s.p);
   });
+  // orages (Blitzortung, 30 dernières min) : cellules de 0,5° posées sur la carte, couleur selon l'âge
+  let storms = $state(!publicView), stormData = $state(null);
+  $effect(() => {
+    if (!storms || publicView) { stormData = null; return; }
+    const get = () => api.lightning().then((r) => (stormData = r)).catch(() => {});
+    get();
+    const t = setInterval(get, 60 * 1000);
+    return () => clearInterval(t);
+  });
+  const stormCells = $derived.by(() => {
+    if (!proj || !data?.ok || !stormData?.cells) return [];
+    return stormData.cells.map((c) => {
+      const [az, km] = bearingKm(data.home, [c.lat, c.lon]);
+      if (km > MAX_KM) return null;
+      const p = proj([c.lon, c.lat]);
+      return p ? { ...c, p, az: Math.round(az), km: Math.round(km), r: Math.min(14, 3 + Math.sqrt(c.n) * 1.6),
+                   age: c.age_min < 10 ? 'a0' : c.age_min < 20 ? 'a1' : 'a2' } : null;
+    }).filter(Boolean);
+  });
   const bandList = $derived(data?.ok ? Object.keys(data.bands) : []);
   const sessions = $derived([...new Set((data?.stations ?? []).map((s) => s.session).filter(Boolean))]);
 </script>
@@ -202,6 +221,9 @@
     <button type="button" class="tog" class:on={onlyBand} onclick={() => (onlyBand = !onlyBand)}
             title="Afficher tous les correspondants du jour, ou seulement ceux de la bande choisie">
       {onlyBand ? `Correspondants : ${band} seulement` : 'Correspondants : toutes bandes'}</button>
+    <button type="button" class="tog" class:on={storms} onclick={() => (storms = !storms)}
+            title="Impacts de foudre des 30 dernières minutes (Blitzortung.org)">
+      {storms ? 'Orages affichés' : 'Orages masqués'}</button>
     {/if}
   </div>
 
@@ -238,6 +260,13 @@
           <circle cx={c.p[0]} cy={c.p[1]} r="2" class="city" />
           <text x={c.p[0] + 4} y={c.p[1] + 3.5} class="cname">{c.name}</text>
         {/each}
+        {#each stormCells as c}
+          <g role="presentation" onmouseenter={() => (hover = `Orage · ${c.n} impact${c.n > 1 ? 's' : ''} en 30 min · ${c.km} km, azimut ${c.az}° · dernier il y a ${c.age_min} min`)}
+             onmouseleave={() => (hover = '')}>
+            <circle cx={c.p[0]} cy={c.p[1]} r={c.r} class="storm {c.age}" />
+            <text x={c.p[0]} y={c.p[1] + 3.5} class="bolt" text-anchor="middle">ϟ</text>
+          </g>
+        {/each}
         <circle cx={C} cy={C} r="4" class="home" />
         {#each stations as s}
           <g class="st" role="presentation" onmouseenter={() => (hover = `${s.call} · ${s.band ?? '?'} · ${s.km} km, azimut ${s.az}°${s.session ? ` · ${s.session}` : ''} : ${LABEL[s.code]} sur sa bande`)}
@@ -252,6 +281,7 @@
         {#if sat && satMsg}<p class="muted">{satMsg}</p>{/if}
         <div class="legend">
           {#each (mode === 'listen' ? ['G', 'M', 'P', 'a', 'c'] : ['o', 'e', 'w', 'a', 'c']) as k}<span><i style="background:{fillFor(k)}"></i>{labelFor(k)}</span>{/each}
+          {#if stormCells.length}<span><i style="background: rgba(214,80,80,0.6); border-radius: 50%"></i>orage (rouge &lt; 10 min, orange &lt; 20, jaune &lt; 30)</span>{/if}
           <span><i class="hatch"></i>{mode === 'listen' ? TX.nodata : "pas de mesure (pas d'ionosonde assez proche)"}</span>
         </div>
         {#if mode === 'listen'}
@@ -284,6 +314,11 @@
 </div>
 
 <style>
+  .storm { stroke-width: 1; }
+  .storm.a0 { fill: rgba(214, 80, 80, 0.55); stroke: rgb(214, 80, 80); }
+  .storm.a1 { fill: rgba(224, 160, 48, 0.45); stroke: rgb(224, 160, 48); }
+  .storm.a2 { fill: rgba(230, 220, 90, 0.3); stroke: rgba(230, 220, 90, 0.7); }
+  .bolt { fill: #fff; font-size: 10px; pointer-events: none; }
   .sm { display: flex; flex-direction: column; gap: 8px; }
   .bar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
   .bands { display: inline-flex; border: 1px solid rgba(207, 181, 59, 0.6); border-radius: 999px; overflow: hidden; }

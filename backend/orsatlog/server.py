@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, dlayer, eibi, enrich, geo, ionosonde, kc2g, lightning, partners, qrz, qrzxml, reach, snr, solar, spacewx, weather
+from . import __version__, adif, auth, backup, dlayer, eibi, enrich, geo, ionosonde, kc2g, lightning, partners, qrn, qrz, qrzxml, reach, snr, solar, spacewx, weather
 from .db import DATA_DIR, Database
 from .websdr import Page, WebSdrLink
 
@@ -1244,6 +1244,16 @@ def _bucket_stats(rows):
     return {"n": n, "with_km": len(km),
             "median_km": km[len(km) // 2] if km else None, "max_km": km[-1] if km else None,
             "dx_pct": round(100 * sum(k > 3000 for k in km) / len(km)) if km else None}
+
+
+@app.get("/api/analysis/qrn")
+async def analysis_qrn(days: int = 90):
+    """Bruit de fond mesuré par ORSAT selon la foudre, le Kp et la pression (écart au bruit habituel)."""
+    days = max(7, min(400, days))
+    rows = await asyncio.to_thread(db.qrn_rows, qrn.since_day(days))
+    out = await asyncio.to_thread(qrn.compute, rows)
+    out["days"] = days
+    return out
 
 
 @app.get("/api/analysis")
