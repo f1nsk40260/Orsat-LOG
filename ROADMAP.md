@@ -493,7 +493,6 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `SkipMap.svelte` (fenêtre « 📶 Bandes ») : projection azimutale équidistante centrée sur le QTH (d3-geo,
   fond Natural Earth `world-atlas` 110m embarqué), choix de la bande à la souris, correspondants du jour
   placés avec leur état (silence / ouvert…) sur leur bande, liste triée par distance, détail au survol.
-- À venir : choix de la meilleure antenne (inventaire à saisir, dont loops onde entière horizontales).
 
 ## Fait — v1.18.1 (23/10/2026) : carte et portée par bande sur un seul calcul
 - `reach.build_grid` (azimut 5°, anneaux 50 km jusqu'à 1000 km puis 250 km, distance réelle de chaque
@@ -513,7 +512,6 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
   Angle de départ par tranche (F2 à 300 km ; DX : 2 à 8°). Classement fixe par bande/tranche, en cache.
 - Fenêtre « Bandes » : tableau « Meilleure antenne » (là où la bande passe, direction choisie ou meilleure),
   bouton pour exclure les antennes directives, top 4 au survol.
-- À faire éventuellement : marquer « mes antennes » pour ne classer que celles de la station.
 
 ## Fait — v1.19.1 (23/10/2026) : carte plus détaillée au zoom
 - Fond Natural Earth 1:10 M (`world-atlas/countries-10m`, ~1 Mo compressé) chargé seulement sous 600 km.
@@ -615,6 +613,13 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
   écart de bruit 160/80/40/20/10 m, courbe 24 h foudre (barres) + bruit 160/80/40 m (lignes).
 - Réglage `blitzortung` (1 par défaut, 0 = coupé sans redémarrage) : interrupteur à ajouter dans le panneau admin ORSAT.
 - Non testé en réel depuis l'atelier de Claude (Internet bloqué) : à vérifier sur le PC ORSAT.
+
+## Fait — v1.26.0 (26/10/2026) : fenêtres agrandissables, suppression de la meilleure antenne
+- Météo locale, Orages et QRN, Propagation du jour, Météo spatiale : bouton ⤢ (grand) en haut à droite,
+  vue agrandie au centre, fermeture par ✕ ou clic sur le fond.
+- Fonction « Meilleure antenne » (v1.19.0) jugée inutile : supprimée totalement (tableau de la fenêtre Bandes,
+  19 modèles types et classement dans `antennas.py`). `antennas.py` ne garde que l'angle de départ et le
+  diagramme NEC de la loop du WebSDR, utilisés par la carte d'écoute. Les autres calculs sont inchangés.
 
 ## Fait — v1.25.1 (25/10/2026) : logo ORSAT-LOG
 - Logo « carnet ouvert » (`docs/branding/orsat-log-icon.svg`), même famille que celui d'ORSAT SDR.

@@ -26,21 +26,6 @@
     return `${row.band} · ${label}${c.dir && !sel ? ` · meilleure direction ${c.dir}` : ''} : ${STATE[c.state]}`
       + `\nMUF ${c.muf ?? '—'} MHz · absorption estimée ${c.db} dB`;
   }
-  // meilleure antenne : classement par bande et tranche (fixe), affiché seulement là où la bande passe
-  let withBeams = $state(true);
-  const antRows = $derived(data?.ok && data.reach?.antennas ? data.reach.antennas.rows : []);
-  const PASS = ['open', 'edge', 'weak'];
-  function pick(band, key) {
-    const r = antRows.find((x) => x.band === band);
-    return r ? r[key].top.filter((a) => withBeams || !a.directive) : [];
-  }
-  function antTip(row, key, d) {
-    const r = antRows.find((x) => x.band === row.band);
-    if (!r) return '';
-    const dir = sel || row[key].dir;
-    const list = pick(row.band, key).slice(0, 4).map((a, i) => `${i + 1}. ${a.name} : ${a.dbi} dBi${a.directive ? (dir ? ` (pointée ${dir})` : ' (à pointer)') : ''}`).join('\n');
-    return `${row.band} · ${d} · angle de départ ${r[key].angles[0]}–${r[key].angles[r[key].angles.length - 1]}°\n${list}`;
-  }
   function cellTip(row, col, cell) {
     const where = col.az == null ? 'proche (saut de 600 km)' : `vers ${col.dir} (${col.az}°, saut de 3000 km)`;
     if (!cell.state) return `${row.band} ${where} : pas d'ionosonde assez proche du point de réflexion.`;
@@ -124,32 +109,6 @@
     {/if}
    </div>
    </div>
-    {#if antRows.length && reachRows.length}
-      <div class="blk wide">
-        <h3 class="sub">Meilleure antenne <span>{sel ? `vers ${sel}` : 'meilleure direction'} · là où la bande passe</span>
-          <button type="button" class="tog" class:on={withBeams} onclick={() => (withBeams = !withBeams)}
-                  title="Inclure ou non les antennes directives (Yagi, quad, hexbeam), supposées pointées vers le correspondant">
-            {withBeams ? 'Antennes directives incluses' : 'Sans antennes directives'}</button></h3>
-        <table class="ant">
-          <thead><tr><th></th>{#each RANGES as [, l, d]}<th title={d}>{l} km</th>{/each}</tr></thead>
-          <tbody>
-            {#each reachRows as row}
-              <tr>
-                <td class="b">{row.band}</td>
-                {#each RANGES as [k, , d]}
-                  {@const best = pick(row.band, k)[0]}
-                  {#if PASS.includes(row[k].state) && best}
-                    <td class="a {row[k].state}" title={antTip(row, k, d)}><b>{best.short}</b><small>{best.dbi} dBi</small></td>
-                  {:else}<td class="a off" title="{row.band} · {d} : la bande ne passe pas">—</td>{/if}
-                {/each}
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-        <p class="src">Gain estimé à l'angle de départ de la tranche, sur sol moyen (diagramme de l'antenne + réflexion dans le sol).
-          Comparaison de modèles types : la hiérarchie est fiable, les valeurs absolues approchées. Survol : les 4 meilleures.</p>
-      </div>
-    {/if}
     <div class="blk wide">
       <h3 class="sub">Carte des zones de silence <span>depuis le QTH, jusqu'à 5000 km · une bande à la fois</span></h3>
       <SkipMap bind:this={skipMap} />
@@ -173,16 +132,6 @@
   .close { margin-left: auto; padding: 0 8px; font-size: 1rem; }
   .close + .close { margin-left: 0; }
   .blocks { display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start; }
-  table.ant td.a { font-size: 0.78rem; text-align: center; padding: 3px 4px; border-radius: 3px; cursor: help; line-height: 1.15; }
-  table.ant td.a b { display: block; font-weight: 600; color: #fff; }
-  table.ant td.a small { color: rgba(255, 255, 255, 0.75); font-size: 0.7rem; }
-  table.ant td.a.open { background: rgba(95, 191, 107, 0.45); }
-  table.ant td.a.edge { background: rgba(224, 160, 48, 0.45); }
-  table.ant td.a.weak { background: rgba(95, 191, 107, 0.22); }
-  table.ant td.a.off { color: var(--muted); background: rgba(255, 255, 255, 0.03); }
-  table.ant th { font-size: 0.8rem; }
-  .tog { border-radius: 999px; padding: 2px 10px; font-size: 0.76rem; margin-left: 8px; text-transform: none; letter-spacing: 0; }
-  .tog.on { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); }
   .blk.wide { border-top: 1px solid var(--panel-edge); padding-top: 10px; }
   .blk { flex: 1 1 460px; display: flex; flex-direction: column; gap: 8px; }
   table { font-size: 0.9rem !important; }
