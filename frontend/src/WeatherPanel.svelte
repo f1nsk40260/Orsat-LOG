@@ -55,9 +55,12 @@
     const v = snapshots.map((s) => s.temp).filter((x) => x != null);
     return v.length ? [Math.min(...v), Math.max(...v)] : null;
   });
+  let big = $state(false);   // vue agrandie au centre de la page
 </script>
 
-<section class="panel weather">
+{#if big}<div class="zoom-backdrop" onclick={() => (big = false)} role="presentation"></div>{/if}
+<section class="panel weather zoomable" class:big>
+  <button class="ghost zoom-btn" onclick={() => (big = !big)} title={big ? 'Fermer' : 'Agrandir'}>{big ? '✕' : '⤢'}</button>
   <h2 class="panel-title">Météo locale</h2>
 
   {#if cur}
@@ -148,4 +151,10 @@
   .foot { font-size: 0.72rem; }
   .muted { color: var(--muted); font-size: 0.82rem; margin: 0; }
   .err { color: var(--warn); font-size: 0.74rem; margin: 0; }
+  /* vue agrandie */
+  .big .temp { font-size: 3.6rem; } .big .temp small { font-size: 1.6rem; }
+  .big .side, .big .rows { font-size: 1.1rem; gap: 4px; }
+  .big .legend { font-size: 0.95rem; } .big .legend i { width: 18px; }
+  .big .foot, .big .muted { font-size: 0.9rem; }
+  .big .chart { max-height: 56vh; }
 </style>

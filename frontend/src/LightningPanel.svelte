@@ -79,9 +79,12 @@
     ? ['160m', '80m', '40m', '20m', '10m'].filter((b) => live.noise.bands[b]).map((b) => [b, live.noise.bands[b]])
     : []);
   const exClass = (e) => (e == null ? '' : e >= 6 ? 'bad' : e >= 3 ? 'warn' : e <= -6 ? 'cold' : '');
+  let big = $state(false);   // vue agrandie au centre de la page
 </script>
 
-<section class="panel storms">
+{#if big}<div class="zoom-backdrop" onclick={() => (big = false)} role="presentation"></div>{/if}
+<section class="panel storms zoomable" class:big>
+  <button class="ghost zoom-btn" onclick={() => (big = !big)} title={big ? 'Fermer' : 'Agrandir'}>{big ? '✕' : '⤢'}</button>
   <h2 class="panel-title">Orages et QRN</h2>
 
   {#if summary}
@@ -173,4 +176,12 @@
   .lb { background: rgba(207, 181, 59, 0.6); } .ln { background: var(--bad); }
   .foot { font-size: 0.7rem; }
   .muted { color: var(--muted); font-size: 0.82rem; margin: 0; }
+  /* vue agrandie */
+  .big .head { gap: 28px; }
+  .big .rose { width: 190px; height: 190px; }
+  .big .facts { font-size: 1.1rem; } .big .when { font-size: 0.9rem; }
+  .big .chip { font-size: 1rem; padding: 2px 12px; }
+  .big .legend { font-size: 0.95rem; } .big .legend i { width: 16px; }
+  .big .foot, .big .muted { font-size: 0.9rem; }
+  .big .chart { max-height: 52vh; }
 </style>
