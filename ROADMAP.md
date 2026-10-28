@@ -592,6 +592,10 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.36.1 (28/10/2026) : envoyer un locator du carnet vers le Trajet
+- Tableaux d'entrées (page du jour, carnet complet) : le locator devient un lien « 〽 » qui ouvre la fenêtre Trajet
+  sur ce correspondant. Formulaire de saisie : bouton « 〽 Trajet » placé à côté du libellé Locator (plus visible).
+
 ## Fait — v1.36.0 (28/10/2026) : fenêtre Trajet glissante et réductible
 - Plus de voile sombre : la page reste visible et utilisable dessous. La fenêtre se déplace en glissant sa barre
   de titre (position retenue dans le navigateur), bouton « ▁ Réduire / ▢ Déplier » pour la ramener à sa barre.

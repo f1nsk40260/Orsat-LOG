@@ -5,6 +5,10 @@
   import EditEntry from './EditEntry.svelte';
   import QsoCard from './QsoCard.svelte';
   import { tciActive, tciTune, tciModeFor } from './tciBrowser.js';
+  import { traceTarget } from './tracetarget.svelte.js';
+  import { locToLatLon } from './locator.js';
+  // ouvre la fenêtre Trajet sur le locator de cette entrée
+  const toTrace = (q) => { traceTarget.loc = q.gridsquare.toUpperCase(); traceTarget.call = q.call || ''; traceTarget.open = true; };
 
   // showDate = false sur la page du jour (la date est déjà en tête de page)
   // onchanged : appelé après une modification ou une suppression faite dans le formulaire d'édition
@@ -69,7 +73,11 @@
           <td>{q.submode || q.mode}</td>
           <td class="mono">{q.rst_sent}</td>
           <td class="mono">{q.rst_rcvd}</td>
-          <td class="mono">{q.gridsquare}</td>
+          <td class="mono">
+            {#if q.gridsquare && locToLatLon(q.gridsquare)}
+              <button class="ghost loclink" title="Voir ce locator sur la courbe des distances (fenêtre Trajet)" onclick={() => toTrace(q)}>{q.gridsquare} <span class="lt">〽</span></button>
+            {:else}{q.gridsquare}{/if}
+          </td>
           <td class="country" title={q.country ? `${q.country}${q.dxcc ? ` · DXCC ${q.dxcc}` : ''}${q.cont ? ` · ${q.cont}` : ''}${q.cqz ? ` · CQ ${q.cqz}` : ''}${q.ituz ? ` · ITU ${q.ituz}` : ''}` : ''}>
             {q.country || ''}{#if q.confirmed}<span class="conf" title={`Confirmé (${q.confirmed})`}>◆</span>{/if}
           </td>
@@ -105,6 +113,9 @@
 {/if}
 
 <style>
+  .loclink { padding: 0 4px; font: inherit; color: inherit; border: 0; background: none; cursor: pointer; white-space: nowrap; }
+  .loclink:hover { color: var(--gold); text-decoration: underline; }
+  .loclink .lt { color: rgb(90, 200, 255); font-size: 1.15em; }
   .table-wrap { overflow: auto; flex: 1; min-height: 0; }
   td { white-space: nowrap; padding: 5px 6px; }
   th { padding: 6px; }

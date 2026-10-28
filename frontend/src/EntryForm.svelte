@@ -229,13 +229,12 @@
         </div>
       {/if}
       <div>
-        <label for="grid">{kind === 'SWL' ? 'Loc. émetteur' : 'Locator'}</label>
+        <label for="grid">{kind === 'SWL' ? 'Loc. émetteur' : 'Locator'}
+          {#if locToLatLon(form.gridsquare)}<button type="button" class="totrace" onclick={() => (traceTarget.open = true)}
+            title="Voir ce locator sur la courbe des distances (fenêtre Trajet)">〽 Trajet</button>{/if}</label>
         <input id="grid" class="mono" bind:value={form.gridsquare}
                oninput={() => (form.gridsquare = form.gridsquare.toUpperCase())} maxlength="8" />
-        {#if locToLatLon(form.gridsquare)}
-          <button type="button" class="totrace" onclick={() => (traceTarget.open = true)}
-                  title="Voir ce locator sur la courbe des distances (fenêtre Trajet)">〽</button>
-        {/if}
+
       </div>
       {#if kind === 'QSO'}
         <div>
@@ -274,8 +273,8 @@
 </section>
 
 <style>
-  div:has(> .totrace) { position: relative; }
-  .totrace { position: absolute; right: 3px; bottom: 3px; padding: 0 8px; font-size: 1.1rem; line-height: 1.5; }
+  .totrace { margin-left: 6px; padding: 0 8px; font-size: 0.9rem; line-height: 1.4; color: rgb(90, 200, 255);
+             text-transform: none; letter-spacing: 0; }
   /* Couleur du mode d'exploitation : QSO = vieil or, SWL = bleu, Groupe = vert */
   .entry { --kc: 207, 181, 59; border: 2px solid rgba(var(--kc), 0.55); box-shadow: 0 0 18px rgba(var(--kc), 0.12); }
   .entry.swl { --kc: 110, 170, 230; }
