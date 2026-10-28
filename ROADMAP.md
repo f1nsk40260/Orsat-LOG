@@ -592,6 +592,10 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.27.1 (28/10/2026) : finesse des graphes de la météo spatiale
+- Graphes Bz et couches dessinés en pixels réels (traits fins et textes nets en vue agrandie), heures sur le Bz.
+- Altitudes F2 et E lissées (médiane ±20 min), Es en petits traits, F1 en petits points.
+
 ## Fait — v1.27.0 (26/10/2026) : orages sur la carte et analyse du bruit
 - Carte de la fenêtre « Bandes » (carnet, pas la page publique) : cellules orageuses des 30 dernières min (carrés de 0,5°),
   taille selon le nombre d'impacts, couleur selon l'âge (rouge < 10 min, orange < 20, jaune < 30), infobulle,

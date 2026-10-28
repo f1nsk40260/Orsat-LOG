@@ -49,12 +49,15 @@
     : 'Absorption de la couche D mesurée par les ionosondes (fmin) : premier relevé en cours.');
 
   // frise de Bz sur la journée (relevés enregistrés)
-  const W = 290, H = 54, PADL = 18;
+  let big = $state(false);   // vue agrandie au centre de la page
+  let bw = $state(290);
+  const W = $derived(Math.max(220, Math.round(bw)));
+  const H = $derived(big ? 110 : 60);
+  const PADL = 18, PADB = 12;
   const bzPts = $derived(records.filter((x) => x.bz != null));
   const xOf = (t) => PADL + ((+t.slice(0, 2) + +t.slice(2, 4) / 60) / 24) * (W - PADL - 6);
-  const yOf = (bz) => H / 2 - Math.max(-20, Math.min(20, bz)) * (H / 2 - 4) / 20;
+  const yOf = (bz) => (H - PADB) / 2 - Math.max(-20, Math.min(20, bz)) * ((H - PADB) / 2 - 4) / 20;
   const bzPath = $derived(bzPts.map((x, i) => `${i ? 'L' : 'M'}${xOf(x.time).toFixed(1)},${yOf(x.bz).toFixed(1)}`).join(' '));
-  let big = $state(false);   // vue agrandie au centre de la page
 </script>
 
 {#if big}<div class="zoom-backdrop" onclick={() => (big = false)} role="presentation"></div>{/if}
@@ -78,13 +81,19 @@
       </div>
     {/if}
     {#if bzPts.length > 1}
-      <svg viewBox="0 0 {W} {H}" class="chart" role="img" aria-label="Bz sur la journée">
-        <line x1={PADL} x2={W - 6} y1={H / 2} y2={H / 2} class="zero" />
+      <div class="bzwrap" bind:clientWidth={bw}>
+      <svg width={W} height={H} viewBox="0 0 {W} {H}" class="chart" role="img" aria-label="Bz sur la journée">
+        <line x1={PADL} x2={W - 6} y1={(H - PADB) / 2} y2={(H - PADB) / 2} class="zero" />
+        {#each [0, 6, 12, 18, 24] as h}
+          <text x={PADL + (h / 24) * (W - PADL - 6)} y={H - 2} class="axis"
+                text-anchor={h === 0 ? 'start' : h === 24 ? 'end' : 'middle'}>{h}h</text>
+        {/each}
         <text x={PADL - 4} y="10" class="axis" text-anchor="end">+</text>
-        <text x={PADL - 4} y={H - 3} class="axis" text-anchor="end">−</text>
+        <text x={PADL - 4} y={H - PADB - 2} class="axis" text-anchor="end">−</text>
         <path d={bzPath} class="bz" />
         {#each bzPts as x}<circle cx={xOf(x.time)} cy={yOf(x.bz)} r="5" fill="transparent"><title>{fmtTime(x.time)} UTC — Bz {x.bz} nT, Kp {x.kp ?? '—'}, vent {x.speed ?? '—'} km/s</title></circle>{/each}
       </svg>
+      </div>
     {/if}
     <IonoLayers {day} {isToday} />
     {#if dl}
@@ -125,9 +134,10 @@
   .lbl { color: var(--muted); font-size: 0.72rem; width: 100%; }
   .fl { border: 1px solid var(--panel-edge); border-radius: 10px; padding: 0 7px; cursor: help; }
   .dlay { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; font-size: 0.78rem; cursor: help; }
-  .chart { width: 100%; height: auto; }
+  .bzwrap { width: 100%; }
+  .chart { display: block; }
   .zero { stroke: rgba(207, 181, 59, 0.25); stroke-dasharray: 3 3; }
-  .bz { fill: none; stroke: var(--gold); stroke-width: 1.6; }
+  .bz { fill: none; stroke: var(--gold); stroke-width: 1.4; stroke-linejoin: round; }
   .axis { fill: var(--muted); font-size: 10px; }
   .src { font-size: 0.7rem; color: var(--muted); margin: 0; }
   .ok { color: var(--ok) !important; } .warn { color: var(--warn) !important; } .bad { color: var(--bad) !important; }
