@@ -592,6 +592,16 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.28.0 (28/10/2026) : trajet d'une onde (tracé de rayons)
+- Bouton « 〽 Trajet » du bandeau : fenêtre qui trace le rebond d'une onde depuis IN93LR sur l'ionosphère
+  mesurée (ionosonde du jour, médiane ±20 min) : coupe de la Terre courbe (échelle verticale exagérée),
+  strates selon la densité électronique, éventail de tous les angles, rayon choisi sur 3 sauts avec distances.
+- Réglages à la souris (boutons et molette) : bande ou fréquence ±100 kHz, angle de départ, mesure de la journée.
+- Résultats : retour au sol, couche et altitude de réflexion, MUF pour l'angle, zone de silence, portée maxi d'un saut.
+- `raytrace.js` : profil de Chapman (F2, F1, E, Es) sur les mesures, n² = 1 − fp²/f², intégration hamiltonienne
+  (RK2) sur Terre sphérique. Limites : ionosphère supposée identique sur tout le trajet, pas de champ magnétique
+  ni d'absorption.
+
 ## Fait — v1.27.1 (28/10/2026) : finesse des graphes de la météo spatiale
 - Graphes Bz et couches dessinés en pixels réels (traits fins et textes nets en vue agrandie), heures sur le Bz.
 - Altitudes F2 et E lissées (médiane ±20 min), Es en petits traits, F1 en petits points.
