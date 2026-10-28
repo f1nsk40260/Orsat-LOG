@@ -9,13 +9,13 @@
   import Analysis from './Analysis.svelte';
   import OpenBands from './OpenBands.svelte';
   import IonoTrace from './IonoTrace.svelte';
+  import { traceTarget } from './tracetarget.svelte.js';
   import Calendar from './Calendar.svelte';
 
   let settings = $state({});
   let radio = $state({ connected: false, freq: 0, mode: '', submode: '', ptt: false, device: '' });
   let websdr = $state({ listening: false, connected: false, freq: 0, mode: '', submode: '', ptt: false, device: 'WebSDR' });
   let showCalendar = $state(false);
-  let showTrace = $state(false);     // fenêtre « Trajet d'une onde »
   let showBands = $state(false);     // fenêtre « Bandes ouvertes et portée par bande »
   let view = $state('day');              // 'day' = page d'agenda, 'log' = carnet complet
   let utc = $state(new Date());
@@ -109,7 +109,7 @@
     <HeaderClock />
     <button class="bands-btn" class:on={showBands} onclick={() => (showBands = !showBands)}
             title="Bandes ouvertes maintenant par direction, et portée par bande (ionosondes mesurées)">📶 Bandes</button>
-    <button class="bands-btn" class:on={showTrace} onclick={() => (showTrace = !showTrace)}
+    <button class="bands-btn" class:on={traceTarget.open} onclick={() => (traceTarget.open = !traceTarget.open)}
             title="Trajet d'une onde : rebond sur l'ionosphère mesurée et distance de retour au sol">〽 Trajet</button>
     <div class="seg" role="group" aria-label="Affichage">
       <button type="button" class:on={view === 'day'} onclick={() => (view = 'day')}
@@ -131,7 +131,7 @@
 {/if}
 
 {#if showBands}<OpenBands onclose={() => (showBands = false)} />{/if}
-{#if showTrace}<IonoTrace onclose={() => (showTrace = false)} />{/if}
+{#if traceTarget.open}<IonoTrace onclose={() => (traceTarget.open = false)} />{/if}
 
 {#if showCalendar}
   <Calendar {day} {today} onpick={openDay} onclose={() => (showCalendar = false)} />

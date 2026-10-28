@@ -6,6 +6,7 @@
   import { budget, MODES, pct, pCls } from './linkbudget.js';
   import { TX_ANTENNAS, txGain, usable } from './txantennas.js';
   import { locToLatLon, distAz, dirName } from './locator.js';
+  import { traceTarget } from './tracetarget.svelte.js';
 
   let { onclose = null, locator = 'IN93LR' } = $props();
 
@@ -149,12 +150,11 @@
   });
   // ---------- locator à placer sur la courbe (saisie temporaire, rien n'est enregistré) ----------
   const HOME = locToLatLon('IN93LR');
-  let locIn = $state('');
   const target = $derived.by(() => {
-    const ll = locToLatLon(locIn);
+    const ll = locToLatLon(traceTarget.loc);
     if (!ll) return null;
     const [d, az] = distAz(HOME, ll);
-    return { loc: locIn.trim().toUpperCase(), d, az };
+    return { loc: traceTarget.loc.trim().toUpperCase(), call: traceTarget.call, d, az };
   });
   // comment l'atteindre : en 1, 2 ou 3 sauts, avec l'angle qui donne la meilleure chance (mode choisi)
   const tgt = $derived.by(() => {
@@ -397,17 +397,18 @@
 
     <div class="grp locbox">
       <span class="lab">Placer un locator</span>
-      <input class="locin" class:bad={locIn.trim() && !target} bind:value={locIn} maxlength="8" placeholder="ex. JN18EU"
+      <input class="locin" class:bad={traceTarget.loc.trim() && !target} bind:value={traceTarget.loc} maxlength="8" placeholder="ex. JN18EU"
+             oninput={() => (traceTarget.call = '')} onfocus={(e) => e.currentTarget.select()}
              spellcheck="false" autocomplete="off" title="Saisie temporaire : le locator est placé sur la courbe des distances (rien n'est enregistré)" />
-      {#if locIn}<button type="button" class="locclr" onclick={() => (locIn = '')} title="Effacer">✕</button>{/if}
+      {#if traceTarget.loc}<button type="button" class="locclr" onclick={() => { traceTarget.loc = ''; traceTarget.call = ''; }} title="Effacer">✕</button>{/if}
       {#if target}
-        <span class="locres"><b>{target.loc}</b> : {km(target.d)} km au {Math.round(target.az)}° ({dirName(target.az)}) —
+        <span class="locres"><b>{target.call ? `${target.call} · ` : ''}{target.loc}</b> : {km(target.d)} km au {Math.round(target.az)}° ({dirName(target.az)}) —
           {#if !tgt || tgt.hops === 0}aucun angle n'y retombe en 1 à 3 sauts (zone de silence ou trop loin)
           {:else}{tgt.hops} saut{tgt.hops > 1 ? 's' : ''}, départ à {tgt.el}° :
             {#each tgt.b.modes.slice().reverse() as m, i}{i ? ', ' : ''}<span class="lp {pCls(m.p)}">{m.id} {pct(m.p)}</span>{/each}
             {#if Math.round(tgt.el) !== elev}<button type="button" class="aim" onclick={() => setE(tgt.el)} title="Régler l'angle de départ sur celui qui atteint ce locator">↗ Viser ({Math.round(tgt.el)}°)</button>{/if}{/if}
         </span>
-      {:else if locIn.trim()}<span class="locres muted">locator incomplet ou invalide (4, 6 ou 8 caractères)</span>{/if}
+      {:else if traceTarget.loc.trim()}<span class="locres muted">locator incomplet ou invalide (4, 6 ou 8 caractères)</span>{/if}
     </div>
 
     <div class="wrap" bind:clientWidth={cw}>
@@ -467,7 +468,7 @@
           {@const top = P(target.d / R, 140).map(Number)}
           <line x1={gx} y1={gy} x2={top[0]} y2={top[1]} class="flagpole" />
           <path d={`M${top[0]},${top[1]} l${16 / zoom},${5 / zoom} l${-16 / zoom},${5 / zoom} Z`} class="flag" />
-          <text x={top[0]} y={top[1] - 6 / zoom} class="flagt" text-anchor="middle">{target.loc} · {km(target.d)} km</text>
+          <text x={top[0]} y={top[1] - 6 / zoom} class="flagt" text-anchor="middle">{target.call ? `${target.call} · ` : ''}{target.loc} · {km(target.d)} km</text>
           <circle cx={gx} cy={gy} r={5 / zoom} class="flagdot" />
         {/if}
       </svg>

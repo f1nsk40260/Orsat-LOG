@@ -592,6 +592,11 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.34.0 (28/10/2026) : le locator du carnet part dans la fenêtre Trajet
+- `tracetarget.svelte.js` : cible partagée. Le locator de la saisie en cours (QRZ ou tapé) remplace le précédent
+  dans la fenêtre Trajet, avec l'indicatif ; bouton 〽 dans la case Locator du formulaire pour ouvrir la fenêtre.
+- Case de la fenêtre Trajet : tout le texte est sélectionné au clic, la frappe remplace l'ancien locator.
+
 ## Fait — v1.33.0 (28/10/2026) : placer un locator sur la courbe des distances
 - Fenêtre Trajet : case « Placer un locator » (saisie temporaire, rien n'est enregistré) : distance et azimut depuis
   IN93LR, drapeau sur le dessin, nombre de sauts et meilleur angle pour l'atteindre, chances par mode ;
