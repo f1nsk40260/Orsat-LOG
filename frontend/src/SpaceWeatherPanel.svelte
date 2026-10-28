@@ -2,8 +2,9 @@
   // Météo spatiale NOAA SWPC : en direct sur la page du jour, relevés enregistrés sur les jours passés
   import { api } from './api.js';
   import { kClass, fmtTime } from './util.js';
+  import IonoLayers from './IonoLayers.svelte';
 
-  let { records = [], flares = [], isToday = false } = $props();
+  let { day, records = [], flares = [], isToday = false } = $props();
 
   let live = $state(null);
   async function refresh() { live = await api.spacewx().catch(() => ({ ok: false, msg: 'Serveur injoignable.' })); }
@@ -85,6 +86,7 @@
         {#each bzPts as x}<circle cx={xOf(x.time)} cy={yOf(x.bz)} r="5" fill="transparent"><title>{fmtTime(x.time)} UTC — Bz {x.bz} nT, Kp {x.kp ?? '—'}, vent {x.speed ?? '—'} km/s</title></circle>{/each}
       </svg>
     {/if}
+    <IonoLayers {day} {isToday} />
     {#if dl}
       <div class="dlay" title={fminTip}>
         <span class="lbl">Couche D mesurée</span>

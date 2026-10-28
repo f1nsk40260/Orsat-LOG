@@ -126,7 +126,7 @@
       {/if}
     {/if}
     <PropagationPanel snapshots={page?.propagation ?? []} archive={page?.archive} {isToday} />
-    <SpaceWeatherPanel records={page?.spacewx ?? []} flares={page?.flares ?? []} {isToday} />
+    <SpaceWeatherPanel {day} records={page?.spacewx ?? []} flares={page?.flares ?? []} {isToday} />
   </div>
 
   <!-- colonne centrale : saisie + activité du jour -->

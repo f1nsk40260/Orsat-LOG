@@ -601,6 +601,13 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
   (terciles), Kp et tendance de pression 3 h. Périodes 30 j / 90 j / 1 an. Case vide = moins d'une heure de mesures.
 - Les classes ne deviennent parlantes qu'après quelques semaines d'enregistrement de la foudre (depuis le 26/10/2026).
 
+## Fait — v1.27.0 (28/10/2026) : altitude des couches ionosphériques
+- Fenêtre Météo spatiale : graphe altitude (0-450 km) × heure UTC de la journée, ionosonde GIRO la plus proche
+  (Roquetes, puis El Arenosillo, Dourbes, Chilton, Rome en secours) : F2 (hmF2 mesurée), F1 et E (altitude
+  mesurée ou typique), Es (foEs), D (60-90 km, présence selon la hauteur du Soleil : pas d'altitude mesurable).
+  Survol : toutes les valeurs de la mesure. Jours passés consultables. `layers.py`, route `/api/layers/{jour}`.
+- À vérifier sur le serveur : que GIRO accepte hmF1/hmE/foF1 (sinon repli automatique sur foF2, hmF2, foE, foEs).
+
 ## Fait — v1.26.0 (26/10/2026) : orages (Blitzortung) et QRN
 - Écoute permanente du flux public Blitzortung.org (`lightning.py`, WebSocket ws1/ws7/ws8, décodage LZW de la carte).
   Rien de brut stocké : comptage par tranche de 5 min (monde, < 500 km, < 2000 km, 8 secteurs, impact le plus proche)
