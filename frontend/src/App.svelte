@@ -131,7 +131,7 @@
 {/if}
 
 {#if showBands}<OpenBands onclose={() => (showBands = false)} />{/if}
-{#if traceTarget.open}<IonoTrace onclose={() => (traceTarget.open = false)} />{/if}
+{#if traceTarget.open}<IonoTrace {radio} {websdr} onclose={() => (traceTarget.open = false)} />{/if}
 
 {#if showCalendar}
   <Calendar {day} {today} onpick={openDay} onclose={() => (showCalendar = false)} />

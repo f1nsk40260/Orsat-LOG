@@ -592,6 +592,11 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.35.0 (28/10/2026) : la fréquence du Trajet suit le transceiver / le WebSDR
+- Fenêtre Trajet : « Fréquence suivie » Auto (transceiver TCI s'il est connecté, sinon WebSDR ORSAT) / Transceiver /
+  WebSDR / Manuel ; source affichée ; hors HF (> 60 MHz) non suivie ; temporisation de 0,4 s pendant qu'on tourne
+  le VFO ; un réglage à la main (bande, ±, molette) passe en Manuel. Fréquence affichée au kHz.
+
 ## Fait — v1.34.0 (28/10/2026) : le locator du carnet part dans la fenêtre Trajet
 - `tracetarget.svelte.js` : cible partagée. Le locator de la saisie en cours (QRZ ou tapé) remplace le précédent
   dans la fenêtre Trajet, avec l'indicatif ; bouton 〽 dans la case Locator du formulaire pour ouvrir la fenêtre.

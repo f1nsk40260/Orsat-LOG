@@ -8,7 +8,7 @@
   import { locToLatLon, distAz, dirName } from './locator.js';
   import { traceTarget } from './tracetarget.svelte.js';
 
-  let { onclose = null, locator = 'IN93LR' } = $props();
+  let { onclose = null, locator = 'IN93LR', radio = null, websdr = null } = $props();
 
   // ---------- mesures de l'ionosonde (page du jour) ----------
   let data = $state(null);
@@ -36,7 +36,29 @@
                  ['17m', 18.1], ['15m', 21.2], ['12m', 24.94], ['10m', 28.5], ['6m', 50.15]];
   let freq = $state(14.1);
   let elev = $state(10);
-  const setF = (v) => (freq = Math.round(Math.max(1, Math.min(60, v)) * 100) / 100);
+  const setF = (v) => (freq = Math.round(Math.max(1, Math.min(60, v)) * 1000) / 1000);
+
+  // ---------- la fréquence suit le transceiver (TCI) ou le WebSDR ORSAT ----------
+  // auto : le transceiver s'il est connecté, sinon le WebSDR ; un réglage à la main passe en « Manuel »
+  let follow = $state('auto');
+  const live = (s) => (s?.connected && s.freq ? s.freq / 1e6 : null);
+  const src = $derived.by(() => {
+    const tx = live(radio), ws = live(websdr);
+    if (follow === 'tx') return { name: 'transceiver', f: tx };
+    if (follow === 'websdr') return { name: 'WebSDR ORSAT', f: ws };
+    if (follow === 'auto') return tx ? { name: 'transceiver', f: tx } : ws ? { name: 'WebSDR ORSAT', f: ws } : { name: null, f: null };
+    return null;
+  });
+  const srcHF = $derived(src?.f != null && src.f >= 1 && src.f <= 60);
+  // petite temporisation : pendant qu'on tourne le VFO, le calcul n'est refait qu'une fois la fréquence posée
+  $effect(() => {
+    if (!srcHF) return;
+    const f = Math.round(src.f * 1000) / 1000;
+    if (f === freq) return;
+    const t = setTimeout(() => (freq = f), 400);
+    return () => clearTimeout(t);
+  });
+  const userF = (v) => { follow = 'manuel'; setF(v); };
   const setE = (v) => (elev = Math.max(1, Math.min(89, Math.round(v))));
   const bandOf = $derived(BANDS.find(([, f]) => Math.abs(f - freq) < 0.6)?.[0]);
 
@@ -341,13 +363,29 @@
       <div class="grp">
         <span class="lab">Fréquence</span>
         <div class="bands">
-          {#each BANDS as [b, f]}<button type="button" class:on={bandOf === b} onclick={() => setF(f)}>{b}</button>{/each}
+          {#each BANDS as [b, f]}<button type="button" class:on={bandOf === b} onclick={() => userF(f)}>{b}</button>{/each}
         </div>
-        <div class="val" use:wheel={(d) => setF(freq + d * 0.1)} title="Molette : ±100 kHz">
-          <button type="button" onclick={() => setF(freq - 0.1)}>−</button>
-          <b>{freq.toFixed(2)} MHz</b>
-          <button type="button" onclick={() => setF(freq + 0.1)}>+</button>
+        <div class="val" use:wheel={(d) => userF(freq + d * 0.1)} title="Molette : ±100 kHz (passe en réglage manuel)">
+          <button type="button" onclick={() => userF(freq - 0.1)}>−</button>
+          <b>{freq.toFixed(3)} MHz</b>
+          <button type="button" onclick={() => userF(freq + 0.1)}>+</button>
         </div>
+      </div>
+      <div class="grp">
+        <span class="lab">Fréquence suivie</span>
+        <div class="bands">
+          {#each [['auto', 'Auto'], ['tx', 'Transceiver'], ['websdr', 'WebSDR'], ['manuel', 'Manuel']] as [k, l]}
+            <button type="button" class:on={follow === k} onclick={() => (follow = k)}
+                    title={k === 'auto' ? 'Le transceiver s\'il est connecté, sinon le WebSDR ORSAT' : k === 'manuel' ? 'Fréquence réglée à la main dans cette fenêtre' : `Suivre la fréquence du ${l}`}>{l}</button>
+          {/each}
+        </div>
+        <span class="follow" class:warn={src && !srcHF}>
+          {#if !src}réglage manuel
+          {:else if srcHF}← {src.name} ({src.f.toFixed(3)} MHz)
+          {:else if src.f != null}{src.name} sur {src.f.toFixed(3)} MHz, hors HF : non suivi
+          {:else if follow === 'auto'}aucun transceiver ni WebSDR connecté : fréquence inchangée
+          {:else}{follow === 'tx' ? 'transceiver' : 'WebSDR'} non connecté : fréquence inchangée{/if}
+        </span>
       </div>
       <div class="grp">
         <span class="lab">Angle de départ</span>
@@ -622,6 +660,8 @@
   .flagdot { fill: rgb(90, 200, 255); stroke: #000; stroke-width: 1.5; }
   .flagt { fill: rgb(150, 225, 255); font-size: calc(13px / var(--z)); font-weight: 700; paint-order: stroke;
            stroke: rgba(0, 0, 0, 0.9); stroke-width: calc(3.5px / var(--z)); }
+  .follow { color: rgb(150, 225, 255); font-size: 0.95rem; }
+  .follow.warn { color: var(--warn); }
   .antbtn { padding: 4px 12px; font-size: 0.95rem; }
   .antbtn.on { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); font-weight: 600; }
   .lobe { fill: rgba(90, 200, 220, 0.18); stroke: rgb(90, 200, 220); stroke-width: 1.5; }
