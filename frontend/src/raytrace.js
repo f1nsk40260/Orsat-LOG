@@ -47,7 +47,7 @@ export function trace(fp2, f, elevDeg, step = 1.5) {
   // repère plan : centre de la Terre à l'origine, départ au sommet (0, R)
   let x = 0, y = R, px = Math.cos(e), py = Math.sin(e);
   const pts = [[0, 0]];
-  let apex = 0, prevH = 0;
+  let apex = 0, prevH = 0, len = 0;     // len : longueur réelle parcourue (km)
   for (let i = 0; i < 20000; i++) {
     // RK2 (point milieu)
     const acc = (X, Y) => {
@@ -59,6 +59,7 @@ export function trace(fp2, f, elevDeg, step = 1.5) {
     const pxm = px + 0.5 * step * ax, pym = py + 0.5 * step * ay;
     const [bx, by] = acc(xm, ym);
     x += step * pxm; y += step * pym; px += step * bx; py += step * by;
+    len += step * Math.hypot(pxm, pym);
     // renormalisation |p| = n (stabilité numérique)
     const r = Math.hypot(x, y), h = r - R, nn = Math.sqrt(Math.max(1e-6, n2(h))), pn = Math.hypot(px, py);
     px *= nn / pn; py *= nn / pn;
@@ -67,7 +68,7 @@ export function trace(fp2, f, elevDeg, step = 1.5) {
     apex = Math.max(apex, h);
     if (h <= 0 && prevH > 0 && i > 5) {
       pts.push([th, 0]);
-      return { pts, ground: th * R, apex };
+      return { pts, ground: th * R, apex, len };
     }
     if (h > HTOP) return { pts, ground: null, apex };
     prevH = h;

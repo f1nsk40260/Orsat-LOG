@@ -592,6 +592,17 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.31.0 (28/10/2026) : absorption D et chances de réception dans la fenêtre Trajet
+- `linkbudget.js` : bilan de liaison par rayon — puissance en face (réglable, 100 W), dipôle +2 dBi, loop du WebSDR
+  (NEC) à l'élévation du rayon, espace libre sur la longueur réelle du trajet, absorption D George & Bradley par
+  saut (sec de l'angle réel, facteur fmin mesuré, éruption D-RAP), 3 dB par rebond au sol, 9 dB de pertes diverses ;
+  bruit UIT-R P.372 rural + galactique, relevé de l'excès de bruit mesuré par ORSAT. Chances = loi normale σ 7 dB
+  autour du SNR, seuils SSB +10 dB/2,4 kHz, CW 0 dB/500 Hz, FT8 −21 dB, WSPR −28 dB (2,5 kHz).
+- Route `/api/linkctx` (SSN, hauteur du Soleil au récepteur, facteur D, éruption, excès de bruit par bande).
+- Fenêtre : tableau des chances par mode pour les 3 sauts, sol colorié selon les chances du mode choisi
+  (ou la couverture de l'antenne), points de chute colorés, phrase de résumé, aide complétée.
+- Limites : ordres de grandeur ; bruit et antenne valent pour la réception au WebSDR.
+
 ## Fait — v1.30.0 (28/10/2026) : zoom du dessin de la fenêtre Trajet
 - Molette sur le dessin : zoom centré sur la souris (jusqu'à ×12) ; glisser pour se déplacer ; boutons ＋ / − /
   « Vue entière ». Traits, points et textes gardent leur taille à l'écran quel que soit le zoom.

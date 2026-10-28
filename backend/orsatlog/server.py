@@ -1070,6 +1070,29 @@ def _gfz_day(day):
     return {"kp": row[0], "ap": row[1], "sfi": row[2], "sn": row[3]}
 
 
+@app.get("/api/linkctx")
+async def get_linkctx():
+    """Contexte du bilan de liaison de la fenêtre Trajet : activité solaire, hauteur du Soleil au récepteur,
+    absorption D mesurée (facteur fmin, éruption) et écart du bruit de fond mesuré par ORSAT à son habitude."""
+    sol = await asyncio.to_thread(solar.get_solar) or {}
+    ll = _storm_center() or geo.locator_to_latlon("IN93LR")
+    now = datetime.now(timezone.utc)
+    try:
+        h0, cls = dlayer.haf0()
+    except Exception:
+        h0, cls = None, None
+    try:
+        fac = dlayer.factor_at((round(ll[0], 1), round(ll[1], 1)))
+    except Exception:
+        fac = 1.0
+    noise = await asyncio.to_thread(_noise_now)
+    return {"ssn": round(reach.ssn_from_sfi(sol.get("sfi")), 1), "sfi": sol.get("sfi"),
+            "chi": round(reach.solar_zenith(ll[0], ll[1], now), 1), "dfactor": round(fac, 2),
+            "haf0": round(h0, 1) if h0 else None, "flare": cls if h0 else None,
+            "noise": {b: v["excess"] for b, v in (noise or {}).get("bands", {}).items()},
+            "noise_at": (noise or {}).get("at")}
+
+
 @app.get("/api/antenna")
 async def get_antenna():
     """Diagramme vertical (NEC, moyenne en azimut) de l'antenne du WebSDR, par bande."""
