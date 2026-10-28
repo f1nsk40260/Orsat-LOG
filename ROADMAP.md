@@ -592,6 +592,11 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.33.0 (28/10/2026) : placer un locator sur la courbe des distances
+- Fenêtre Trajet : case « Placer un locator » (saisie temporaire, rien n'est enregistré) : distance et azimut depuis
+  IN93LR, drapeau sur le dessin, nombre de sauts et meilleur angle pour l'atteindre, chances par mode ;
+  bouton « ↗ Viser » qui règle l'angle de départ. `locator.js` (Maidenhead 4/6/8, orthodromie). Calculs inchangés.
+
 ## Fait — v1.32.0 (28/10/2026) : antenne d'en face au choix dans la fenêtre Trajet
 - `txantennas.js` : 19 antennes types (dipôles 6/10/15/25 m, V inversé, EFHW, NVIS, loops horizontales 7/15 m,
   delta-loop, loop magnétique, verticales λ/4 et 5/8 au sol, ground-plane, hexbeam, Yagi 3/5 él., quad) — modèles

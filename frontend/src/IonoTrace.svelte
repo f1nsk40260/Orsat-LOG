@@ -5,6 +5,7 @@
   import { profile, trace, fan, foMax, layerName, R } from './raytrace.js';
   import { budget, MODES, pct, pCls } from './linkbudget.js';
   import { TX_ANTENNAS, txGain, usable } from './txantennas.js';
+  import { locToLatLon, distAz, dirName } from './locator.js';
 
   let { onclose = null, locator = 'IN93LR' } = $props();
 
@@ -145,6 +146,29 @@
       return { lo, hi, modes: MODES.map((m, k) => bs.reduce((a, c) => (c.b.modes[k].p > a.p
         ? { p: c.b.modes[k].p, snr: c.b.modes[k].snr, el: c.r.el, la: c.b.la } : a), { p: -1 })) };
     });
+  });
+  // ---------- locator à placer sur la courbe (saisie temporaire, rien n'est enregistré) ----------
+  const HOME = locToLatLon('IN93LR');
+  let locIn = $state('');
+  const target = $derived.by(() => {
+    const ll = locToLatLon(locIn);
+    if (!ll) return null;
+    const [d, az] = distAz(HOME, ll);
+    return { loc: locIn.trim().toUpperCase(), d, az };
+  });
+  // comment l'atteindre : en 1, 2 ou 3 sauts, avec l'angle qui donne la meilleure chance (mode choisi)
+  const tgt = $derived.by(() => {
+    if (!target || !fine.length) return null;
+    const k = MODES.findIndex((m) => m.id === (groundMode === 'Antenne' ? 'SSB' : groundMode));
+    const tol = Math.max(25, target.d * 0.03);
+    for (const hops of [1, 2, 3]) {
+      const rs = fine.filter((r) => Math.abs(r.ground * hops - target.d) <= tol * hops);
+      if (!rs.length) continue;
+      let best = null;
+      for (const r of rs) { const b = bud(r, hops); if (!best || b.modes[k].p > best.b.modes[k].p) best = { r, b }; }
+      return { hops, el: best.r.el, b: best.b, mode: MODES[k].id };
+    }
+    return { hops: 0 };
   });
   const modesTxt = (b) => b.modes.slice().reverse().map((m) => `${m.id} ${pct(m.p)}`).join(', ');
 
@@ -371,6 +395,21 @@
       </div>
     </div>
 
+    <div class="grp locbox">
+      <span class="lab">Placer un locator</span>
+      <input class="locin" class:bad={locIn.trim() && !target} bind:value={locIn} maxlength="8" placeholder="ex. JN18EU"
+             spellcheck="false" autocomplete="off" title="Saisie temporaire : le locator est placé sur la courbe des distances (rien n'est enregistré)" />
+      {#if locIn}<button type="button" class="locclr" onclick={() => (locIn = '')} title="Effacer">✕</button>{/if}
+      {#if target}
+        <span class="locres"><b>{target.loc}</b> : {km(target.d)} km au {Math.round(target.az)}° ({dirName(target.az)}) —
+          {#if !tgt || tgt.hops === 0}aucun angle n'y retombe en 1 à 3 sauts (zone de silence ou trop loin)
+          {:else}{tgt.hops} saut{tgt.hops > 1 ? 's' : ''}, départ à {tgt.el}° :
+            {#each tgt.b.modes.slice().reverse() as m, i}{i ? ', ' : ''}<span class="lp {pCls(m.p)}">{m.id} {pct(m.p)}</span>{/each}
+            {#if Math.round(tgt.el) !== elev}<button type="button" class="aim" onclick={() => setE(tgt.el)} title="Régler l'angle de départ sur celui qui atteint ce locator">↗ Viser ({Math.round(tgt.el)}°)</button>{/if}{/if}
+        </span>
+      {:else if locIn.trim()}<span class="locres muted">locator incomplet ou invalide (4, 6 ou 8 caractères)</span>{/if}
+    </div>
+
     <div class="wrap" bind:clientWidth={cw}>
       <div class="zoombar">
         <button type="button" onclick={() => zoomAt(0.5, 0.5, 1.5)} title="Zoomer (ou molette sur le dessin)">＋</button>
@@ -423,6 +462,14 @@
           {/each}
         {/if}
         <circle cx={P(0, 0)[0]} cy={P(0, 0)[1]} r={4 / zoom} class="me" />
+        {#if target && target.d <= dMax}
+          {@const [gx, gy] = P(target.d / R, 0).map(Number)}
+          {@const top = P(target.d / R, 140).map(Number)}
+          <line x1={gx} y1={gy} x2={top[0]} y2={top[1]} class="flagpole" />
+          <path d={`M${top[0]},${top[1]} l${16 / zoom},${5 / zoom} l${-16 / zoom},${5 / zoom} Z`} class="flag" />
+          <text x={top[0]} y={top[1] - 6 / zoom} class="flagt" text-anchor="middle">{target.loc} · {km(target.d)} km</text>
+          <circle cx={gx} cy={gy} r={5 / zoom} class="flagdot" />
+        {/if}
       </svg>
     </div>
     <div class="legend">
@@ -559,6 +606,21 @@
            border-radius: 6px; padding: 4px 8px; cursor: pointer; max-width: 340px; }
   .txsel option, .txsel optgroup { background: #1d1a12; color: var(--text); }
   .txg { color: var(--muted); font-size: 0.85rem; }
+  .locbox { margin-top: 2px; }
+  .locin { font: inherit; font-size: 1.05rem; width: 120px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--gold);
+           background: rgba(0, 0, 0, 0.45); border: 1px solid var(--panel-edge); border-radius: 6px; padding: 4px 8px; }
+  .locin.bad { border-color: var(--warn); }
+  .aim { padding: 2px 10px; font-size: 0.95rem; margin-left: 8px; }
+  .locclr { padding: 2px 10px; font-size: 1.05rem; }
+  .locres { font-size: 0.95rem; }
+  .locres b { color: rgb(90, 200, 255); letter-spacing: 0.05em; }
+  .lp.p9 { color: rgb(60, 240, 100); font-weight: 600; } .lp.p5 { color: rgb(255, 205, 0); font-weight: 600; }
+  .lp.p1 { color: rgb(255, 90, 80); } .lp.p0 { color: var(--muted); }
+  .flagpole { stroke: rgb(90, 200, 255); stroke-width: 2; vector-effect: non-scaling-stroke; }
+  .flag { fill: rgb(90, 200, 255); }
+  .flagdot { fill: rgb(90, 200, 255); stroke: #000; stroke-width: 1.5; }
+  .flagt { fill: rgb(150, 225, 255); font-size: calc(13px / var(--z)); font-weight: 700; paint-order: stroke;
+           stroke: rgba(0, 0, 0, 0.9); stroke-width: calc(3.5px / var(--z)); }
   .antbtn { padding: 4px 12px; font-size: 0.95rem; }
   .antbtn.on { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); font-weight: 600; }
   .lobe { fill: rgba(90, 200, 220, 0.18); stroke: rgb(90, 200, 220); stroke-width: 1.5; }
