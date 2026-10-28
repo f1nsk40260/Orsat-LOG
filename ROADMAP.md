@@ -592,6 +592,11 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.31.2 (28/10/2026) : bande des chances plus fine et plus visible
+- Éventail fin au demi-degré ; sol découpé en tranches de 10 km (meilleure chance des angles qui y retombent,
+  tranches voisines fusionnées) ; couleurs vives cernées de noir, gris pour moins de 10 % ; zone de silence en
+  pointillé gris clair ; graduations de distance adaptées au zoom (jusqu'à tous les 50 km).
+
 ## Fait — v1.31.1 (28/10/2026) : chances avant le premier saut
 - Tableau des chances : colonnes « plus près » (tranches de 0 km jusqu'au 1er saut), meilleure chance de la tranche
   parmi les autres angles de départ, « silence » dans la zone de silence ; phrase correspondante dans le résumé.

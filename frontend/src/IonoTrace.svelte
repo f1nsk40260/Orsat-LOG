@@ -73,7 +73,7 @@
   });
   const ant = $derived(showAnt ? antAll : null);
   // éventail fin (1°) : chaque angle qui revient pose sa distance de retour au sol
-  const fine = $derived(fp2 ? fan(fp2, freq, Array.from({ length: 89 }, (_, i) => i + 1)).rays.filter((r) => r.ground != null)
+  const fine = $derived(fp2 ? fan(fp2, freq, Array.from({ length: 177 }, (_, i) => 1 + i / 2)).rays.filter((r) => r.ground != null)
     .sort((a, b) => a.ground - b.ground) : []);
   const spans = (list) => list.map((r, i) => ({ ...r,
     d0: i ? (list[i - 1].d + r.d) / 2 : r.d - 15, d1: i < list.length - 1 ? (r.d + list[i + 1].d) / 2 : r.d + 15 }));
@@ -99,11 +99,29 @@
   const bud = (r, hops) => budget({ f: freq, elev: r.el ?? elev, len1: r.len, hops, grDbi: antAll ? antAll.g(r.el ?? elev) : 0,
                                      ctx, band: nBand, foF2: iono?.foF2, pW });
   const rayB = $derived(ray?.ground && ray.len ? [1, 2, 3].map((h) => bud({ ...ray, el: elev }, h)) : null);
+  // bande des chances sur le sol : tranches de 10 km, chacune prend la meilleure chance des angles qui y
+  // retombent (comme on choisirait son angle), puis les tranches voisines de même couleur sont fusionnées
   const chance = $derived.by(() => {
     if (groundMode === 'Antenne' || !fine.length) return [];
+    const STEP = 10;
     const list = fine.map((r) => { const b = bud(r, 1); const m = b.modes.find((x) => x.id === groundMode);
                                     return { d: r.ground, el: r.el, p: m.p, snr: m.snr, la: b.la }; });
-    return spans(list).filter((r) => r.d1 - r.d0 < 400 && r.p >= 0.1);
+    const bins = new Map();
+    for (const r of spans(list)) {
+      if (r.d1 - r.d0 > 400) continue;
+      for (let k = Math.floor(r.d0 / STEP); k * STEP < r.d1; k++) {
+        const o = bins.get(k);
+        if (!o || r.p > o.p) bins.set(k, r);
+      }
+    }
+    const out = [];
+    for (const k of [...bins.keys()].sort((x, y) => x - y)) {
+      const r = bins.get(k);
+      const last = out[out.length - 1];
+      if (last && last.d1 === k * STEP && pCls(last.p) === pCls(r.p)) { last.d1 = (k + 1) * STEP; if (r.p > last.p) Object.assign(last, { p: r.p, snr: r.snr, el: r.el, la: r.la, d: r.d }); }
+      else out.push({ ...r, d0: k * STEP, d1: (k + 1) * STEP });
+    }
+    return out;
   });
   // zone avant le 1er saut : distances atteintes par les autres angles de départ (plus hauts), en un saut
   const near = $derived.by(() => {
@@ -236,7 +254,9 @@
     return `M${a.join(' L')} L${b.join(' L')} Z`;
   };
   const kmTicks = $derived.by(() => {
-    const st = dMax > 6000 ? 1000 : 500;
+    // pas des graduations adapté à la portion visible : une dizaine de repères à l'écran
+    const vis = dMax / zoom;
+    const st = [50, 100, 250, 500, 1000].find((x) => vis / x <= 12) ?? 1000;
     return Array.from({ length: Math.floor(dMax / st) + 1 }, (_, i) => i * st);
   });
   const hops = $derived(ray?.ground ? Array.from({ length: HOPS }, (_, k) => k) : [0]);
@@ -356,9 +376,10 @@
           <path d={Array.from({ length: 31 }, (_, i) => `${i ? 'L' : 'M'}${P((i / 30) * (fanRes.skip / R), 0).join(',')}`).join(' ')} class="skip" />
         {/if}
         <path d={arc(0)} class="ground" />
+        {#each chance as c}<path d={Array.from({ length: 9 }, (_, i) => `${i ? 'L' : 'M'}${P((c.d0 + (i / 8) * (c.d1 - c.d0)) / R, 0).join(',')}`).join(' ')} class="chbg" />{/each}
         {#each chance as c}
           <path d={Array.from({ length: 5 }, (_, i) => `${i ? 'L' : 'M'}${P((c.d0 + (i / 4) * (c.d1 - c.d0)) / R, 0).join(',')}`).join(' ')}
-                class="ch {pCls(c.p)}"><title>{km(c.d)} km · départ à {c.el}° · {groundMode} : {pct(c.p)} (SNR ≈ {Math.round(c.snr)} dB) · absorption D {c.la.toFixed(1)} dB</title></path>
+                class="ch {pCls(c.p)}"><title>{km(c.d0)} à {km(c.d1)} km · meilleur angle {c.el}° · {groundMode} : {pct(c.p)} (SNR ≈ {Math.round(c.snr)} dB) · absorption D {c.la.toFixed(1)} dB</title></path>
         {/each}
         {#if cover && groundMode === 'Antenne'}
           {#each cover.segs as c}
@@ -391,7 +412,7 @@
       <span><i class="k-iono"></i>ionosphère (plus c'est doré, plus elle est dense)</span>
       {#if ant}<span><i class="k-lobe"></i>lobe de la loop</span>{/if}
       {#if groundMode === 'Antenne'}<span><i class="k-cov"></i>bien couvert par la loop</span><span><i class="k-cov2"></i>couvert moins bien</span>
-      {:else}<span class="lgm">chances en {groundMode} :</span><span><i class="ch-p9"></i>≥ 90 %</span><span><i class="ch-p5"></i>50 à 90 %</span><span><i class="ch-p1"></i>10 à 50 %</span>{/if}
+      {:else}<span class="lgm">chances en {groundMode} :</span><span><i class="ch-p9"></i>≥ 90 %</span><span><i class="ch-p5"></i>50 à 90 %</span><span><i class="ch-p1"></i>10 à 50 %</span><span><i class="ch-p0"></i>moins de 10 %</span>{/if}
     </div>
     <div class="summary">{#each summary as l}<p>{l}</p>{/each}</div>
     {#if rayB}
@@ -471,7 +492,7 @@
   .alt { fill: none; stroke: rgba(207, 181, 59, 0.15); stroke-dasharray: 3 4; }
   .axis { fill: var(--muted); font-size: calc(11px / var(--z)); }
   .ground { fill: none; stroke: rgb(120, 160, 90); stroke-width: 2; }
-  .skip { fill: none; stroke: var(--bad); stroke-width: 5; opacity: 0.75; }
+  .skip { fill: none; stroke: rgb(200, 200, 210); stroke-width: 5; stroke-dasharray: 6 5; opacity: 0.8; }
   .fan { fill: none; stroke: rgba(240, 225, 170, 0.22); stroke-width: 1; }
   .fan.out { stroke: rgba(160, 160, 160, 0.14); }
   .helpbtn { margin-left: auto; padding: 2px 12px; font-size: 1rem; text-transform: none; letter-spacing: 0; }
@@ -484,15 +505,16 @@
   .help b.o { color: rgb(255, 120, 60); } .help b.g { color: rgb(110, 220, 120); }
   .lay { fill: var(--gold); font-size: calc(13px / var(--z)); font-weight: 700; }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.85rem; color: var(--text); }
-  .legend i { display: inline-block; width: 18px; height: 4px; margin-right: 6px; vertical-align: 3px; border-radius: 2px; }
+  .legend i { display: inline-block; width: 18px; height: 6px; margin-right: 6px; vertical-align: 3px; border-radius: 2px; }
   .k-ray { background: rgb(255, 120, 60); } .k-fan { background: rgba(240, 225, 170, 0.5); } .k-out { background: rgba(160, 160, 160, 0.4); }
-  .k-skip { background: var(--bad); } .k-iono { background: rgba(207, 181, 59, 0.6); height: 10px !important; vertical-align: -1px !important; }
+  .k-skip { background: repeating-linear-gradient(90deg, rgb(200, 200, 210) 0 5px, transparent 5px 9px); } .k-iono { background: rgba(207, 181, 59, 0.6); height: 10px !important; vertical-align: -1px !important; }
   .k-lobe { background: rgba(90, 200, 220, 0.6); border: 1px solid rgb(90, 200, 220); height: 8px !important; vertical-align: 0 !important; }
   .k-cov { background: rgb(95, 210, 110); } .k-cov2 { background: rgba(224, 180, 60, 0.7); }
-  .ch { fill: none; stroke-width: 7; }
-  .ch.p9 { stroke: rgb(95, 210, 110); } .ch.p5 { stroke: rgb(224, 180, 60); } .ch.p1 { stroke: rgba(214, 80, 80, 0.8); }
+  .chbg { fill: none; stroke: #000; stroke-width: 13; stroke-linecap: butt; opacity: 0.85; }
+  .ch { fill: none; stroke-width: 9; stroke-linecap: butt; }
+  .ch.p9 { stroke: rgb(40, 255, 90); } .ch.p5 { stroke: rgb(255, 205, 0); } .ch.p1 { stroke: rgb(255, 55, 55); } .ch.p0 { stroke: rgb(95, 95, 105); }
   .land.p9 { fill: rgb(95, 210, 110); } .land.p5 { fill: rgb(224, 180, 60); } .land.p1, .land.p0 { fill: rgb(214, 80, 80); }
-  .ch-p9 { background: rgb(95, 210, 110); } .ch-p5 { background: rgb(224, 180, 60); } .ch-p1 { background: rgb(214, 80, 80); }
+  .ch-p9 { background: rgb(40, 255, 90); } .ch-p5 { background: rgb(255, 205, 0); } .ch-p1 { background: rgb(255, 55, 55); } .ch-p0 { background: rgb(95, 95, 105); }
   .lgm { color: var(--muted); }
   .chances { width: 100%; border-collapse: collapse; font-size: 0.95rem; cursor: help; }
   .chances th { color: var(--gold-soft); font-weight: 500; text-align: center; padding: 3px 6px; font-size: 0.85rem; }
