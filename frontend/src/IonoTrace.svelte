@@ -105,6 +105,21 @@
                                     return { d: r.ground, el: r.el, p: m.p, snr: m.snr, la: b.la }; });
     return spans(list).filter((r) => r.d1 - r.d0 < 400 && r.p >= 0.1);
   });
+  // zone avant le 1er saut : distances atteintes par les autres angles de départ (plus hauts), en un saut
+  const near = $derived.by(() => {
+    if (!rayB || !fine.length) return [];
+    const lim = ray.ground;
+    const edges = [0, ...[250, 500, 1000, 1500, 2000, 3000].filter((e) => e < lim - 100), lim];
+    return edges.slice(0, -1).map((lo, i) => {
+      const hi = edges[i + 1];
+      const rs = fine.filter((r) => r.ground >= lo && r.ground < hi);
+      if (!rs.length) return { lo, hi, silent: true };
+      const bs = rs.map((r) => ({ r, b: bud(r, 1) }));
+      // pour chaque mode : la meilleure chance dans la tranche, et l'angle qui la donne
+      return { lo, hi, modes: MODES.map((m, k) => bs.reduce((a, c) => (c.b.modes[k].p > a.p
+        ? { p: c.b.modes[k].p, snr: c.b.modes[k].snr, el: c.r.el, la: c.b.la } : a), { p: -1 })) };
+    });
+  });
   const modesTxt = (b) => b.modes.slice().reverse().map((m) => `${m.id} ${pct(m.p)}`).join(', ');
 
   // résumé en phrases simples
@@ -118,6 +133,11 @@
     if (fanRes.allBack) out.push('Tous les angles reviennent : pas de zone de silence, cette fréquence sert aussi bien pour le proche que pour le lointain.');
     else if (fanRes.skip != null) out.push(`Personne entre 0 et ${km(fanRes.skip)} km ne reçoit l'onde réfléchie (zone de silence) ; un seul saut porte au plus à ${km(fanRes.maxHop)} km.`);
     else out.push('Aucun angle ne revient : la fréquence est au-dessus de ce que l\'ionosphère réfléchit en ce moment.');
+    if (near.length) {
+      const k = MODES.findIndex((m) => m.id === (groundMode === 'Antenne' ? 'SSB' : groundMode));
+      out.push(`Plus près, avec des angles de départ plus hauts, en ${MODES[k].id} : `
+        + near.map((z) => `${km(z.lo)} à ${km(z.hi)} km ${z.silent ? 'zone de silence' : pct(z.modes[k].p)}`).join(' · ') + '.');
+    }
     if (rayB) out.push(`Chances de réception à ${km(ray.ground)} km avec ${pW} W : ${modesTxt(rayB[0])} (SNR en SSB ≈ ${Math.round(rayB[0].modes[0].snr)} dB, absorption de la couche D ${rayB[0].la.toFixed(1)} dB). Au 2e saut (${km(2 * ray.ground)} km) : ${modesTxt(rayB[1])}.`);
     if (ant) {
       const rel = ant.gmax - ant.g(elev);
@@ -377,14 +397,17 @@
     {#if rayB}
       <table class="chances" title="Probabilité que le signal dépasse le seuil du mode, compte tenu des variations (fading) d'environ ±7 dB">
         <thead><tr><th>Chances de réception · {pW} W, dipôle en face</th>
+          {#each near as z}<th class="nr" title="Distances avant le 1er saut, atteintes par d'autres angles de départ (plus hauts) : meilleure chance de la tranche">{km(z.lo)}–{km(z.hi)} km<br><small>plus près</small></th>{/each}
           {#each rayB as _, k}<th>{k + 1}{k ? 'e' : 'er'} saut · {km((k + 1) * ray.ground)} km</th>{/each}</tr></thead>
         <tbody>
           {#each MODES as m, i}
             <tr><td>{m.label} <small>(seuil {m.req > 0 ? '+' : ''}{m.req} dB en {m.bw} Hz)</small></td>
+              {#each near as z}{#if z.silent}<td class="sil" title="Aucun angle ne retombe ici : zone de silence (seule l'onde de sol, sur quelques dizaines de km)">silence</td>
+                {:else}<td class="nr {pCls(z.modes[i].p)}" title="Meilleur angle {z.modes[i].el}° · SNR {z.modes[i].snr.toFixed(1)} dB en {m.bw} Hz · absorption D {z.modes[i].la.toFixed(1)} dB">{pct(z.modes[i].p)}</td>{/if}{/each}
               {#each rayB as b}<td class={pCls(b.modes[i].p)} title="SNR estimé {b.modes[i].snr.toFixed(1)} dB en {m.bw} Hz">{pct(b.modes[i].p)}</td>{/each}</tr>
           {/each}
-          <tr class="det"><td>Absorption de la couche D</td>{#each rayB as b}<td>{b.la.toFixed(1)} dB</td>{/each}</tr>
-          <tr class="det"><td>Affaiblissement de trajet</td>{#each rayB as b}<td>{b.lbf.toFixed(0)} dB</td>{/each}</tr>
+          <tr class="det"><td>Absorption de la couche D</td>{#each near as z}<td class="nr">{z.silent ? '' : `${Math.min(...z.modes.map((m) => m.la)).toFixed(1)} dB`}</td>{/each}{#each rayB as b}<td>{b.la.toFixed(1)} dB</td>{/each}</tr>
+          <tr class="det"><td>Affaiblissement de trajet</td>{#each near as z}<td class="nr"></td>{/each}{#each rayB as b}<td>{b.lbf.toFixed(0)} dB</td>{/each}</tr>
         </tbody>
       </table>
       <p class="src">Bruit : modèle UIT-R P.372 (zone rurale){ctx?.noise?.[nBand] != null ? `, corrigé du bruit mesuré par ORSAT sur ${nBand} (${ctx.noise[nBand] > 0 ? '+' : ''}${ctx.noise[nBand]} dB par rapport à l'habitude)` : ''}.
@@ -478,6 +501,9 @@
   .chances td small { color: var(--muted); }
   .chances td.p9 { color: rgb(110, 220, 120); font-weight: 700; } .chances td.p5 { color: rgb(230, 190, 70); font-weight: 600; }
   .chances td.p1 { color: rgb(224, 110, 90); } .chances td.p0 { color: var(--muted); }
+  .chances th.nr { color: var(--muted); } .chances th small { font-size: 0.75rem; text-transform: none; }
+  .chances td.nr { background: rgba(255, 255, 255, 0.02); }
+  .chances td.sil { color: var(--bad); font-size: 0.85rem; background: rgba(214, 80, 80, 0.06); }
   .chances tr.det td { color: var(--muted); font-size: 0.85rem; }
   .summary { border-left: 3px solid var(--gold); padding: 4px 12px; background: rgba(207, 181, 59, 0.06); font-size: 1rem; line-height: 1.45; }
   .summary p { margin: 2px 0; }

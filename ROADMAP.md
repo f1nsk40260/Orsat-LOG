@@ -592,6 +592,10 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.31.1 (28/10/2026) : chances avant le premier saut
+- Tableau des chances : colonnes « plus près » (tranches de 0 km jusqu'au 1er saut), meilleure chance de la tranche
+  parmi les autres angles de départ, « silence » dans la zone de silence ; phrase correspondante dans le résumé.
+
 ## Fait — v1.31.0 (28/10/2026) : absorption D et chances de réception dans la fenêtre Trajet
 - `linkbudget.js` : bilan de liaison par rayon — puissance en face (réglable, 100 W), dipôle +2 dBi, loop du WebSDR
   (NEC) à l'élévation du rayon, espace libre sur la longueur réelle du trajet, absorption D George & Bradley par
