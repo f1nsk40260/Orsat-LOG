@@ -31,6 +31,31 @@
     foEs: pts[cur].es ? med((p) => p.es) : null, time: pts[cur].time,
   });
 
+  // ---------- fenêtre glissante (sans voile sombre : la page reste visible et utilisable dessous) ----------
+  const POS_KEY = 'orsatlog.trace.pos2';   // décalage depuis le haut, centré en largeur
+  let pos = $state((() => { try { return JSON.parse(localStorage.getItem(POS_KEY)) || { x: 0, y: 0 }; } catch { return { x: 0, y: 0 }; } })());
+  let mini = $state(false);
+  function draggable(node) {
+    let st = null;
+    const down = (e) => {
+      if (e.target.closest('button')) return;
+      st = { x: e.clientX, y: e.clientY, px: pos.x, py: pos.y };
+      node.setPointerCapture(e.pointerId);
+    };
+    const move = (e) => {
+      if (!st) return;
+      // la barre de titre reste toujours attrapable à l'écran
+      const lim = (v, m) => Math.max(-m, Math.min(m, v));
+      const w = node.parentElement.offsetWidth, mx = Math.max(0, (window.innerWidth - w) / 2) + w / 3;
+      pos = { x: lim(st.px + e.clientX - st.x, mx), y: Math.max(-10, Math.min(window.innerHeight - 70, st.py + e.clientY - st.y)) };
+    };
+    const up = () => { if (st) { st = null; try { localStorage.setItem(POS_KEY, JSON.stringify(pos)); } catch {} } };
+    node.addEventListener('pointerdown', down); node.addEventListener('pointermove', move);
+    node.addEventListener('pointerup', up); node.addEventListener('pointercancel', up);
+    return { destroy() { node.removeEventListener('pointerdown', down); node.removeEventListener('pointermove', move);
+      node.removeEventListener('pointerup', up); node.removeEventListener('pointercancel', up); } };
+  }
+
   // ---------- réglages : fréquence et angle de départ ----------
   const BANDS = [['160m', 1.84], ['80m', 3.65], ['60m', 5.36], ['40m', 7.1], ['30m', 10.12], ['20m', 14.1],
                  ['17m', 18.1], ['15m', 21.2], ['12m', 24.94], ['10m', 28.5], ['6m', 50.15]];
@@ -317,9 +342,9 @@
   const km = (v) => Math.round(v).toLocaleString('fr-FR');
 </script>
 
-<div class="backdrop" onclick={onclose} role="presentation"></div>
-<section class="panel tr">
-  <h2 class="panel-title">Trajet d'une onde depuis {locator}
+<section class="panel tr" class:mini style="transform: translate(calc(-50% + {pos.x}px), {pos.y}px)">
+  <h2 class="panel-title drag" use:draggable title="Glisser pour déplacer la fenêtre">✥ Trajet d'une onde depuis {locator}
+    <button class="ghost minbtn" onclick={() => (mini = !mini)} title={mini ? 'Déplier la fenêtre' : 'Réduire la fenêtre à sa barre de titre'}>{mini ? '▢ Déplier' : '▁ Réduire'}</button>
     <button class="ghost helpbtn" class:on={showHelp} onclick={() => (showHelp = !showHelp)} title="Comment lire cette fenêtre">? Aide</button>
     <button class="ghost close" onclick={onclose} title="Fermer">✕</button></h2>
 
@@ -573,10 +598,15 @@
 </section>
 
 <style>
-  .backdrop { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, 0.6); }
-  .tr { position: fixed; z-index: 21; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  .tr { position: fixed; z-index: 21; top: 3vh; left: 50%; box-shadow: 0 8px 40px rgba(0, 0, 0, 0.8);
         width: min(1050px, 96vw); max-height: 94vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
   .tr .panel-title { display: flex; align-items: center; font-size: 0.95rem; }
+  .drag { cursor: move; user-select: none; touch-action: none; margin: -4px -6px 0; padding: 4px 6px;
+          border-radius: 6px; background: rgba(207, 181, 59, 0.07); }
+  .tr.mini > :global(*:not(h2)) { display: none; }
+  .tr.mini { overflow: hidden; }
+  .minbtn { margin-left: auto; padding: 2px 12px; font-size: 1rem; text-transform: none; letter-spacing: 0; }
+  .minbtn + .helpbtn { margin-left: 10px; }
   .close { margin-left: 10px; padding: 1px 12px; font-size: 1.5rem; line-height: 1.2; }
   .ctl { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; }
   .grp { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
