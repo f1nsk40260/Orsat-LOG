@@ -29,6 +29,7 @@ export const api = {
   settings: () => req('GET', 'api/settings'),
   solar: () => req('GET', 'api/solar'),
   spacewx: () => req('GET', 'api/spacewx'),
+  antenna: () => req('GET', 'api/antenna'),
   layers: (day) => req('GET', `api/layers/${day}`),
   openBands: () => req('GET', 'api/openbands'),
   skipMap: () => req('GET', 'api/skipmap'),

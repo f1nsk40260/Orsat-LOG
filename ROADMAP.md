@@ -592,6 +592,12 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.29.0 (28/10/2026) : zone couverte par l'antenne du WebSDR
+- Fenêtre Trajet, bouton « 📡 Antenne du WebSDR » : lobe vertical NEC de la loop (bande la plus proche) dessiné
+  au départ, et zone couverte au sol au 1er saut (éventail de 1° en 1°, chaque retour pondéré par le gain) :
+  vert ≤ 3 dB du maxi, vert pâle ≤ 6 dB, ambre ≤ 10 dB. Gain à l'angle choisi et maxi affichés.
+- Route `/api/antenna` (diagramme moyenné en azimut, orientation de la loop toujours inconnue).
+
 ## Fait — v1.28.0 (28/10/2026) : trajet d'une onde (tracé de rayons)
 - Bouton « 〽 Trajet » du bandeau : fenêtre qui trace le rebond d'une onde depuis IN93LR sur l'ionosphère
   mesurée (ionosonde du jour, médiane ±20 min) : coupe de la Terre courbe (échelle verticale exagérée),

@@ -58,6 +58,31 @@
   });
   const HOPS = 3;
 
+  // ---------- antenne du WebSDR (diagramme NEC) : zone couverte au premier saut ----------
+  let showAnt = $state(false);
+  let antData = $state(null);
+  $effect(() => { if (showAnt && !antData) api.antenna().then((a) => (antData = a)).catch(() => (antData = { error: true })); });
+  const ant = $derived.by(() => {
+    if (!showAnt || !antData?.bands) return null;
+    const [name, b] = Object.entries(antData.bands).reduce((a, c) => (Math.abs(c[1].mhz - freq) < Math.abs(a[1].mhz - freq) ? c : a));
+    const g = (e) => b.avg[Math.max(0, Math.min(90, Math.round(e)))];
+    let gmax = -99, emax = 0;
+    for (let e = 1; e <= 89; e++) if (g(e) > gmax) { gmax = g(e); emax = e; }
+    return { name, mhz: b.mhz, far: Math.abs(b.mhz - freq) / freq > 0.15, g, gmax, emax };
+  });
+  // éventail fin (1°) : chaque angle qui revient pose sa distance de retour au sol, pondérée par le gain
+  const cover = $derived.by(() => {
+    if (!ant || !fp2) return null;
+    const rays = fan(fp2, freq, Array.from({ length: 89 }, (_, i) => i + 1)).rays.filter((r) => r.ground != null)
+      .map((r) => ({ d: r.ground, rel: ant.g(r.el) - ant.gmax, el: r.el })).sort((a, b) => a.d - b.d);
+    const segs = rays.map((r, i) => ({ ...r,
+      d0: i ? (rays[i - 1].d + r.d) / 2 : r.d - 15, d1: i < rays.length - 1 ? (r.d + rays[i + 1].d) / 2 : r.d + 15 }))
+      .filter((r) => r.d1 - r.d0 < 400 && r.rel > -10);
+    const zone = (lim) => { const z = rays.filter((r) => r.rel >= lim); return z.length ? [z[0].d, z[z.length - 1].d] : null; };
+    return { segs, z3: zone(-3), z10: zone(-10) };
+  });
+  const relCls = (rel) => (rel >= -3 ? 'g3' : rel >= -6 ? 'g6' : 'g10');
+
   // ---------- dessin : coupe de la Terre, échelle verticale exagérée ----------
   let cw = $state(900);
   const W = $derived(Math.max(300, Math.round(cw)));
@@ -82,6 +107,19 @@
   const path = (pts, off = 0) => pts.map(([th, h], i) => `${i ? 'L' : 'M'}${P(th + off, h).join(',')}`).join(' ');
   const arc = (h, n = 80) => Array.from({ length: n + 1 }, (_, i) => `${i ? 'L' : 'M'}${P((i / n) * geo.span, h).join(',')}`).join(' ');
 
+  // lobe de l'antenne dessiné au point de départ (champ relatif, échelle linéaire)
+  const lobe = $derived.by(() => {
+    if (!ant) return '';
+    const [ox, oy] = P(0, 0).map(Number), [tx, ty] = P(200 / R, 0).map(Number), [ux, uy] = P(0, 60).map(Number);
+    const tn = Math.hypot(tx - ox, ty - oy), un = Math.hypot(ux - ox, uy - oy);
+    const t = [(tx - ox) / tn, (ty - oy) / tn], u = [(ux - ox) / un, (uy - oy) / un], L = Math.min(150, H * 0.45);
+    let d = `M${ox},${oy}`;
+    for (let e = 0; e <= 90; e += 2) {
+      const r = L * Math.pow(10, (Math.max(-30, ant.g(e) - ant.gmax)) / 20), a = (e * Math.PI) / 180;
+      d += ` L${(ox + r * (Math.cos(a) * t[0] + Math.sin(a) * u[0])).toFixed(1)},${(oy + r * (Math.cos(a) * t[1] + Math.sin(a) * u[1])).toFixed(1)}`;
+    }
+    return d + ' Z';
+  });
   // ionosphère en strates colorées selon la densité (fp / fo max)
   const strata = $derived.by(() => {
     if (!fp2) return [];
@@ -139,6 +177,8 @@
           <b>{fmtTime(iono.time)} UTC</b>
           <button type="button" onclick={() => (idx = cur + 1 >= pts.length - 1 ? -1 : cur + 1)} disabled={cur >= pts.length - 1}>▶</button>
         </div>
+        <button type="button" class="antbtn" class:on={showAnt} onclick={() => (showAnt = !showAnt)}
+                title="Diagramme réel (NEC) de la loop du WebSDR : lobe au départ et zone couverte au sol au premier saut">📡 Antenne du WebSDR</button>
       </div>
     </div>
 
@@ -157,6 +197,13 @@
           <path d={Array.from({ length: 31 }, (_, i) => `${i ? 'L' : 'M'}${P((i / 30) * (fanRes.skip / R), 0).join(',')}`).join(' ')} class="skip" />
         {/if}
         <path d={arc(0)} class="ground" />
+        {#if cover}
+          {#each cover.segs as c}
+            <path d={Array.from({ length: 5 }, (_, i) => `${i ? 'L' : 'M'}${P((c.d0 + (i / 4) * (c.d1 - c.d0)) / R, 0).join(',')}`).join(' ')}
+                  class="cov {relCls(c.rel)}"><title>{km(c.d)} km · départ à {c.el}° · {c.rel.toFixed(1)} dB / maxi</title></path>
+          {/each}
+        {/if}
+        {#if lobe}<path d={lobe} class="lobe" />{/if}
         {#each kmTicks as d}
           <text x={P(d / R, 0)[0]} y={+P(d / R, 0)[1] + 13} class="axis" text-anchor={d === 0 ? 'start' : 'middle'}>{d ? km(d) : '0 km'}</text>
         {/each}
@@ -181,6 +228,12 @@
       {:else}
         <div><span>À {elev}°, sur {freq.toFixed(2)} MHz</span><b class="bad">l'onde traverse l'ionosphère : pas de retour</b></div>
       {/if}
+      {#if ant}
+        <div><span>Antenne ({ant.name}{ant.far ? ', bande calculée la plus proche' : ''})</span>
+          <b>{ant.g(elev).toFixed(1)} dBi à {elev}° · maxi {ant.gmax.toFixed(1)} dBi à {ant.emax}°</b></div>
+        <div><span>Zone couverte (≤ 3 dB du maxi)</span><b class="g3t">{cover?.z3 ? `${km(cover.z3[0])} à ${km(cover.z3[1])} km` : 'aucune au 1er saut'}</b></div>
+        <div><span>Zone couverte (≤ 10 dB du maxi)</span><b class="g6t">{cover?.z10 ? `${km(cover.z10[0])} à ${km(cover.z10[1])} km` : 'aucune au 1er saut'}</b></div>
+      {:else if showAnt}<div><span>Antenne</span><b>{antData?.error ? 'diagramme indisponible' : 'lecture…'}</b></div>{/if}
       <div><span>MUF pour {elev}°</span><b>{muf != null ? `${muf} MHz` : '—'}</b></div>
       <div><span>Zone de silence</span>
         <b>{fanRes.allBack ? 'aucune (tous les angles reviennent)' : fanRes.skip != null ? `0 à ${km(fanRes.skip)} km` : 'totale : la fréquence passe à travers'}</b></div>
@@ -220,6 +273,12 @@
   .skip { fill: none; stroke: var(--bad); stroke-width: 5; opacity: 0.75; }
   .fan { fill: none; stroke: rgba(240, 225, 170, 0.22); stroke-width: 1; }
   .fan.out { stroke: rgba(160, 160, 160, 0.14); }
+  .antbtn { padding: 4px 12px; font-size: 0.95rem; }
+  .antbtn.on { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); font-weight: 600; }
+  .lobe { fill: rgba(90, 200, 220, 0.18); stroke: rgb(90, 200, 220); stroke-width: 1.5; }
+  .cov { fill: none; stroke-width: 7; stroke-linecap: butt; }
+  .cov.g3 { stroke: rgb(95, 210, 110); } .cov.g6 { stroke: rgba(95, 210, 110, 0.5); } .cov.g10 { stroke: rgba(224, 180, 60, 0.45); }
+  .g3t { color: rgb(110, 220, 120); } .g6t { color: rgb(200, 210, 120); }
   .ray { fill: none; stroke: rgb(255, 120, 60); stroke-width: 2.2; stroke-linejoin: round; }
   .land { fill: rgb(255, 120, 60); stroke: #000; stroke-width: 1; }
   .me { fill: var(--gold); stroke: #000; stroke-width: 1; }

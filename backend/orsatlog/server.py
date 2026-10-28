@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, dlayer, eibi, enrich, geo, ionosonde, kc2g, layers, lightning, partners, qrn, qrz, qrzxml, reach, snr, solar, spacewx, weather
+from . import __version__, adif, auth, backup, dlayer, antennas, eibi, enrich, geo, ionosonde, kc2g, layers, lightning, partners, qrn, qrz, qrzxml, reach, snr, solar, spacewx, weather
 from .db import DATA_DIR, Database
 from .websdr import Page, WebSdrLink
 
@@ -1068,6 +1068,14 @@ def _gfz_day(day):
     if not row:
         return None
     return {"kp": row[0], "ap": row[1], "sfi": row[2], "sn": row[3]}
+
+
+@app.get("/api/antenna")
+async def get_antenna():
+    """Diagramme vertical (NEC, moyenne en azimut) de l'antenne du WebSDR, par bande."""
+    pat = await asyncio.to_thread(antennas.websdr_pattern)
+    return {"description": pat["description"],
+            "bands": {b: {"mhz": v["mhz"], "avg": [round(x, 2) for x in v["avg"]]} for b, v in pat["bands"].items()}}
 
 
 @app.get("/api/layers/{day}")
