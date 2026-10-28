@@ -592,6 +592,10 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.30.0 (28/10/2026) : zoom du dessin de la fenêtre Trajet
+- Molette sur le dessin : zoom centré sur la souris (jusqu'à ×12) ; glisser pour se déplacer ; boutons ＋ / − /
+  « Vue entière ». Traits, points et textes gardent leur taille à l'écran quel que soit le zoom.
+
 ## Fait — v1.29.1 (28/10/2026) : fenêtre Trajet plus lisible
 - Résumé en phrases simples sous le dessin (trajet de l'onde, zone de silence, antenne), légende des couleurs,
   nom des couches (D, E, F1, F2) au bord du dessin, infobulles sur chaque résultat, bouton « ? Aide » (mode d'emploi).

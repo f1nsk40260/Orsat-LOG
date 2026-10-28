@@ -139,6 +139,39 @@
     }
     return d + ' Z';
   });
+  // ---------- zoom (molette sur le dessin, centré sur la souris) et déplacement (glisser) ----------
+  let vb = $state(null);                       // [x, y, largeur, hauteur] ; null = vue entière
+  const zoom = $derived(vb ? W / vb[2] : 1);
+  const view = $derived(vb ?? [0, 0, W, H]);
+  function zoomAt(fx, fy, k) {                 // fx, fy : position relative (0-1) dans le dessin
+    const [x, y, w, h] = view;
+    const nw = Math.max(W / 12, Math.min(W, w / k)), nh = nw * H / W;
+    if (nw >= W - 0.5) { vb = null; return; }
+    const nx = Math.max(0, Math.min(W - nw, x + fx * w - fx * nw)), ny = Math.max(0, Math.min(H - nh, y + fy * h - fy * nh));
+    vb = [nx, ny, nw, nh];
+  }
+  function zoomable(node) {
+    let drag = null;
+    const wh = (e) => {
+      e.preventDefault();
+      const r = node.getBoundingClientRect();
+      zoomAt((e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, e.deltaY < 0 ? 1.25 : 0.8);
+    };
+    const down = (e) => { if (!vb) return; drag = { x: e.clientX, y: e.clientY, v: [...vb] }; node.setPointerCapture(e.pointerId); };
+    const move = (e) => {
+      if (!drag) return;
+      const r = node.getBoundingClientRect(), [x, y, w, h] = drag.v;
+      vb = [Math.max(0, Math.min(W - w, x - (e.clientX - drag.x) * w / r.width)),
+            Math.max(0, Math.min(H - h, y - (e.clientY - drag.y) * h / r.height)), w, h];
+    };
+    const up = () => (drag = null);
+    node.addEventListener('wheel', wh, { passive: false });
+    node.addEventListener('pointerdown', down); node.addEventListener('pointermove', move);
+    node.addEventListener('pointerup', up); node.addEventListener('pointercancel', up);
+    return { destroy() { node.removeEventListener('wheel', wh); node.removeEventListener('pointerdown', down);
+      node.removeEventListener('pointermove', move); node.removeEventListener('pointerup', up); node.removeEventListener('pointercancel', up); } };
+  }
+
   // ionosphère en strates colorées selon la densité (fp / fo max)
   const strata = $derived.by(() => {
     if (!fp2) return [];
@@ -227,16 +260,23 @@
     </div>
 
     <div class="wrap" bind:clientWidth={cw}>
-      <svg width={W} height={H} viewBox="0 0 {W} {H}" role="img" aria-label="Coupe de l'ionosphère et trajet de l'onde">
+      <div class="zoombar">
+        <button type="button" onclick={() => zoomAt(0.5, 0.5, 1.5)} title="Zoomer (ou molette sur le dessin)">＋</button>
+        <button type="button" onclick={() => zoomAt(0.5, 0.5, 1 / 1.5)} disabled={!vb} title="Dézoomer">−</button>
+        <button type="button" onclick={() => (vb = null)} disabled={!vb} title="Revenir à la vue entière">⟲ Vue entière</button>
+        <span>{vb ? `zoom ×${zoom.toFixed(1)} · glisser pour se déplacer` : 'molette sur le dessin pour zoomer'}</span>
+      </div>
+      <svg use:zoomable class:zoomed={!!vb} width={W} height={H} viewBox={view.join(' ')} style="--z: {zoom}"
+           role="img" aria-label="Coupe de l'ionosphère et trajet de l'onde">
         {#each strata as s}<path d={band(s.h, s.h + 6)} class="iono" style="opacity: {s.o}" />{/each}
         {#each [100, 200, 300, 400] as h}
           <path d={arc(h)} class="alt" />
-          <text x={P(0, h)[0] - 4} y={+P(0, h)[1] + 3} class="axis" text-anchor="end">{h}</text>
+          <text x={P(0, h)[0] - 4 / zoom} y={+P(0, h)[1] + 3 / zoom} class="axis" text-anchor="end">{h}</text>
         {/each}
-        <text x={P(0, 470)[0] - 4} y={+P(0, 470)[1] + 3} class="axis" text-anchor="end">km</text>
+        <text x={P(0, 470)[0] - 4 / zoom} y={+P(0, 470)[1] + 3 / zoom} class="axis" text-anchor="end">km</text>
         <!-- nom des couches, au bord droit, à leur altitude mesurée -->
         {#each [['D', 50, true], ['E', (iono.hmE || 110) + 12, iono.foE || iono.foEs], ['F1', iono.hmF1 || 200, iono.foF1], ['F2', iono.hmF2 || 300, iono.foF2]] as [n, h, on]}
-          {#if on}<text x={+P(geo.span, h)[0] + 4} y={+P(geo.span, h)[1] + 4} class="lay">{n}</text>{/if}
+          {#if on}<text x={+P(geo.span, h)[0] + 4 / zoom} y={+P(geo.span, h)[1] + 4 / zoom} class="lay">{n}</text>{/if}
         {/each}
         <!-- éventail : tous les angles, en léger -->
         {#each fanRes.rays as r}<path d={path(r.pts)} class="fan" class:out={r.ground == null} />{/each}
@@ -253,18 +293,18 @@
         {/if}
         {#if lobe}<path d={lobe} class="lobe" />{/if}
         {#each kmTicks as d}
-          <text x={P(d / R, 0)[0]} y={+P(d / R, 0)[1] + 13} class="axis" text-anchor={d === 0 ? 'start' : 'middle'}>{d ? km(d) : '0 km'}</text>
+          <text x={P(d / R, 0)[0]} y={+P(d / R, 0)[1] + 13 / zoom} class="axis" text-anchor={d === 0 ? 'start' : 'middle'}>{d ? km(d) : '0 km'}</text>
         {/each}
         <!-- rayon choisi, répété sur 3 sauts -->
         {#each hops as k}<path d={path(ray.pts, k * (ray.ground ?? 0) / R)} class="ray" style="opacity: {1 - k * 0.25}" />{/each}
         {#if ray.ground}
           {#each hops as k}
             {@const [x, y] = P((k + 1) * ray.ground / R, 0)}
-            <circle cx={x} cy={y} r="4" class="land" />
-            <text x={x} y={+y - 8} class="lt" text-anchor="middle">{km((k + 1) * ray.ground)} km</text>
+            <circle cx={x} cy={y} r={4 / zoom} class="land" />
+            <text x={x} y={+y - 8 / zoom} class="lt" text-anchor="middle">{km((k + 1) * ray.ground)} km</text>
           {/each}
         {/if}
-        <circle cx={P(0, 0)[0]} cy={P(0, 0)[1]} r="4" class="me" />
+        <circle cx={P(0, 0)[0]} cy={P(0, 0)[1]} r={4 / zoom} class="me" />
       </svg>
     </div>
     <div class="legend">
@@ -322,10 +362,16 @@
   .val b { min-width: 92px; text-align: center; font-size: 1.05rem; color: var(--gold); }
   .val button { padding: 2px 11px; font-size: 1.15rem; line-height: 1.2; }
   .wrap { width: 100%; }
-  svg { display: block; }
+  svg { display: block; cursor: zoom-in; touch-action: none; }
+  svg.zoomed { cursor: grab; }
+  svg.zoomed:active { cursor: grabbing; }
+  svg :global(path), svg :global(circle) { vector-effect: non-scaling-stroke; }
+  .zoombar { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+  .zoombar button { padding: 2px 12px; font-size: 1.15rem; line-height: 1.2; }
+  .zoombar span { color: var(--muted); font-size: 0.85rem; margin-left: 6px; }
   .iono { fill: rgb(207, 181, 59); }
   .alt { fill: none; stroke: rgba(207, 181, 59, 0.15); stroke-dasharray: 3 4; }
-  .axis { fill: var(--muted); font-size: 11px; }
+  .axis { fill: var(--muted); font-size: calc(11px / var(--z)); }
   .ground { fill: none; stroke: rgb(120, 160, 90); stroke-width: 2; }
   .skip { fill: none; stroke: var(--bad); stroke-width: 5; opacity: 0.75; }
   .fan { fill: none; stroke: rgba(240, 225, 170, 0.22); stroke-width: 1; }
@@ -338,7 +384,7 @@
   .help h3 { color: var(--gold); font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; margin: 8px 0 2px; }
   .help p { margin: 2px 0 6px; }
   .help b.o { color: rgb(255, 120, 60); } .help b.g { color: rgb(110, 220, 120); }
-  .lay { fill: var(--gold); font-size: 13px; font-weight: 700; }
+  .lay { fill: var(--gold); font-size: calc(13px / var(--z)); font-weight: 700; }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.85rem; color: var(--text); }
   .legend i { display: inline-block; width: 18px; height: 4px; margin-right: 6px; vertical-align: 3px; border-radius: 2px; }
   .k-ray { background: rgb(255, 120, 60); } .k-fan { background: rgba(240, 225, 170, 0.5); } .k-out { background: rgba(160, 160, 160, 0.4); }
@@ -357,7 +403,7 @@
   .ray { fill: none; stroke: rgb(255, 120, 60); stroke-width: 2.2; stroke-linejoin: round; }
   .land { fill: rgb(255, 120, 60); stroke: #000; stroke-width: 1; }
   .me { fill: var(--gold); stroke: #000; stroke-width: 1; }
-  .lt { fill: var(--text); font-size: 12px; font-weight: 600; paint-order: stroke; stroke: rgba(0, 0, 0, 0.7); stroke-width: 3px; }
+  .lt { fill: var(--text); font-size: calc(12px / var(--z)); font-weight: 600; paint-order: stroke; stroke: rgba(0, 0, 0, 0.7); stroke-width: calc(3px / var(--z)); }
   .res { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 4px 20px; font-size: 0.95rem; }
   .res div { display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid rgba(207, 181, 59, 0.08); padding: 2px 0; }
   .res span { color: var(--muted); }
