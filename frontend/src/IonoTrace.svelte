@@ -4,6 +4,7 @@
   import { dayOf, fmtTime } from './util.js';
   import { profile, trace, fan, foMax, layerName, R } from './raytrace.js';
   import { budget, MODES, pct, pCls } from './linkbudget.js';
+  import { TX_ANTENNAS, txGain, usable } from './txantennas.js';
 
   let { onclose = null, locator = 'IN93LR' } = $props();
 
@@ -96,7 +97,14 @@
   let groundMode = $state('SSB');           // ce que montre la bande colorée sur le sol
   const NOISE_BANDS = [['160m', 1.9], ['80m', 3.65], ['60m', 5.36], ['40m', 7.1], ['30m', 10.12], ['20m', 14.2], ['17m', 18.1], ['15m', 21.2], ['12m', 24.94], ['10m', 28.5]];
   const nBand = $derived(NOISE_BANDS.reduce((a, c) => (Math.abs(c[1] - freq) < Math.abs(a[1] - freq) ? c : a))[0]);
-  const bud = (r, hops) => budget({ f: freq, elev: r.el ?? elev, len1: r.len, hops, grDbi: antAll ? antAll.g(r.el ?? elev) : 0,
+  // antenne d'en face (modèles types) ; hors de ses bandes, on retombe sur le dipôle à 10 m
+  let txId = $state('dip10');
+  const txSel = $derived(TX_ANTENNAS.find((a) => a.id === txId));
+  const txOk = $derived(usable(txSel, freq));
+  const txAnt = $derived(txOk ? txSel : TX_ANTENNAS.find((a) => a.id === 'dip10'));
+  const gt = (el) => txGain(txAnt, freq, el) ?? 2;
+  const TX_GROUPS = [...new Set(TX_ANTENNAS.map((a) => a.group))];
+  const bud = (r, hops) => budget({ gtDbi: gt(r.el ?? elev), f: freq, elev: r.el ?? elev, len1: r.len, hops, grDbi: antAll ? antAll.g(r.el ?? elev) : 0,
                                      ctx, band: nBand, foF2: iono?.foF2, pW });
   const rayB = $derived(ray?.ground && ray.len ? [1, 2, 3].map((h) => bud({ ...ray, el: elev }, h)) : null);
   // bande des chances sur le sol : tranches de 10 km, chacune prend la meilleure chance des angles qui y
@@ -156,7 +164,7 @@
       out.push(`Plus près, avec des angles de départ plus hauts, en ${MODES[k].id} : `
         + near.map((z) => `${km(z.lo)} à ${km(z.hi)} km ${z.silent ? 'zone de silence' : pct(z.modes[k].p)}`).join(' · ') + '.');
     }
-    if (rayB) out.push(`Chances de réception à ${km(ray.ground)} km avec ${pW} W : ${modesTxt(rayB[0])} (SNR en SSB ≈ ${Math.round(rayB[0].modes[0].snr)} dB, absorption de la couche D ${rayB[0].la.toFixed(1)} dB). Au 2e saut (${km(2 * ray.ground)} km) : ${modesTxt(rayB[1])}.`);
+    if (rayB) out.push(`Chances de réception à ${km(ray.ground)} km avec ${pW} W et « ${txAnt.name} » en face : ${modesTxt(rayB[0])} (SNR en SSB ≈ ${Math.round(rayB[0].modes[0].snr)} dB, absorption de la couche D ${rayB[0].la.toFixed(1)} dB). Au 2e saut (${km(2 * ray.ground)} km) : ${modesTxt(rayB[1])}.`);
     if (ant) {
       const rel = ant.gmax - ant.g(elev);
       out.push(`La loop du WebSDR rayonne surtout vers ${ant.emax}°${ant.emax >= 50 ? ' (presque vers le haut : antenne de proximité)' : ant.emax <= 20 ? ' (angle bas : bonne pour le lointain)' : ''}`
@@ -288,7 +296,7 @@
         <p>Plus la fréquence monte, plus l'onde a du mal à revenir : elle doit partir bas, et la <b>zone de silence</b>
           s'agrandit. Si la fréquence dépasse la <b>MUF</b>, l'onde traverse. Plus l'angle est bas, plus le saut est long.</p>
         <h3>Chances de réception</h3>
-        <p>Pour chaque distance, le carnet fait le bilan : puissance en face (réglable, dipôle supposé), affaiblissement
+        <p>Pour chaque distance, le carnet fait le bilan : puissance et antenne d'en face (réglables : dipôles, loops, verticales, Yagi… modèles types sur sol moyen), affaiblissement
           sur la longueur du trajet, <b>absorption de la couche D</b> (plus forte de jour, sur les bandes basses et pour
           les angles bas, corrigée par la mesure des ionosondes), gain de la loop du WebSDR, et bruit de fond (modèle
           de zone rurale, relevé si ORSAT mesure en ce moment plus de bruit que d'habitude). Il en tire le rapport
@@ -340,6 +348,19 @@
           <b>{pW} W</b>
           <button type="button" onclick={() => setP(1)}>+</button>
         </div>
+        <span class="lab">Antenne en face</span>
+        <select class="txsel" bind:value={txId} title="Antenne type de la station d'en face (gain calculé selon l'angle de départ, sol moyen)">
+          {#each TX_GROUPS as g}
+            <optgroup label={g}>
+              {#each TX_ANTENNAS.filter((a) => a.group === g) as a}
+                <option value={a.id}>{a.name}{usable(a, freq) ? '' : ' — pas sur cette bande'}</option>
+              {/each}
+            </optgroup>
+          {/each}
+        </select>
+        <span class="txg" title="Gain de l'antenne d'en face à l'angle de départ choisi">{txOk ? '' : 'pas sur cette bande → dipôle à 10 m · '}{gt(elev).toFixed(1)} dBi à {elev}°</span>
+      </div>
+      <div class="grp">
         <span class="lab">Sol colorié selon</span>
         <div class="bands">
           {#each [...MODES.map((m) => m.id), 'Antenne'] as m}
@@ -417,7 +438,7 @@
     <div class="summary">{#each summary as l}<p>{l}</p>{/each}</div>
     {#if rayB}
       <table class="chances" title="Probabilité que le signal dépasse le seuil du mode, compte tenu des variations (fading) d'environ ±7 dB">
-        <thead><tr><th>Chances de réception · {pW} W, dipôle en face</th>
+        <thead><tr><th>Chances de réception · {pW} W · en face : {txAnt.name}</th>
           {#each near as z}<th class="nr" title="Distances avant le 1er saut, atteintes par d'autres angles de départ (plus hauts) : meilleure chance de la tranche">{km(z.lo)}–{km(z.hi)} km<br><small>plus près</small></th>{/each}
           {#each rayB as _, k}<th>{k + 1}{k ? 'e' : 'er'} saut · {km((k + 1) * ray.ground)} km</th>{/each}</tr></thead>
         <tbody>
@@ -427,13 +448,14 @@
                 {:else}<td class="nr {pCls(z.modes[i].p)}" title="Meilleur angle {z.modes[i].el}° · SNR {z.modes[i].snr.toFixed(1)} dB en {m.bw} Hz · absorption D {z.modes[i].la.toFixed(1)} dB">{pct(z.modes[i].p)}</td>{/if}{/each}
               {#each rayB as b}<td class={pCls(b.modes[i].p)} title="SNR estimé {b.modes[i].snr.toFixed(1)} dB en {m.bw} Hz">{pct(b.modes[i].p)}</td>{/each}</tr>
           {/each}
+          <tr class="det"><td>Gain de l'antenne en face</td>{#each near as z}<td class="nr"></td>{/each}{#each rayB as _}<td>{gt(elev).toFixed(1)} dBi</td>{/each}</tr>
           <tr class="det"><td>Absorption de la couche D</td>{#each near as z}<td class="nr">{z.silent ? '' : `${Math.min(...z.modes.map((m) => m.la)).toFixed(1)} dB`}</td>{/each}{#each rayB as b}<td>{b.la.toFixed(1)} dB</td>{/each}</tr>
           <tr class="det"><td>Affaiblissement de trajet</td>{#each near as z}<td class="nr"></td>{/each}{#each rayB as b}<td>{b.lbf.toFixed(0)} dB</td>{/each}</tr>
         </tbody>
       </table>
       <p class="src">Bruit : modèle UIT-R P.372 (zone rurale){ctx?.noise?.[nBand] != null ? `, corrigé du bruit mesuré par ORSAT sur ${nBand} (${ctx.noise[nBand] > 0 ? '+' : ''}${ctx.noise[nBand]} dB par rapport à l'habitude)` : ''}.
         Absorption D : modèle George & Bradley{ctx ? ` (Soleil à ${Math.round(90 - ctx.chi)}° au-dessus de l'horizon, facteur mesuré ×${ctx.dfactor}${ctx.flare ? `, éruption ${ctx.flare}` : ''})` : ''}.
-        Réception sur la loop du WebSDR (gain NEC), émission sur un dipôle (+2 dBi), 9 dB de pertes diverses, 3 dB par rebond au sol.</p>
+        Réception sur la loop du WebSDR (gain NEC), émission sur l'antenne choisie en face (modèle type sur sol moyen, gain à l'angle de chaque rayon{txAnt.group.startsWith('Directives') ? ', supposée pointée vers le WebSDR' : ''}), 9 dB de pertes diverses, 3 dB par rebond au sol.</p>
     {/if}
 
     <div class="res">
@@ -533,6 +555,10 @@
   .summary { border-left: 3px solid var(--gold); padding: 4px 12px; background: rgba(207, 181, 59, 0.06); font-size: 1rem; line-height: 1.45; }
   .summary p { margin: 2px 0; }
   .res div[title] { cursor: help; }
+  .txsel { font: inherit; font-size: 0.95rem; color: var(--gold); background: rgba(0, 0, 0, 0.45); border: 1px solid var(--panel-edge);
+           border-radius: 6px; padding: 4px 8px; cursor: pointer; max-width: 340px; }
+  .txsel option, .txsel optgroup { background: #1d1a12; color: var(--text); }
+  .txg { color: var(--muted); font-size: 0.85rem; }
   .antbtn { padding: 4px 12px; font-size: 0.95rem; }
   .antbtn.on { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); font-weight: 600; }
   .lobe { fill: rgba(90, 200, 220, 0.18); stroke: rgb(90, 200, 220); stroke-width: 1.5; }

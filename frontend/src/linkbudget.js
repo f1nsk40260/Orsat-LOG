@@ -1,7 +1,7 @@
 // Bilan de liaison d'un rayon (fenêtre Trajet) : SNR estimé et chances de réception par mode.
 //
 // Signal reçu S (dBW) = P + Gt + Gr − Lbf − La − Lg − Lz
-//   P   : puissance d'émission (100 W par défaut) · Gt : dipôle en face, +2 dBi
+//   P   : puissance d'émission (100 W par défaut) · Gt : antenne d'en face choisie (txantennas.js), à l'angle du rayon
 //   Gr  : loop du WebSDR (NEC, moyenne en azimut) à l'élévation du rayon
 //   Lbf : affaiblissement d'espace libre sur la longueur réelle parcourue = 32,45 + 20 log f + 20 log d
 //   La  : absorption D par saut, George & Bradley (comme le calcul des bandes) :
@@ -61,10 +61,10 @@ function phi(x) {
  * ctx (contexte /api/linkctx), band (pour l'écart de bruit mesuré), foF2, pW (W)
  * -> { snr1Hz, la, modes: [{id, snr, p}] }
  */
-export function budget({ f, elev, len1, hops = 1, grDbi = 0, ctx, band, foF2, pW = 100 }) {
+export function budget({ f, elev, len1, hops = 1, grDbi = 0, gtDbi = GT, ctx, band, foF2, pW = 100 }) {
   const la = hops * absorption(f, elev, ctx);
   const lbf = 32.45 + 20 * log10(f) + 20 * log10(Math.max(1, hops * len1));
-  const s = 10 * log10(pW) + GT + grDbi - lbf - la - LG * (hops - 1) - LZ;   // dBW
+  const s = 10 * log10(pW) + gtDbi + grDbi - lbf - la - LG * (hops - 1) - LZ;   // dBW
   const n = noise1Hz(f, foF2, ctx?.noise?.[band]);
   const snr1 = s - n;
   return {

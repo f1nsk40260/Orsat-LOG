@@ -592,6 +592,13 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.32.0 (28/10/2026) : antenne d'en face au choix dans la fenêtre Trajet
+- `txantennas.js` : 19 antennes types (dipôles 6/10/15/25 m, V inversé, EFHW, NVIS, loops horizontales 7/15 m,
+  delta-loop, loop magnétique, verticales λ/4 et 5/8 au sol, ground-plane, hexbeam, Yagi 3/5 él., quad) — modèles
+  repris de l'ancien antennas.py (élément + image dans le sol moyen, Fresnel), gain à l'angle de chaque rayon ;
+  directives supposées pointées vers le WebSDR ; hors de ses bandes, retour au dipôle à 10 m.
+- Liste déroulante « Antenne en face », gain affiché à l'angle choisi, ligne « Gain de l'antenne en face » au tableau.
+
 ## Fait — v1.31.3 (28/10/2026) : distances au sol lisibles
 - Chiffres des distances en clair (crème), gras, cernés de noir, placés sous la bande colorée ; altitudes éclaircies.
 
