@@ -592,6 +592,9 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.31.3 (28/10/2026) : distances au sol lisibles
+- Chiffres des distances en clair (crème), gras, cernés de noir, placés sous la bande colorée ; altitudes éclaircies.
+
 ## Fait — v1.31.2 (28/10/2026) : bande des chances plus fine et plus visible
 - Éventail fin au demi-degré ; sol découpé en tranches de 10 km (meilleure chance des angles qui y retombent,
   tranches voisines fusionnées) ; couleurs vives cernées de noir, gris pour moins de 10 % ; zone de silence en

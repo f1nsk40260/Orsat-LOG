@@ -389,7 +389,7 @@
         {/if}
         {#if lobe}<path d={lobe} class="lobe" />{/if}
         {#each kmTicks as d}
-          <text x={P(d / R, 0)[0]} y={+P(d / R, 0)[1] + 13 / zoom} class="axis" text-anchor={d === 0 ? 'start' : 'middle'}>{d ? km(d) : '0 km'}</text>
+          <text x={P(d / R, 0)[0]} y={+P(d / R, 0)[1] + 22 / zoom} class="kmt" text-anchor={d === 0 ? 'start' : 'middle'}>{d ? km(d) : '0 km'}</text>
         {/each}
         <!-- rayon choisi, répété sur 3 sauts -->
         {#each hops as k}<path d={path(ray.pts, k * (ray.ground ?? 0) / R)} class="ray" style="opacity: {1 - k * 0.25}" />{/each}
@@ -490,7 +490,10 @@
   .zoombar span { color: var(--muted); font-size: 0.85rem; margin-left: 6px; }
   .iono { fill: rgb(207, 181, 59); }
   .alt { fill: none; stroke: rgba(207, 181, 59, 0.15); stroke-dasharray: 3 4; }
-  .axis { fill: var(--muted); font-size: calc(11px / var(--z)); }
+  .axis { fill: rgb(200, 190, 160); font-size: calc(11px / var(--z)); }
+  /* distances au sol : clair et cerné de noir, lisible sur la bande colorée comme sur le fond */
+  .kmt { fill: rgb(255, 245, 215); font-size: calc(12.5px / var(--z)); font-weight: 600; paint-order: stroke;
+         stroke: rgba(0, 0, 0, 0.9); stroke-width: calc(3.5px / var(--z)); stroke-linejoin: round; }
   .ground { fill: none; stroke: rgb(120, 160, 90); stroke-width: 2; }
   .skip { fill: none; stroke: rgb(200, 200, 210); stroke-width: 5; stroke-dasharray: 6 5; opacity: 0.8; }
   .fan { fill: none; stroke: rgba(240, 225, 170, 0.22); stroke-width: 1; }
