@@ -592,6 +592,10 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `api/public/listenbanner` : champ `ip`, `measure_error` (cause d'une mesure absente). L'étalonnage (`snr_obs.pred_pct`)
   porte désormais sur la prévision de l'IP.
 
+## Fait — v1.29.1 (28/10/2026) : fenêtre Trajet plus lisible
+- Résumé en phrases simples sous le dessin (trajet de l'onde, zone de silence, antenne), légende des couleurs,
+  nom des couches (D, E, F1, F2) au bord du dessin, infobulles sur chaque résultat, bouton « ? Aide » (mode d'emploi).
+
 ## Fait — v1.29.0 (28/10/2026) : zone couverte par l'antenne du WebSDR
 - Fenêtre Trajet, bouton « 📡 Antenne du WebSDR » : lobe vertical NEC de la loop (bande la plus proche) dessiné
   au départ, et zone couverte au sol au 1er saut (éventail de 1° en 1°, chaque retour pondéré par le gain) :

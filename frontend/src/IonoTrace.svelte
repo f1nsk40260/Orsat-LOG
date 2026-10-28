@@ -81,6 +81,25 @@
     const zone = (lim) => { const z = rays.filter((r) => r.rel >= lim); return z.length ? [z[0].d, z[z.length - 1].d] : null; };
     return { segs, z3: zone(-3), z10: zone(-10) };
   });
+  // résumé en phrases simples
+  let showHelp = $state(false);
+  const summary = $derived.by(() => {
+    if (!ray || !fanRes) return [];
+    const b = bandOf ? `Sur ${bandOf} (${freq.toFixed(2)} MHz)` : `Sur ${freq.toFixed(2)} MHz`;
+    const out = [];
+    if (ray.ground) out.push(`${b}, une onde qui part à ${elev}° monte jusqu'à ${Math.round(ray.apex)} km, rebondit sur la couche ${layerName(ray.apex, iono)} et retombe à ${km(ray.ground)} km de IN93LR.`);
+    else out.push(`${b}, une onde qui part à ${elev}° traverse l'ionosphère et se perd dans l'espace${muf ? ` : à cet angle, seules les fréquences sous ${muf} MHz reviennent` : ''}. Baissez l'angle ou la fréquence.`);
+    if (fanRes.allBack) out.push('Tous les angles reviennent : pas de zone de silence, cette fréquence sert aussi bien pour le proche que pour le lointain.');
+    else if (fanRes.skip != null) out.push(`Personne entre 0 et ${km(fanRes.skip)} km ne reçoit l'onde réfléchie (zone de silence) ; un seul saut porte au plus à ${km(fanRes.maxHop)} km.`);
+    else out.push('Aucun angle ne revient : la fréquence est au-dessus de ce que l\'ionosphère réfléchit en ce moment.');
+    if (ant) {
+      const rel = ant.gmax - ant.g(elev);
+      out.push(`La loop du WebSDR rayonne surtout vers ${ant.emax}°${ant.emax >= 50 ? ' (presque vers le haut : antenne de proximité)' : ant.emax <= 20 ? ' (angle bas : bonne pour le lointain)' : ''}`
+        + (cover?.z3 ? ` : elle couvre le mieux de ${km(cover.z3[0])} à ${km(cover.z3[1])} km` : ' : aucun retour au sol dans son lobe principal à cette fréquence')
+        + `. À ${elev}°, elle est ${rel < 0.5 ? 'à son maximum' : `${rel.toFixed(0)} dB sous son maximum${rel >= 10 ? ' (très peu efficace)' : rel >= 6 ? ' (peu efficace)' : ''}`}.`);
+    }
+    return out;
+  });
   const relCls = (rel) => (rel >= -3 ? 'g3' : rel >= -6 ? 'g6' : 'g10');
 
   // ---------- dessin : coupe de la Terre, échelle verticale exagérée ----------
@@ -147,11 +166,36 @@
 <div class="backdrop" onclick={onclose} role="presentation"></div>
 <section class="panel tr">
   <h2 class="panel-title">Trajet d'une onde depuis {locator}
+    <button class="ghost helpbtn" class:on={showHelp} onclick={() => (showHelp = !showHelp)} title="Comment lire cette fenêtre">? Aide</button>
     <button class="ghost close" onclick={onclose} title="Fermer">✕</button></h2>
 
   {#if !iono}
     <p class="muted">{data ? (data.msg || 'Pas de mesure d\'ionosonde aujourd\'hui.') : 'Lecture de l\'ionosonde…'}</p>
   {:else}
+    {#if showHelp}
+      <div class="help">
+        <h3>Ce que montre le dessin</h3>
+        <p>Une coupe de la Terre vue de côté : IN93LR est le point doré à gauche, le sol est la ligne verte, l'ionosphère
+          est la bande dorée au-dessus (D, E, F1, F2 à droite = nom des couches à leur altitude). Les hauteurs sont
+          exagérées pour que les couches restent visibles.</p>
+        <p>La ligne <b class="o">orange</b> est votre onde : elle part avec l'angle choisi, se courbe dans l'ionosphère,
+          retombe au sol, rebondit et repart (3 sauts). Les fines lignes claires sont tous les autres angles de départ
+          (de 1° à 88°) : on voit d'un coup d'œil lesquels reviennent et lesquels s'échappent (lignes grises qui sortent en haut).</p>
+        <h3>Les réglages</h3>
+        <p><b>Fréquence</b> : une bande, puis − / + ou la molette pour affiner. <b>Angle de départ</b> : 1° = presque
+          à l'horizontale (DX), 90° = droit vers le haut (NVIS). <b>Mesure</b> : rejouer une autre heure de la journée.</p>
+        <h3>Ce qu'il faut retenir</h3>
+        <p>Plus la fréquence monte, plus l'onde a du mal à revenir : elle doit partir bas, et la <b>zone de silence</b>
+          s'agrandit. Si la fréquence dépasse la <b>MUF</b>, l'onde traverse. Plus l'angle est bas, plus le saut est long.</p>
+        <h3>Antenne du WebSDR</h3>
+        <p>Le lobe bleu montre dans quels angles la loop rayonne (et donc écoute) le mieux. Sur le sol, le <b class="g">vert</b>
+          marque les distances atteintes par ses meilleurs angles : c'est la zone qu'elle couvre le mieux au premier saut ;
+          l'ambre, une couverture plus faible. Une loop basse rayonne surtout vers le haut : elle favorise le proche.</p>
+        <p class="muted">Calcul : tracé de rayons dans l'ionosphère reconstruite à partir de l'ionosonde ({data.station}).
+          Ionosphère supposée la même partout, sans champ magnétique ni absorption : c'est la géométrie du saut,
+          pas une garantie de liaison.</p>
+      </div>
+    {/if}
     <div class="ctl">
       <div class="grp">
         <span class="lab">Fréquence</span>
@@ -190,6 +234,10 @@
           <text x={P(0, h)[0] - 4} y={+P(0, h)[1] + 3} class="axis" text-anchor="end">{h}</text>
         {/each}
         <text x={P(0, 470)[0] - 4} y={+P(0, 470)[1] + 3} class="axis" text-anchor="end">km</text>
+        <!-- nom des couches, au bord droit, à leur altitude mesurée -->
+        {#each [['D', 50, true], ['E', (iono.hmE || 110) + 12, iono.foE || iono.foEs], ['F1', iono.hmF1 || 200, iono.foF1], ['F2', iono.hmF2 || 300, iono.foF2]] as [n, h, on]}
+          {#if on}<text x={+P(geo.span, h)[0] + 4} y={+P(geo.span, h)[1] + 4} class="lay">{n}</text>{/if}
+        {/each}
         <!-- éventail : tous les angles, en léger -->
         {#each fanRes.rays as r}<path d={path(r.pts)} class="fan" class:out={r.ground == null} />{/each}
         <!-- zone de silence -->
@@ -219,25 +267,34 @@
         <circle cx={P(0, 0)[0]} cy={P(0, 0)[1]} r="4" class="me" />
       </svg>
     </div>
+    <div class="legend">
+      <span><i class="k-ray"></i>votre onde (angle choisi), sur 3 sauts</span>
+      <span><i class="k-fan"></i>les autres angles</span>
+      <span><i class="k-out"></i>angles qui traversent</span>
+      {#if fanRes.skip && !fanRes.allBack}<span><i class="k-skip"></i>zone de silence</span>{/if}
+      <span><i class="k-iono"></i>ionosphère (plus c'est doré, plus elle est dense)</span>
+      {#if ant}<span><i class="k-lobe"></i>lobe de la loop</span><span><i class="k-cov"></i>zone bien couverte</span><span><i class="k-cov2"></i>couverte moins bien</span>{/if}
+    </div>
+    <div class="summary">{#each summary as l}<p>{l}</p>{/each}</div>
 
     <div class="res">
       {#if ray.ground}
-        <div><span>Retour au sol (1er saut)</span><b class="big">{km(ray.ground)} km</b></div>
-        <div><span>Réfléchie par la couche</span><b>{layerName(ray.apex, iono)} · à {Math.round(ray.apex)} km</b></div>
-        <div><span>2e et 3e sauts</span><b>{km(2 * ray.ground)} km · {km(3 * ray.ground)} km</b></div>
+        <div title="Distance où l'onde revient sur Terre après un rebond : c'est là qu'on l'entend."><span>Retour au sol (1er saut)</span><b class="big">{km(ray.ground)} km</b></div>
+        <div title="Couche qui renvoie l'onde et altitude la plus haute atteinte. E : vers 100 km, de jour. F2 : 200 à 400 km, fait le DX."><span>Réfléchie par la couche</span><b>{layerName(ray.apex, iono)} · à {Math.round(ray.apex)} km</b></div>
+        <div title="L'onde rebondit sur le sol et repart : chaque saut ajoute la même distance (même ionosphère supposée partout)."><span>2e et 3e sauts</span><b>{km(2 * ray.ground)} km · {km(3 * ray.ground)} km</b></div>
       {:else}
         <div><span>À {elev}°, sur {freq.toFixed(2)} MHz</span><b class="bad">l'onde traverse l'ionosphère : pas de retour</b></div>
       {/if}
       {#if ant}
-        <div><span>Antenne ({ant.name}{ant.far ? ', bande calculée la plus proche' : ''})</span>
+        <div title="Gain de la loop du WebSDR (NEC) à l'angle choisi, et son meilleur angle. dBi : gain par rapport à une antenne idéale qui rayonne pareil partout."><span>Antenne ({ant.name}{ant.far ? ', bande calculée la plus proche' : ''})</span>
           <b>{ant.g(elev).toFixed(1)} dBi à {elev}° · maxi {ant.gmax.toFixed(1)} dBi à {ant.emax}°</b></div>
-        <div><span>Zone couverte (≤ 3 dB du maxi)</span><b class="g3t">{cover?.z3 ? `${km(cover.z3[0])} à ${km(cover.z3[1])} km` : 'aucune au 1er saut'}</b></div>
-        <div><span>Zone couverte (≤ 10 dB du maxi)</span><b class="g6t">{cover?.z10 ? `${km(cover.z10[0])} à ${km(cover.z10[1])} km` : 'aucune au 1er saut'}</b></div>
+        <div title="Distances atteintes par les angles où la loop rayonne presque au maximum (moins de 3 dB de perte)."><span>Zone couverte (≤ 3 dB du maxi)</span><b class="g3t">{cover?.z3 ? `${km(cover.z3[0])} à ${km(cover.z3[1])} km` : 'aucune au 1er saut'}</b></div>
+        <div title="Distances atteintes avec au plus 10 dB de perte par rapport au meilleur angle de la loop."><span>Zone couverte (≤ 10 dB du maxi)</span><b class="g6t">{cover?.z10 ? `${km(cover.z10[0])} à ${km(cover.z10[1])} km` : 'aucune au 1er saut'}</b></div>
       {:else if showAnt}<div><span>Antenne</span><b>{antData?.error ? 'diagramme indisponible' : 'lecture…'}</b></div>{/if}
-      <div><span>MUF pour {elev}°</span><b>{muf != null ? `${muf} MHz` : '—'}</b></div>
-      <div><span>Zone de silence</span>
+      <div title="Fréquence maximale utilisable à cet angle : au-dessus, l'onde traverse l'ionosphère."><span>MUF pour {elev}°</span><b>{muf != null ? `${muf} MHz` : '—'}</b></div>
+      <div title="Distances où personne ne reçoit l'onde réfléchie : trop près pour le saut, trop loin pour l'onde de sol."><span>Zone de silence</span>
         <b>{fanRes.allBack ? 'aucune (tous les angles reviennent)' : fanRes.skip != null ? `0 à ${km(fanRes.skip)} km` : 'totale : la fréquence passe à travers'}</b></div>
-      <div><span>Portée maxi d'un saut</span><b>{fanRes.maxHop != null ? `${km(fanRes.maxHop)} km` : '—'}</b></div>
+      <div title="Distance la plus longue atteinte en un seul rebond (onde partie presque à l'horizontale)."><span>Portée maxi d'un saut</span><b>{fanRes.maxHop != null ? `${km(fanRes.maxHop)} km` : '—'}</b></div>
       <div><span>Ionosphère ({data.station}, {fmtTime(iono.time)} UTC)</span>
         <b>foF2 {iono.foF2 ?? '—'} MHz à {iono.hmF2 ?? '—'} km{iono.foE ? ` · foE ${iono.foE}` : ''}{iono.foF1 ? ` · foF1 ${iono.foF1}` : ''}{iono.foEs ? ` · foEs ${iono.foEs}` : ''}</b></div>
     </div>
@@ -253,7 +310,7 @@
   .tr { position: fixed; z-index: 21; top: 50%; left: 50%; transform: translate(-50%, -50%);
         width: min(1050px, 96vw); max-height: 94vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
   .tr .panel-title { display: flex; align-items: center; font-size: 0.95rem; }
-  .close { margin-left: auto; padding: 1px 12px; font-size: 1.5rem; line-height: 1.2; }
+  .close { margin-left: 10px; padding: 1px 12px; font-size: 1.5rem; line-height: 1.2; }
   .ctl { display: flex; flex-wrap: wrap; gap: 8px 22px; align-items: center; }
   .grp { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; }
   .lab { color: var(--muted); font-size: 0.85rem; }
@@ -273,6 +330,24 @@
   .skip { fill: none; stroke: var(--bad); stroke-width: 5; opacity: 0.75; }
   .fan { fill: none; stroke: rgba(240, 225, 170, 0.22); stroke-width: 1; }
   .fan.out { stroke: rgba(160, 160, 160, 0.14); }
+  .helpbtn { margin-left: auto; padding: 2px 12px; font-size: 1rem; text-transform: none; letter-spacing: 0; }
+  .helpbtn + .close { margin-left: 10px; }
+  .helpbtn.on { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); }
+  .help { border: 1px solid var(--panel-edge); border-radius: 8px; padding: 8px 14px; background: rgba(0, 0, 0, 0.35);
+          font-size: 0.95rem; line-height: 1.45; }
+  .help h3 { color: var(--gold); font-size: 0.85rem; letter-spacing: 0.08em; text-transform: uppercase; margin: 8px 0 2px; }
+  .help p { margin: 2px 0 6px; }
+  .help b.o { color: rgb(255, 120, 60); } .help b.g { color: rgb(110, 220, 120); }
+  .lay { fill: var(--gold); font-size: 13px; font-weight: 700; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 0.85rem; color: var(--text); }
+  .legend i { display: inline-block; width: 18px; height: 4px; margin-right: 6px; vertical-align: 3px; border-radius: 2px; }
+  .k-ray { background: rgb(255, 120, 60); } .k-fan { background: rgba(240, 225, 170, 0.5); } .k-out { background: rgba(160, 160, 160, 0.4); }
+  .k-skip { background: var(--bad); } .k-iono { background: rgba(207, 181, 59, 0.6); height: 10px !important; vertical-align: -1px !important; }
+  .k-lobe { background: rgba(90, 200, 220, 0.6); border: 1px solid rgb(90, 200, 220); height: 8px !important; vertical-align: 0 !important; }
+  .k-cov { background: rgb(95, 210, 110); } .k-cov2 { background: rgba(224, 180, 60, 0.7); }
+  .summary { border-left: 3px solid var(--gold); padding: 4px 12px; background: rgba(207, 181, 59, 0.06); font-size: 1rem; line-height: 1.45; }
+  .summary p { margin: 2px 0; }
+  .res div[title] { cursor: help; }
   .antbtn { padding: 4px 12px; font-size: 0.95rem; }
   .antbtn.on { color: #1a1606; background: linear-gradient(180deg, #e2c95a, var(--gold)); font-weight: 600; }
   .lobe { fill: rgba(90, 200, 220, 0.18); stroke: rgb(90, 200, 220); stroke-width: 1.5; }
