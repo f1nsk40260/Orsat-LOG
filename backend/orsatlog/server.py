@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, dlayer, antennas, eibi, enrich, geo, ionosonde, kc2g, layers, lightning, partners, qrn, qrz, qrzxml, reach, snr, solar, spacewx, weather
+from . import __version__, adif, auth, backup, dlayer, antennas, eibi, enrich, geo, ionosonde, kc2g, layers, lightning, partners, qrn, qrz, qrzxml, reach, snr, solar, spacewx, spots, weather
 from .db import DATA_DIR, Database
 from .websdr import Page, WebSdrLink
 
@@ -28,7 +28,8 @@ ROOT = Path(__file__).resolve().parents[2]          # dossier du dépôt (~/Orsa
 FRONTEND_DIST = ROOT / "frontend" / "dist"
 
 db = Database()
-# Écoute FT8/WSPR via l'autorun du WebSDR supprimée (v1.13.0) : trop de charge sur le serveur.
+# Écoute FT8/WSPR continue supprimée (v1.13.0, trop de charge) ; remplacée le 30/10/2026 par la veille cyclique
+# de l'autorun (une bande à la fois), relue en lecture seule par spots.py pour le bandeau.
 # Purge unique des anciennes tables (jusqu'à ~2 Go) puis récupération de la place.
 with db._lock:
     if db._con.execute("SELECT 1 FROM sqlite_master WHERE name='heard'").fetchone():
@@ -644,6 +645,19 @@ def _measured():
     return {"at": st["at"], "bands": st["last"]}
 
 
+def _merge_ft8(heard, ft8):
+    """Ajoute aux stations du carnet celles décodées par la veille FT8 (une fois par indicatif et par bande)."""
+    tr = [("d100", 100), ("d300", 300), ("d900", 900), ("d2500", 2500), ("dx", None)]
+    for band, calls in ft8.items():
+        b = heard.setdefault(band, {"n": 0, "tranches": {k: 0 for k, _ in tr}, "far_call": "", "far_km": -1})
+        b["ft8"] = len(calls)
+        for call, (km, _snr) in calls.items():
+            b["n"] += 1
+            b["tranches"][next(k for k, lim in tr if lim is None or km <= lim)] += 1
+            if km > b["far_km"]:
+                b["far_km"], b["far_call"] = km, call
+
+
 HEARD_HOURS = 3      # fenêtre des stations localisées du carnet montrées dans le bandeau
 
 
@@ -658,6 +672,7 @@ async def get_public_listen_banner(radius: int = 800):
     meas = _measured()
     h0 = datetime.now(timezone.utc) - timedelta(hours=HEARD_HOURS)
     heard = db.heard_located(h0.strftime("%Y%m%d"), h0.strftime("%H%M%S"))
+    _merge_ft8(heard, spots.recent(m["locator"], HEARD_HOURS))
     return {"ok": True, "radius_km": radius, "heard": {"hours": HEARD_HOURS, "bands": heard}, "when": m["when"], "locator": m["locator"],
             "bands": reach.listen_probability(m, radius), "measured": meas,
             "ip": reach.performance_index(m, meas["bands"] if meas else None),

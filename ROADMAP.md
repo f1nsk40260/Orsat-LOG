@@ -782,3 +782,6 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
   avec tranches de distance et la plus lointaine. Règle : toute distance vient d'un locator ou de lat/long.
 - Mesure de la chute d'eau : plages ignorées `EXCLUDE_KHZ` (snr.py), d'abord 28 515–28 685 kHz
   (parasite permanent à ORSAT). Les mesures 10 m enregistrées avant cette date en restent faussées.
+- Veille cyclique FT8 (autorun de PhantomSDR-ORSAT, une bande à la fois, réglée dans ORSAT-SYSTEM) :
+  `spots.py` relit `autorun-spots/*.jsonl` en lecture seule ; les stations à locator valide s'ajoutent
+  au `heard` du bandeau. Jamais dans le carnet QSO/SWL, donc jamais vers QRZ.
