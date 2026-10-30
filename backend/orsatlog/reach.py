@@ -305,9 +305,15 @@ def measure_score(m):
     return 70 * snr + 30 * min(1.0, m["signals"] / 10)
 
 
-def observed_score(n):
-    """Stations localisées entendues dans une tranche -> note : 1–2 stations 60, 3 et plus 100."""
-    return 0 if not n else 60 if n < 3 else 100
+def observed_score(n, snr=None):
+    """Stations localisées entendues dans une tranche -> note, orientée phonie (SSB).
+    snr : SNR FT8 représentatif de la tranche (dB, bande de 2,5 kHz), None = contact du carnet (pas de
+    SNR : compté comme pleinement exploitable). Le FT8 passe jusqu'à −24 dB, une SSB confortable demande
+    environ +5 dB : −24 dB -> 15, −10 -> 56, 0 -> 85, +5 et plus -> 100. Avec 1 ou 2 stations : 60 au plus."""
+    if not n:
+        return 0
+    q = 100 if snr is None else max(15, min(100, round(15 + (snr + 24) * 85 / 29)))
+    return min(q, 60) if n < 3 else q
 
 
 def performance_index(lmap, measured=None, heard=None):
@@ -340,7 +346,7 @@ def performance_index(lmap, measured=None, heard=None):
         tr_iono = dict(tr)
         hb = (heard or {}).get(band) or {}
         for k, nb in (hb.get("tranches") or {}).items():
-            o = observed_score(nb)
+            o = observed_score(nb, (hb.get("snr") or {}).get(k))
             if k in tr and o and (tr[k] is None or o > tr[k]):
                 tr[k] = o
         known = [v for v in tr.values() if v is not None]

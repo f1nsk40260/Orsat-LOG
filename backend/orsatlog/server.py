@@ -646,16 +646,30 @@ def _measured():
 
 
 def _merge_ft8(heard, ft8):
-    """Ajoute aux stations du carnet celles décodées par la veille FT8 (une fois par indicatif et par bande)."""
+    """Ajoute aux stations du carnet celles décodées par la veille FT8 (une fois par indicatif et par bande).
+    snr[tranche] = SNR FT8 représentatif (médiane des 3 meilleurs) ; absent si la tranche n'a que des
+    contacts du carnet, comptés comme pleinement exploitables."""
     tr = [("d100", 100), ("d300", 300), ("d900", 900), ("d2500", 2500), ("dx", None)]
     for band, calls in ft8.items():
         b = heard.setdefault(band, {"n": 0, "tranches": {k: 0 for k, _ in tr}, "far_call": "", "far_km": -1})
         b["ft8"] = len(calls)
-        for call, (km, _snr) in calls.items():
+        log_tr = {k for k, c in b["tranches"].items() if c}      # tranches où le carnet a des contacts
+        per = {}
+        for call, (km, snr) in calls.items():
+            k = next(k for k, lim in tr if lim is None or km <= lim)
             b["n"] += 1
-            b["tranches"][next(k for k, lim in tr if lim is None or km <= lim)] += 1
+            b["tranches"][k] += 1
+            if snr is not None:
+                per.setdefault(k, []).append(float(snr))
             if km > b["far_km"]:
                 b["far_km"], b["far_call"] = km, call
+        b["snr"] = {}
+        for k, v in per.items():
+            top = sorted(v, reverse=True)[:3]
+            b["snr"][k] = round(top[len(top) // 2], 1)
+        # une tranche où le carnet a aussi des contacts : le contact réel prime (pas de pondération SNR)
+        for k in log_tr:
+            b["snr"].pop(k, None)
 
 
 HEARD_HOURS = 3      # fenêtre des stations localisées du carnet montrées dans le bandeau
