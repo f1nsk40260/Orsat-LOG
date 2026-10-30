@@ -339,8 +339,8 @@ def performance_index(lmap, measured=None, heard=None):
         tr = {k: (round(100 * v[1] / v[0]) if v[0] else None) for k, v in acc.items()}
         tr_iono = dict(tr)
         hb = (heard or {}).get(band) or {}
-        for k, n in (hb.get("tranches") or {}).items():
-            o = observed_score(n)
+        for k, nb in (hb.get("tranches") or {}).items():
+            o = observed_score(nb)
             if k in tr and o and (tr[k] is None or o > tr[k]):
                 tr[k] = o
         known = [v for v in tr.values() if v is not None]
