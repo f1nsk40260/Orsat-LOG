@@ -672,7 +672,8 @@ def _merge_ft8(heard, ft8):
             b["snr"].pop(k, None)
 
 
-HEARD_HOURS = 3      # fenêtre des stations localisées du carnet montrées dans le bandeau
+HEARD_MIN = 45       # fenêtre des stations localisées (carnet + veille FT8) : 3 passages de la veille ;
+                     # plus long, une bande refermée resterait « ouverte » par des stations entendues avant
 
 
 @app.get("/api/public/listenbanner")
@@ -684,10 +685,10 @@ async def get_public_listen_banner(radius: int = 800):
         return m
     since = (datetime.now(timezone.utc) - timedelta(days=CALIB_DAYS)).strftime("%Y%m%d")
     meas = _measured()
-    h0 = datetime.now(timezone.utc) - timedelta(hours=HEARD_HOURS)
+    h0 = datetime.now(timezone.utc) - timedelta(minutes=HEARD_MIN)
     heard = db.heard_located(h0.strftime("%Y%m%d"), h0.strftime("%H%M%S"))
-    _merge_ft8(heard, spots.recent(m["locator"], HEARD_HOURS))
-    return {"ok": True, "radius_km": radius, "heard": {"hours": HEARD_HOURS, "bands": heard}, "when": m["when"], "locator": m["locator"],
+    _merge_ft8(heard, spots.recent(m["locator"], HEARD_MIN))
+    return {"ok": True, "radius_km": radius, "heard": {"minutes": HEARD_MIN, "bands": heard}, "when": m["when"], "locator": m["locator"],
             "bands": reach.listen_probability(m, radius), "measured": meas,
             "ip": reach.performance_index(m, meas["bands"] if meas else None, heard, spots.watched_bands()),
             "measure_error": snr.state.get("error") or ("" if snr.state.get("ts") else "pas encore de mesure"),

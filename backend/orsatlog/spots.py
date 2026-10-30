@@ -18,14 +18,14 @@ def spool_dir():
     return Path(auth.ADMIN_CONFIG).parent / "autorun-spots"
 
 
-def recent(home_locator, hours=3):
-    """{bande: {indicatif: (distance_km, snr)}} des stations localisées décodées depuis `hours` h."""
+def recent(home_locator, minutes=45):
+    """{bande: {indicatif: (distance_km, snr)}} des stations localisées décodées depuis `minutes` min."""
     if not geo.valid_locator(home_locator or ""):
         return {}
-    since = time.time() - hours * 3600
+    since = time.time() - minutes * 60
     out = {}
     d = spool_dir()
-    for h in range(hours + 1):                      # un fichier par heure UTC
+    for h in range(minutes // 60 + 2):              # un fichier par heure UTC
         name = time.strftime("%Y%m%d-%H.jsonl", time.gmtime(time.time() - h * 3600))
         try:
             lines = (d / name).read_text(encoding="utf-8").splitlines()
