@@ -398,6 +398,25 @@ class Database:
                     (day, time, band, r["floor"], r["signals"], r["best_snr"], r["occupancy"], preds.get(band)))
             self._con.commit()
 
+    def heard_located(self, since_date, since_time):
+        """Stations localisées du carnet (QSO + SWL) depuis (since_date, since_time) UTC, par bande :
+        seules les lignes dont la distance a pu être calculée depuis un locator ou des coordonnées."""
+        with self._lock:
+            rows = self._con.execute(
+                "SELECT band, call, distance_km FROM qso WHERE distance_km IS NOT NULL AND band != '' "
+                "AND (qso_date > ? OR (qso_date = ? AND time_on >= ?))",
+                (since_date, since_date, since_time)).fetchall()
+        tr = [("d100", 100), ("d300", 300), ("d900", 900), ("d2500", 2500), ("dx", None)]
+        out = {}
+        for r in rows:
+            b = out.setdefault(r["band"], {"n": 0, "tranches": {k: 0 for k, _ in tr}, "far_call": "", "far_km": -1})
+            d = r["distance_km"]
+            b["n"] += 1
+            b["tranches"][next(k for k, lim in tr if lim is None or d <= lim)] += 1
+            if d > b["far_km"]:
+                b["far_km"], b["far_call"] = d, r["call"]
+        return out
+
     def snr_calibration(self, since_day, snr_min=10.0):
         """Par tranche de prévision : nombre de mesures et part « exploitable » (au moins un signal
         de SNR ≥ snr_min dB), toutes bandes confondues."""

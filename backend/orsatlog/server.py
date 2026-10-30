@@ -644,6 +644,9 @@ def _measured():
     return {"at": st["at"], "bands": st["last"]}
 
 
+HEARD_HOURS = 3      # fenêtre des stations localisées du carnet montrées dans le bandeau
+
+
 @app.get("/api/public/listenbanner")
 async def get_public_listen_banner(radius: int = 800):
     """Bandeau du WebSDR : probabilité de réception (%) par bande dans un rayon autour d'ORSAT."""
@@ -653,7 +656,9 @@ async def get_public_listen_banner(radius: int = 800):
         return m
     since = (datetime.now(timezone.utc) - timedelta(days=CALIB_DAYS)).strftime("%Y%m%d")
     meas = _measured()
-    return {"ok": True, "radius_km": radius, "when": m["when"], "locator": m["locator"],
+    h0 = datetime.now(timezone.utc) - timedelta(hours=HEARD_HOURS)
+    heard = db.heard_located(h0.strftime("%Y%m%d"), h0.strftime("%H%M%S"))
+    return {"ok": True, "radius_km": radius, "heard": {"hours": HEARD_HOURS, "bands": heard}, "when": m["when"], "locator": m["locator"],
             "bands": reach.listen_probability(m, radius), "measured": meas,
             "ip": reach.performance_index(m, meas["bands"] if meas else None),
             "measure_error": snr.state.get("error") or ("" if snr.state.get("ts") else "pas encore de mesure"),
