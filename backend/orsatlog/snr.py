@@ -29,6 +29,8 @@ BANDS = [("160m", 1810, 2000), ("80m", 3500, 3800), ("60m", 5351, 5367), ("40m",
 DWELL_S = 3.0                 # temps d'écoute par bande
 SIGNAL_DB = 10.0              # un signal = au moins 10 dB au-dessus du bruit
 PERIOD_S = 5 * 60
+# Plages ignorées par la mesure (kHz) : parasites constants du site, qui fausseraient bruit et signaux
+EXCLUDE_KHZ = [(28515, 28685)]     # 10 m : porteuse parasite permanente à ORSAT
 
 state = {"last": None, "error": "", "at": None, "url": ""}
 
@@ -76,13 +78,19 @@ def waterfall_url():
     return state.get("url_ok") or waterfall_candidates()[0]
 
 
-def analyse(rows):
-    """rows : lignes de dB (même longueur) -> bruit, nombre de signaux, meilleur SNR, occupation %."""
-    n = min(len(r) for r in rows)
+def analyse(rows, lo=None, hi=None):
+    """rows : lignes de dB (même longueur) -> bruit, nombre de signaux, meilleur SNR, occupation %.
+    lo, hi : bornes de la bande (kHz), pour retirer les plages EXCLUDE_KHZ qui y tombent."""
+    n0 = min(len(r) for r in rows)
+    keep = range(n0)
+    if lo is not None and hi is not None and hi > lo:
+        f = lambda i: lo + (i + 0.5) * (hi - lo) / n0
+        keep = [i for i in range(n0) if not any(a <= f(i) <= b for a, b in EXCLUDE_KHZ)]
+    n = len(keep)
     if n < 8:
         return None
     mean = []
-    for i in range(n):                      # moyenne en puissance sur les lignes, puis retour en dB
+    for i in keep:                          # moyenne en puissance sur les lignes, puis retour en dB
         p = sum(10 ** (r[i] / 10) for r in rows) / len(rows)
         mean.append(10 * math.log10(p))
     s = sorted(mean)
@@ -178,7 +186,7 @@ async def _measure_at(url):
                     continue
                 rows.append([b - 256 if b > 127 else b for b in pkt["data"]])
             if len(rows) >= 3:
-                res = analyse(rows[1:])            # la première ligne peut être incomplète
+                res = analyse(rows[1:], lo, hi)            # la première ligne peut être incomplète
                 if res:
                     out[band] = res
     return out

@@ -776,3 +776,9 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - Fait en v0.3 : saisie de base (voir plus haut).
 - À faire : identification automatique de la station par fréquence + heure via une grille de diffusion (EiBi)
   → émetteur et distance connus sans saisie : très utile pour l'analyse de propagation.
+
+## Fait (30/10/2026) : bandeau WebSDR et mesure du 10 m
+- `/api/public/listenbanner` renvoie `heard` : stations localisées du carnet (QSO + SWL, 3 h) par bande,
+  avec tranches de distance et la plus lointaine. Règle : toute distance vient d'un locator ou de lat/long.
+- Mesure de la chute d'eau : plages ignorées `EXCLUDE_KHZ` (snr.py), d'abord 28 515–28 685 kHz
+  (parasite permanent à ORSAT). Les mesures 10 m enregistrées avant cette date en restent faussées.
