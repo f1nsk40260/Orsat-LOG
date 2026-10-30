@@ -785,3 +785,6 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - Veille cyclique FT8 (autorun de PhantomSDR-ORSAT, une bande à la fois, réglée dans ORSAT-SYSTEM) :
   `spots.py` relit `autorun-spots/*.jsonl` en lecture seule ; les stations à locator valide s'ajoutent
   au `heard` du bandeau. Jamais dans le carnet QSO/SWL, donc jamais vers QRZ.
+- IP : la prévision par tranche est relevée par les stations localisées entendues (1–2 → 60, 3+ → 100,
+  jamais abaissée) ; `tranches_iono` garde la prévision ionosondes seule. La calibration (`snr_obs.pred_pct`)
+  continue d'enregistrer la prévision brute.

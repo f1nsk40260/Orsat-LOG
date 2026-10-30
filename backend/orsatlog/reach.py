@@ -305,12 +305,20 @@ def measure_score(m):
     return 70 * snr + 30 * min(1.0, m["signals"] / 10)
 
 
-def performance_index(lmap, measured=None):
+def observed_score(n):
+    """Stations localisées entendues dans une tranche -> note : 1–2 stations 60, 3 et plus 100."""
+    return 0 if not n else 60 if n < 3 else 100
+
+
+def performance_index(lmap, measured=None, heard=None):
     """Par bande : {ip, pred, meas, zone, tranches{clé: 0..100|None}}.
     note d'une tranche = score des cases pondéré par la surface (bonne 1, moyenne 0,6, faible 0,25,
     silence/absorbée 0) ; pred = 0,7 × meilleure tranche + 0,3 × moyenne des tranches ;
     zone = tranche la mieux notée (≥ 50).
-    ip = 0,4·pred + 0,6·mesure si une mesure récente existe, sinon pred."""
+    ip = 0,4·pred + 0,6·mesure si une mesure récente existe, sinon pred.
+    heard : {bande: {tranches: {clé: nb de stations localisées}}} (carnet + veille FT8). Une tranche
+    où des stations ont été entendues est relevée à observed_score() ; l'absence de station n'abaisse
+    jamais une tranche (zone de silence, personne n'émet). tranches_iono garde la prévision seule."""
     rings = lmap["rings"]
     inner = [0] + rings[:-1]
     n = len(rings)
@@ -329,6 +337,12 @@ def performance_index(lmap, measured=None):
                     acc[key][0] += w
                     acc[key][1] += w * BANNER_SCORE.get(code, 0.0)
         tr = {k: (round(100 * v[1] / v[0]) if v[0] else None) for k, v in acc.items()}
+        tr_iono = dict(tr)
+        hb = (heard or {}).get(band) or {}
+        for k, n in (hb.get("tranches") or {}).items():
+            o = observed_score(n)
+            if k in tr and o and (tr[k] is None or o > tr[k]):
+                tr[k] = o
         known = [v for v in tr.values() if v is not None]
         # une bande ne s'ouvre jamais sur toutes les distances (zone de silence) : la meilleure tranche
         # compte pour 70 %, l'étendue (moyenne des tranches) pour 30 %
@@ -345,5 +359,6 @@ def performance_index(lmap, measured=None):
             ip = meas
         else:
             ip = round(IP_PRED_W * pred + IP_MEAS_W * meas)
-        out[band] = {"ip": ip, "pred": pred, "meas": meas, "zone": zone, "tranches": tr}
+        out[band] = {"ip": ip, "pred": pred, "meas": meas, "zone": zone, "tranches": tr,
+                     "tranches_iono": tr_iono, "corrected": tr != tr_iono}
     return out

@@ -675,7 +675,7 @@ async def get_public_listen_banner(radius: int = 800):
     _merge_ft8(heard, spots.recent(m["locator"], HEARD_HOURS))
     return {"ok": True, "radius_km": radius, "heard": {"hours": HEARD_HOURS, "bands": heard}, "when": m["when"], "locator": m["locator"],
             "bands": reach.listen_probability(m, radius), "measured": meas,
-            "ip": reach.performance_index(m, meas["bands"] if meas else None),
+            "ip": reach.performance_index(m, meas["bands"] if meas else None, heard),
             "measure_error": snr.state.get("error") or ("" if snr.state.get("ts") else "pas encore de mesure"),
             "calibration": {"days": CALIB_DAYS, "snr_min": 10, "buckets": db.snr_calibration(since)}}
 
