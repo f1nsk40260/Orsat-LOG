@@ -789,3 +789,5 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
   pour rester juste en phonie (−24 dB → 15, 0 → 85, +5 → 100 ; plafond 60 si 1–2 stations ; contact du carnet = 100,
   jamais abaissée) ; `tranches_iono` garde la prévision ionosondes seule. La calibration (`snr_obs.pred_pct`)
   continue d'enregistrer la prévision brute.
+- Bandes surveillées par la veille FT8 (autorun-status.json) : si aucune station localisée n'y est entendue,
+  l'activité non localisée de la chute d'eau n'entre pas dans l'IP (`meas_ignored`).

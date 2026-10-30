@@ -316,7 +316,7 @@ def observed_score(n, snr=None):
     return min(q, 60) if n < 3 else q
 
 
-def performance_index(lmap, measured=None, heard=None):
+def performance_index(lmap, measured=None, heard=None, watched=None):
     """Par bande : {ip, pred, meas, zone, tranches{clé: 0..100|None}}.
     note d'une tranche = score des cases pondéré par la surface (bonne 1, moyenne 0,6, faible 0,25,
     silence/absorbée 0) ; pred = 0,7 × meilleure tranche + 0,3 × moyenne des tranches ;
@@ -324,7 +324,9 @@ def performance_index(lmap, measured=None, heard=None):
     ip = 0,4·pred + 0,6·mesure si une mesure récente existe, sinon pred.
     heard : {bande: {tranches: {clé: nb de stations localisées}}} (carnet + veille FT8). Une tranche
     où des stations ont été entendues est relevée à observed_score() ; l'absence de station n'abaisse
-    jamais une tranche (zone de silence, personne n'émet). tranches_iono garde la prévision seule."""
+    jamais une tranche (zone de silence, personne n'émet). tranches_iono garde la prévision seule.
+    watched : bandes surveillées par la veille FT8. Si la veille n'y entend aucune station localisée,
+    l'activité de la chute d'eau (origine inconnue : parasites, porteuses locales) n'entre pas dans l'IP."""
     rings = lmap["rings"]
     inner = [0] + rings[:-1]
     n = len(rings)
@@ -357,6 +359,9 @@ def performance_index(lmap, measured=None, heard=None):
         zone = best[1] if best[0] is not None and best[0] >= 50 else None
         m = (measured or {}).get(band)
         meas = round(measure_score(m)) if m is not None else None
+        meas_ignored = bool(meas) and band in (watched or ()) and not hb.get("n")
+        if meas_ignored:
+            meas = None
         if pred is None and meas is None:
             ip = None
         elif meas is None:
@@ -366,5 +371,5 @@ def performance_index(lmap, measured=None, heard=None):
         else:
             ip = round(IP_PRED_W * pred + IP_MEAS_W * meas)
         out[band] = {"ip": ip, "pred": pred, "meas": meas, "zone": zone, "tranches": tr,
-                     "tranches_iono": tr_iono, "corrected": tr != tr_iono}
+                     "tranches_iono": tr_iono, "corrected": tr != tr_iono, "meas_ignored": meas_ignored}
     return out

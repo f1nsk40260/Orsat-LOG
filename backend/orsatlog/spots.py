@@ -45,3 +45,15 @@ def recent(home_locator, hours=3):
                 continue
             out.setdefault(band, {})[call] = (km, s.get("snr"))
     return out
+
+
+def watched_bands(max_age_s=20 * 60):
+    """Bandes surveillées en ce moment par la veille FT8 : créneaux FT8 du démon autorun en marche
+    (autorun-status.json mis à jour depuis moins de max_age_s). Ensemble vide si le démon est arrêté."""
+    try:
+        st = json.loads((Path(auth.ADMIN_CONFIG).parent / "autorun-status.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return set()
+    if time.time() - (st.get("updatedAt") or 0) > max_age_s:
+        return set()
+    return {s.get("band") for s in (st.get("slots") or []) if s.get("mode") == "ft8" and s.get("band")}
