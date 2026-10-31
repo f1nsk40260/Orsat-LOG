@@ -85,7 +85,10 @@
 {#if big}<div class="zoom-backdrop" onclick={() => (big = false)} role="presentation"></div>{/if}
 <section class="panel storms zoomable" class:big>
   <button class="ghost zoom-btn" onclick={() => (big = !big)} title={big ? 'Fermer' : 'Agrandir'}>{big ? '✕' : '⤢'}</button>
-  <h2 class="panel-title">Orages et QRN</h2>
+  <h2 class="panel-title title-row">Orages et QRN
+    <!-- carte Blitzortung des impacts en direct, centrée sur la France, dans un nouvel onglet -->
+    <a class="btn blitz" href="https://map.blitzortung.org/#4.58/46.54/3.23" target="_blank" rel="noopener" title="Ouvrir la carte Blitzortung">Blitz</a>
+  </h2>
 
   {#if summary}
     <div class="head">
@@ -149,6 +152,8 @@
 
 <style>
   .storms { display: flex; flex-direction: column; gap: 6px; }
+  .title-row { display: flex; align-items: center; gap: 10px; }
+  .blitz { padding: 1px 8px; font-size: 0.68rem; letter-spacing: 0.12em; }
   .head { display: flex; align-items: center; gap: 12px; }
   .rose { width: 84px; height: 84px; flex: none; }
   .ring { fill: none; stroke: rgba(207, 181, 59, 0.2); }
