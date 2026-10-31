@@ -61,7 +61,10 @@
 {#if big}<div class="zoom-backdrop" onclick={() => (big = false)} role="presentation"></div>{/if}
 <section class="panel weather zoomable" class:big>
   <button class="ghost zoom-btn" onclick={() => (big = !big)} title={big ? 'Fermer' : 'Agrandir'}>{big ? '✕' : '⤢'}</button>
-  <h2 class="panel-title">Météo locale</h2>
+  <h2 class="panel-title head">Météo locale
+    <!-- carte des vents Windy centrée sur le WebSDR, dans un nouvel onglet -->
+    <a class="btn windy" href="https://www.windy.com/?43.663,-1.298,5" target="_blank" rel="noopener" title="Ouvrir la carte Windy">Windy</a>
+  </h2>
 
   {#if cur}
     <div class="main">
@@ -129,6 +132,8 @@
 
 <style>
   .weather { display: flex; flex-direction: column; gap: 6px; }
+  .head { display: flex; align-items: center; gap: 10px; }
+  .windy { padding: 1px 8px; font-size: 0.68rem; letter-spacing: 0.12em; }
   .main { display: flex; align-items: center; gap: 14px; }
   .temp { font-size: 2.1rem; color: var(--gold); font-weight: 600; text-shadow: 0 0 10px rgba(207, 181, 59, 0.3); }
   .temp small { font-size: 1rem; color: var(--gold-soft); }

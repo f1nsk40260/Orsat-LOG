@@ -792,6 +792,10 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - Bandes surveillées par la veille FT8 (autorun-status.json) : si aucune station localisée n'y est entendue,
   l'activité non localisée de la chute d'eau n'entre pas dans l'IP (`meas_ignored`).
 
+## Fait (31/10/2026) : bouton Windy
+- Panneau Météo locale : bouton « WINDY » à droite du titre, ouvre dans un nouvel onglet
+  la carte Windy centrée sur ORSAT (`https://www.windy.com/?43.663,-1.298,5`).
+
 ## Fait (31/10/2026) : bouton Blitz
 - Panneau Orages et QRN : bouton « BLITZ » à droite du titre, ouvre dans un nouvel onglet
   la carte Blitzortung des impacts en direct (`https://map.blitzortung.org/#4.58/46.54/3.23`).
