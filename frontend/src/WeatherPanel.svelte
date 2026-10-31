@@ -35,18 +35,25 @@
   const DIRS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSO', 'SO', 'OSO', 'O', 'ONO', 'NO', 'NNO'];
   const dirName = (d) => (d == null ? '' : DIRS[Math.round(d / 22.5) % 16]);
 
-  // courbes 24 h : température et pression
-  const W = 260, H = 90, PADL = 4, PADB = 14;
-  const xOf = (time) => PADL + ((+time.slice(0, 2) + +time.slice(2, 4) / 60) / 24) * (W - PADL - 4);
+  // courbes 24 h : température (échelle à gauche) et pression (échelle à droite)
+  const W = 260, H = 90, PADL = 24, PADR = 30, PADB = 14, PADT = 6;
+  const xOf = (time) => PADL + ((+time.slice(0, 2) + +time.slice(2, 4) / 60) / 24) * (W - PADL - PADR);
+  const xH = (h) => PADL + (h / 24) * (W - PADL - PADR);
+  // pas « rond » donnant au plus 5 graduations
+  const niceStep = (span) => [0.5, 1, 2, 5, 10, 20, 50].find((st) => span / st <= 4) ?? 100;
   function series(key) {
     const pts = snapshots.filter((s) => s[key] != null);
-    if (pts.length < 2) return { path: '', lo: null, hi: null };
+    if (pts.length < 2) return { path: '', ticks: [] };
     let lo = Math.min(...pts.map((p) => p[key])), hi = Math.max(...pts.map((p) => p[key]));
     if (hi - lo < 1) { lo -= 0.5; hi += 0.5; }
-    const y = (v) => H - PADB - ((v - lo) / (hi - lo)) * (H - PADB - 6);
+    const step = niceStep(hi - lo);
+    lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+    const y = (v) => H - PADB - ((v - lo) / (hi - lo)) * (H - PADB - PADT);
+    const ticks = [];
+    for (let v = lo; v <= hi + step / 1000; v += step) ticks.push({ v: step < 1 ? v.toFixed(1) : Math.round(v), y: y(v) });
     return {
       path: pts.map((p, i) => `${i ? 'L' : 'M'}${xOf(p.time).toFixed(1)},${y(p[key]).toFixed(1)}`).join(' '),
-      lo, hi,
+      ticks,
     };
   }
   const tSeries = $derived(series('temp'));
@@ -103,10 +110,18 @@
 
     {#if tSeries.path || pSeries.path}
       <svg viewBox="0 0 {W} {H}" class="chart" role="img" aria-label="Température et pression sur la journée">
+        {#each tSeries.ticks as t}
+          <line x1={PADL} x2={W - PADR} y1={t.y} y2={t.y} class="hgrid" />
+          <text x={PADL - 3} y={t.y + 3} class="axis at" text-anchor="end">{t.v}</text>
+        {/each}
+        {#each pSeries.ticks as t}
+          <text x={W - PADR + 3} y={t.y + 3} class="axis ap" text-anchor="start">{t.v}</text>
+        {/each}
+        {#if tSeries.path}<text x={PADL - 3} y="5" class="axis at unit" text-anchor="end">°C</text>{/if}
+        {#if pSeries.path}<text x={W - PADR + 3} y="5" class="axis ap unit" text-anchor="start">hPa</text>{/if}
         {#each [0, 6, 12, 18, 24] as h}
-          <line x1={PADL + (h / 24) * (W - PADL - 4)} x2={PADL + (h / 24) * (W - PADL - 4)} y1="4" y2={H - PADB} class="grid" />
-          <text x={PADL + (h / 24) * (W - PADL - 4)} y={H - 3} class="axis"
-                text-anchor={h === 0 ? 'start' : h === 24 ? 'end' : 'middle'}>{h}h</text>
+          <line x1={xH(h)} x2={xH(h)} y1={PADT} y2={H - PADB} class="grid" />
+          <text x={xH(h)} y={H - 3} class="axis" text-anchor="middle">{h}h</text>
         {/each}
         {#if pSeries.path}<path d={pSeries.path} class="p" />{/if}
         {#if tSeries.path}<path d={tSeries.path} class="t" />{/if}
@@ -147,7 +162,10 @@
   .arrow { display: inline-block; font-style: normal; color: var(--gold); margin-right: 3px; }
   .chart { width: 100%; height: auto; margin-top: 4px; }
   .grid { stroke: rgba(207, 181, 59, 0.12); }
+  .hgrid { stroke: rgba(207, 181, 59, 0.07); }
   .axis { fill: var(--muted); font-size: 9px; }
+  .at { fill: var(--gold); font-size: 7.5px; } .ap { fill: rgb(140, 185, 230); font-size: 7.5px; }
+  .unit { font-size: 6.5px; opacity: 0.8; }
   .t { fill: none; stroke: var(--gold); stroke-width: 2; }
   .p { fill: none; stroke: rgb(140, 185, 230); stroke-width: 1.5; stroke-dasharray: 4 2; }
   .legend { display: flex; gap: 12px; font-size: 0.72rem; }

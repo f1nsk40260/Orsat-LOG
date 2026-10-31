@@ -799,3 +799,7 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 ## Fait (31/10/2026) : bouton Blitz
 - Panneau Orages et QRN : bouton « BLITZ » à droite du titre, ouvre dans un nouvel onglet
   la carte Blitzortung des impacts en direct (`https://map.blitzortung.org/#4.58/46.54/3.23`).
+
+## Fait (31/10/2026) : échelles du graphe météo
+- Panneau Météo locale : graduations « rondes » sur les côtés du graphe 24 h,
+  température à gauche (°C, or, avec lignes de repère) et pression à droite (hPa, bleu).
