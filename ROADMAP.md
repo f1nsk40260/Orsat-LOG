@@ -809,3 +809,8 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - Panneau Orages et QRN : échelle des impacts à gauche (or, « imp. » par tranche de 5 min, racine carrée :
   graduations 0, ¼ et haut d'échelle) et du bruit de fond à droite (dB), mêmes tailles que la Météo locale.
 - Courbes de bruit affinées (trait de 1,1 px à l'écran, identique en vue normale et agrandie).
+
+## Fait (31/10/2026) : zoom des graphes Météo locale et Orages et QRN
+- Sur les deux graphes 24 h (`frontend/src/chartzoom.js`) : molette = zoom autour du pointeur (30 min au plus près),
+  glisser = choisir une plage (aussi au doigt), double-clic ou bouton « ↺ 24 h » = journée entière.
+- Graduations horaires adaptées à la plage (HH:MM), échelles latérales recalculées sur la plage affichée.
