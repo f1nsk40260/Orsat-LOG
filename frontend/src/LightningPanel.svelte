@@ -1,6 +1,7 @@
 <script>
   // Orages (Blitzortung.org) et bruit de fond mesuré par ORSAT : distinguer une bande fermée d'une bande noyée dans le QRN.
   import { api } from './api.js';
+  import { timeZoom, hourTicks, hourOf, uid } from './chartzoom.js';
 
   let { buckets = [], noise = [], isToday = false } = $props();
 
@@ -55,28 +56,39 @@
   // courbes 24 h : impacts < 2000 km (barres, échelle à gauche) et bruit de fond 160/80/40 m (lignes, échelle à droite)
   const W = 260, H = 100, PADL = 22, PADR = 22, PADB = 14, PADT = 13;
   const PW = W - PADL - PADR;
-  const xH = (h) => PADL + (h / 24) * PW;
-  const xOf = (t) => xH(+t.slice(0, 2) + +t.slice(2, 4) / 60);
+  // plage horaire affichée (zoom) et sélection en cours
+  let view = $state([0, 24]);
+  let sel = $state(null);
+  const clip = uid('storm-clip');
+  const xH = (h) => PADL + ((h - view[0]) / (view[1] - view[0])) * PW;
+  const xOf = (t) => xH(hourOf(t));
+  const inView = (t) => { const h = hourOf(t); return h >= view[0] - 0.1 && h <= view[1] + 0.1; };
+  const zoomed = $derived(view[1] - view[0] < 24);
+  const ticksX = $derived(hourTicks(view[0], view[1]));
   // valeur « ronde » (1, 2, 5 × 10ⁿ) juste au-dessus de v
   const niceUp = (v) => { const p = 10 ** Math.floor(Math.log10(v)); return [1, 2, 5, 10].find((m) => m * p >= v) * p; };
   const niceStep = (span) => [0.5, 1, 2, 5, 10, 20, 50].find((st) => span / st <= 4) ?? 100;
   const fmtN = (v) => (v >= 10000 ? `${Math.round(v / 1000)}k` : v >= 1000 ? `${+(v / 1000).toFixed(1)}k` : `${+v.toFixed(1)}`);
   const bars = $derived.by(() => {
-    const top = niceUp(Math.max(1, ...buckets.map((b) => b.n2000)));
+    const vis = buckets.filter((b) => inView(b.time));
+    const top = niceUp(Math.max(1, ...vis.map((b) => b.n2000)));
     const hOf = (v) => Math.sqrt(v / top) * (H - PADB - PADT);   // racine carrée : les petits nombres restent visibles
-    const bw = (PW / 288) * 0.9;
+    const bw = (PW / 288) * 0.9 * (24 / (view[1] - view[0]));
     return {
       // graduations à 0, ¼ et le haut de l'échelle (mi-hauteur et hauteur pleine en racine carrée)
       ticks: [0, top / 4, top].map((v) => ({ v: fmtN(v), y: H - PADB - hOf(v) })),
-      list: buckets.filter((b) => b.n2000).map((b) => {
+      list: vis.filter((b) => b.n2000).map((b) => {
         const h = Math.max(1, hOf(b.n2000));
         return { x: xOf(b.time), y: H - PADB - h, h, w: Math.max(0.8, bw), near: b.n500 > 0 };
       }),
     };
   });
   const noiseChart = $derived.by(() => {
-    const pts = noise.filter((n) => NOISE_BANDS.some(([b]) => b === n.band));
-    if (pts.length < 2) return { lines: [], ticks: [] };
+    const all = noise.filter((n) => NOISE_BANDS.some(([b]) => b === n.band));
+    if (all.length < 2) return { lines: [], ticks: [] };
+    // échelle calculée sur la plage affichée (repli sur la journée si trop peu de points)
+    const vis = all.filter((n) => inView(n.time));
+    const pts = vis.length >= 2 ? vis : all;
     let lo = Math.min(...pts.map((p) => p.floor_db)), hi = Math.max(...pts.map((p) => p.floor_db));
     if (hi - lo < 3) { lo -= 1.5; hi += 1.5; }
     const step = niceStep(hi - lo);
@@ -85,7 +97,7 @@
     const ticks = [];
     for (let v = lo; v <= hi + step / 1000; v += step) ticks.push({ v: step < 1 ? v.toFixed(1) : Math.round(v), y: y(v) });
     const lines = NOISE_BANDS.map(([band, color]) => {
-      const p = pts.filter((n) => n.band === band);
+      const p = all.filter((n) => n.band === band);
       return { band, color, d: p.length > 1 ? p.map((n, i) => `${i ? 'L' : 'M'}${xOf(n.time).toFixed(1)},${y(n.floor_db).toFixed(1)}`).join(' ') : '' };
     }).filter((l) => l.d);
     return { lines, ticks };
@@ -149,7 +161,13 @@
   {/if}
 
   {#if bars.list.length || lines.length}
-    <svg viewBox="0 0 {W} {H}" class="chart" role="img" aria-label="Foudre et bruit de fond sur la journée">
+    {#if zoomed}
+      <button class="ghost reset" onclick={() => (view = [0, 24])} title="Revenir à la journée entière">↺ 24 h</button>
+    {/if}
+    <svg viewBox="0 0 {W} {H}" class="chart" role="img" aria-label="Foudre et bruit de fond sur la journée"
+         use:timeZoom={{ x0: PADL, x1: W - PADR, view, set: (a, b) => (view = [a, b]), select: (s) => (sel = s) }}>
+      <title>Molette : zoom · glisser : choisir une plage · double-clic : journée entière</title>
+      <defs><clipPath id={clip}><rect x={PADL} y="0" width={PW} height={H - PADB} /></clipPath></defs>
       {#if bars.list.length}
         {#each bars.ticks as t}
           <line x1={PADL} x2={W - PADR} y1={t.y} y2={t.y} class="hgrid" />
@@ -163,12 +181,15 @@
         {/each}
         <text x={W - PADR + 3} y="6" class="axis ar unit" text-anchor="start">dB</text>
       {/if}
-      {#each [0, 6, 12, 18, 24] as h}
-        <line x1={xH(h)} x2={xH(h)} y1={PADT} y2={H - PADB} class="grid" />
-        <text x={xH(h)} y={H - 3} class="axis" text-anchor="middle">{h}h</text>
+      {#each ticksX as t}
+        <line x1={xH(t.h)} x2={xH(t.h)} y1={PADT} y2={H - PADB} class="grid" />
+        <text x={xH(t.h)} y={H - 3} class="axis" text-anchor="middle">{t.label}</text>
       {/each}
-      {#each bars.list as b}<rect x={b.x} y={b.y} width={b.w} height={b.h} class:near={b.near} class="bar" />{/each}
-      {#each lines as l}<path d={l.d} style="stroke: {l.color}" class="line" />{/each}
+      <g clip-path="url(#{clip})">
+        {#each bars.list as b}<rect x={b.x} y={b.y} width={b.w} height={b.h} class:near={b.near} class="bar" />{/each}
+        {#each lines as l}<path d={l.d} style="stroke: {l.color}" class="line" />{/each}
+      </g>
+      {#if sel}<rect x={xH(sel[0])} y={PADT} width={xH(sel[1]) - xH(sel[0])} height={H - PADB - PADT} class="sel" />{/if}
     </svg>
     <div class="legend">
       <span><i class="lb"></i>foudre &lt; 2000 km (impacts / 5 min)</span><span><i class="ln"></i>&lt; 500 km</span>
@@ -200,7 +221,9 @@
   .chip { border: 1px solid var(--panel-edge); border-radius: 12px; padding: 1px 8px; font-size: 0.78rem; }
   .chip b { color: var(--text); }
   .chip.warn b { color: var(--warn); } .chip.bad b { color: var(--bad); } .chip.cold b { color: rgb(140, 185, 230); }
-  .chart { width: 100%; height: auto; margin-top: 2px; }
+  .chart { width: 100%; height: auto; margin-top: 2px; cursor: crosshair; touch-action: pan-y; user-select: none; }
+  .sel { fill: rgba(207, 181, 59, 0.15); stroke: var(--gold); stroke-width: 0.5; }
+  .reset { align-self: flex-end; padding: 0 8px; font-size: 0.72rem; margin-bottom: -4px; }
   .grid { stroke: rgba(207, 181, 59, 0.12); }
   .axis { fill: var(--muted); font-size: 9px; }
   .hgrid { stroke: rgba(207, 181, 59, 0.07); }

@@ -1,6 +1,7 @@
 <script>
   import { api } from './api.js';
   import { fmtTime } from './util.js';
+  import { timeZoom, hourTicks, hourOf, uid } from './chartzoom.js';
 
   let { snapshots = [], isToday = false } = $props();
 
@@ -37,14 +38,24 @@
 
   // courbes 24 h : température (échelle à gauche) et pression (échelle à droite)
   const W = 260, H = 90, PADL = 24, PADR = 30, PADB = 14, PADT = 13;
-  const xOf = (time) => PADL + ((+time.slice(0, 2) + +time.slice(2, 4) / 60) / 24) * (W - PADL - PADR);
-  const xH = (h) => PADL + (h / 24) * (W - PADL - PADR);
+  // plage horaire affichée (zoom) et sélection en cours
+  let view = $state([0, 24]);
+  let sel = $state(null);
+  const clip = uid('wx-clip');
+  const xH = (h) => PADL + ((h - view[0]) / (view[1] - view[0])) * (W - PADL - PADR);
+  const xOf = (time) => xH(hourOf(time));
+  const inView = (t) => { const h = hourOf(t); return h >= view[0] - 0.1 && h <= view[1] + 0.1; };
+  const zoomed = $derived(view[1] - view[0] < 24);
+  const ticksX = $derived(hourTicks(view[0], view[1]));
   // pas « rond » donnant au plus 5 graduations
   const niceStep = (span) => [0.5, 1, 2, 5, 10, 20, 50].find((st) => span / st <= 4) ?? 100;
   function series(key) {
     const pts = snapshots.filter((s) => s[key] != null);
     if (pts.length < 2) return { path: '', ticks: [] };
-    let lo = Math.min(...pts.map((p) => p[key])), hi = Math.max(...pts.map((p) => p[key]));
+    // échelle calculée sur la plage affichée (repli sur la journée si trop peu de points)
+    const vis = pts.filter((p) => inView(p.time));
+    const ref = vis.length >= 2 ? vis : pts;
+    let lo = Math.min(...ref.map((p) => p[key])), hi = Math.max(...ref.map((p) => p[key]));
     if (hi - lo < 1) { lo -= 0.5; hi += 0.5; }
     const step = niceStep(hi - lo);
     lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
@@ -109,7 +120,13 @@
     </div>
 
     {#if tSeries.path || pSeries.path}
-      <svg viewBox="0 0 {W} {H}" class="chart" role="img" aria-label="Température et pression sur la journée">
+      {#if zoomed}
+        <button class="ghost reset" onclick={() => (view = [0, 24])} title="Revenir à la journée entière">↺ 24 h</button>
+      {/if}
+      <svg viewBox="0 0 {W} {H}" class="chart" role="img" aria-label="Température et pression sur la journée"
+           use:timeZoom={{ x0: PADL, x1: W - PADR, view, set: (a, b) => (view = [a, b]), select: (s) => (sel = s) }}>
+        <title>Molette : zoom · glisser : choisir une plage · double-clic : journée entière</title>
+        <defs><clipPath id={clip}><rect x={PADL} y="0" width={W - PADL - PADR} height={H - PADB + 2} /></clipPath></defs>
         {#each tSeries.ticks as t}
           <line x1={PADL} x2={W - PADR} y1={t.y} y2={t.y} class="hgrid" />
           <text x={PADL - 3} y={t.y + 3} class="axis at" text-anchor="end">{t.v}</text>
@@ -119,12 +136,15 @@
         {/each}
         {#if tSeries.path}<text x={PADL - 3} y="6" class="axis at unit" text-anchor="end">°C</text>{/if}
         {#if pSeries.path}<text x={W - PADR + 3} y="6" class="axis ap unit" text-anchor="start">hPa</text>{/if}
-        {#each [0, 6, 12, 18, 24] as h}
-          <line x1={xH(h)} x2={xH(h)} y1={PADT} y2={H - PADB} class="grid" />
-          <text x={xH(h)} y={H - 3} class="axis" text-anchor="middle">{h}h</text>
+        {#each ticksX as t}
+          <line x1={xH(t.h)} x2={xH(t.h)} y1={PADT} y2={H - PADB} class="grid" />
+          <text x={xH(t.h)} y={H - 3} class="axis" text-anchor="middle">{t.label}</text>
         {/each}
-        {#if pSeries.path}<path d={pSeries.path} class="p" />{/if}
-        {#if tSeries.path}<path d={tSeries.path} class="t" />{/if}
+        <g clip-path="url(#{clip})">
+          {#if pSeries.path}<path d={pSeries.path} class="p" />{/if}
+          {#if tSeries.path}<path d={tSeries.path} class="t" />{/if}
+        </g>
+        {#if sel}<rect x={xH(sel[0])} y={PADT} width={xH(sel[1]) - xH(sel[0])} height={H - PADB - PADT} class="sel" />{/if}
       </svg>
       <div class="legend"><span><i class="lt"></i>température</span><span><i class="lp"></i>pression</span></div>
     {/if}
@@ -160,7 +180,9 @@
   em { font-style: normal; color: var(--muted); margin-left: 4px; }
   em.up { color: var(--ok); } em.down { color: var(--warn); }
   .arrow { display: inline-block; font-style: normal; color: var(--gold); margin-right: 3px; }
-  .chart { width: 100%; height: auto; margin-top: 4px; }
+  .chart { width: 100%; height: auto; margin-top: 4px; cursor: crosshair; touch-action: pan-y; user-select: none; }
+  .sel { fill: rgba(207, 181, 59, 0.15); stroke: var(--gold); stroke-width: 0.5; }
+  .reset { align-self: flex-end; padding: 0 8px; font-size: 0.72rem; margin-bottom: -4px; }
   .grid { stroke: rgba(207, 181, 59, 0.12); }
   .hgrid { stroke: rgba(207, 181, 59, 0.07); }
   .axis { fill: var(--muted); font-size: 9px; }
