@@ -804,3 +804,8 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - Panneau Météo locale : graduations « rondes » sur les côtés du graphe 24 h,
   température à gauche (°C, or, avec lignes de repère) et pression à droite (hPa, bleu).
   Valeurs en petite taille, unités °C/hPa au-dessus de la graduation haute (sans chevauchement).
+
+## Fait (31/10/2026) : échelles du graphe Orages et QRN
+- Panneau Orages et QRN : échelle des impacts à gauche (or, « imp. » par tranche de 5 min, racine carrée :
+  graduations 0, ¼ et haut d'échelle) et du bruit de fond à droite (dB), mêmes tailles que la Météo locale.
+- Courbes de bruit affinées (trait de 1,1 px à l'écran, identique en vue normale et agrandie).
