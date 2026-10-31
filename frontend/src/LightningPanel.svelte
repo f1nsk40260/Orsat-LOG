@@ -52,28 +52,45 @@
     });
   });
 
-  // courbes 24 h : impacts < 2000 km (barres) et bruit de fond 160/80/40 m (lignes)
-  const W = 260, H = 100, PADL = 4, PADB = 14;
-  const xOf = (t) => PADL + ((+t.slice(0, 2) + +t.slice(2, 4) / 60) / 24) * (W - PADL - 4);
+  // courbes 24 h : impacts < 2000 km (barres, échelle à gauche) et bruit de fond 160/80/40 m (lignes, échelle à droite)
+  const W = 260, H = 100, PADL = 22, PADR = 22, PADB = 14, PADT = 13;
+  const PW = W - PADL - PADR;
+  const xH = (h) => PADL + (h / 24) * PW;
+  const xOf = (t) => xH(+t.slice(0, 2) + +t.slice(2, 4) / 60);
+  // valeur « ronde » (1, 2, 5 × 10ⁿ) juste au-dessus de v
+  const niceUp = (v) => { const p = 10 ** Math.floor(Math.log10(v)); return [1, 2, 5, 10].find((m) => m * p >= v) * p; };
+  const niceStep = (span) => [0.5, 1, 2, 5, 10, 20, 50].find((st) => span / st <= 4) ?? 100;
+  const fmtN = (v) => (v >= 10000 ? `${Math.round(v / 1000)}k` : v >= 1000 ? `${+(v / 1000).toFixed(1)}k` : `${+v.toFixed(1)}`);
   const bars = $derived.by(() => {
-    const max = Math.max(1, ...buckets.map((b) => b.n2000));
-    const bw = ((W - PADL - 4) / 288) * 0.9;
-    return buckets.filter((b) => b.n2000).map((b) => {
-      const h = Math.max(1, (Math.sqrt(b.n2000 / max)) * (H - PADB - 8));
-      return { x: xOf(b.time), y: H - PADB - h, h, w: Math.max(0.8, bw), near: b.n500 > 0 };
-    });
+    const top = niceUp(Math.max(1, ...buckets.map((b) => b.n2000)));
+    const hOf = (v) => Math.sqrt(v / top) * (H - PADB - PADT);   // racine carrée : les petits nombres restent visibles
+    const bw = (PW / 288) * 0.9;
+    return {
+      // graduations à 0, ¼ et le haut de l'échelle (mi-hauteur et hauteur pleine en racine carrée)
+      ticks: [0, top / 4, top].map((v) => ({ v: fmtN(v), y: H - PADB - hOf(v) })),
+      list: buckets.filter((b) => b.n2000).map((b) => {
+        const h = Math.max(1, hOf(b.n2000));
+        return { x: xOf(b.time), y: H - PADB - h, h, w: Math.max(0.8, bw), near: b.n500 > 0 };
+      }),
+    };
   });
-  const lines = $derived.by(() => {
+  const noiseChart = $derived.by(() => {
     const pts = noise.filter((n) => NOISE_BANDS.some(([b]) => b === n.band));
-    if (pts.length < 2) return [];
+    if (pts.length < 2) return { lines: [], ticks: [] };
     let lo = Math.min(...pts.map((p) => p.floor_db)), hi = Math.max(...pts.map((p) => p.floor_db));
     if (hi - lo < 3) { lo -= 1.5; hi += 1.5; }
-    const y = (v) => H - PADB - ((v - lo) / (hi - lo)) * (H - PADB - 8);
-    return NOISE_BANDS.map(([band, color]) => {
+    const step = niceStep(hi - lo);
+    lo = Math.floor(lo / step) * step; hi = Math.ceil(hi / step) * step;
+    const y = (v) => H - PADB - ((v - lo) / (hi - lo)) * (H - PADB - PADT);
+    const ticks = [];
+    for (let v = lo; v <= hi + step / 1000; v += step) ticks.push({ v: step < 1 ? v.toFixed(1) : Math.round(v), y: y(v) });
+    const lines = NOISE_BANDS.map(([band, color]) => {
       const p = pts.filter((n) => n.band === band);
       return { band, color, d: p.length > 1 ? p.map((n, i) => `${i ? 'L' : 'M'}${xOf(n.time).toFixed(1)},${y(n.floor_db).toFixed(1)}`).join(' ') : '' };
     }).filter((l) => l.d);
+    return { lines, ticks };
   });
+  const lines = $derived(noiseChart.lines);
 
   const excess = $derived(live?.noise?.bands
     ? ['160m', '80m', '40m', '20m', '10m'].filter((b) => live.noise.bands[b]).map((b) => [b, live.noise.bands[b]])
@@ -131,18 +148,30 @@
     </div>
   {/if}
 
-  {#if bars.length || lines.length}
+  {#if bars.list.length || lines.length}
     <svg viewBox="0 0 {W} {H}" class="chart" role="img" aria-label="Foudre et bruit de fond sur la journée">
+      {#if bars.list.length}
+        {#each bars.ticks as t}
+          <line x1={PADL} x2={W - PADR} y1={t.y} y2={t.y} class="hgrid" />
+          <text x={PADL - 3} y={t.y + 2.5} class="axis al" text-anchor="end">{t.v}</text>
+        {/each}
+        <text x={PADL - 3} y="6" class="axis al unit" text-anchor="end">imp.</text>
+      {/if}
+      {#if lines.length}
+        {#each noiseChart.ticks as t}
+          <text x={W - PADR + 3} y={t.y + 2.5} class="axis ar" text-anchor="start">{t.v}</text>
+        {/each}
+        <text x={W - PADR + 3} y="6" class="axis ar unit" text-anchor="start">dB</text>
+      {/if}
       {#each [0, 6, 12, 18, 24] as h}
-        <line x1={PADL + (h / 24) * (W - PADL - 4)} x2={PADL + (h / 24) * (W - PADL - 4)} y1="4" y2={H - PADB} class="grid" />
-        <text x={PADL + (h / 24) * (W - PADL - 4)} y={H - 3} class="axis"
-              text-anchor={h === 0 ? 'start' : h === 24 ? 'end' : 'middle'}>{h}h</text>
+        <line x1={xH(h)} x2={xH(h)} y1={PADT} y2={H - PADB} class="grid" />
+        <text x={xH(h)} y={H - 3} class="axis" text-anchor="middle">{h}h</text>
       {/each}
-      {#each bars as b}<rect x={b.x} y={b.y} width={b.w} height={b.h} class:near={b.near} class="bar" />{/each}
+      {#each bars.list as b}<rect x={b.x} y={b.y} width={b.w} height={b.h} class:near={b.near} class="bar" />{/each}
       {#each lines as l}<path d={l.d} style="stroke: {l.color}" class="line" />{/each}
     </svg>
     <div class="legend">
-      <span><i class="lb"></i>foudre &lt; 2000 km</span><span><i class="ln"></i>&lt; 500 km</span>
+      <span><i class="lb"></i>foudre &lt; 2000 km (impacts / 5 min)</span><span><i class="ln"></i>&lt; 500 km</span>
       {#each lines as l}<span><i style="background: {l.color}"></i>bruit {l.band}</span>{/each}
     </div>
   {/if}
@@ -174,8 +203,12 @@
   .chart { width: 100%; height: auto; margin-top: 2px; }
   .grid { stroke: rgba(207, 181, 59, 0.12); }
   .axis { fill: var(--muted); font-size: 9px; }
+  .hgrid { stroke: rgba(207, 181, 59, 0.07); }
+  .al { fill: var(--gold); font-size: 6.5px; } .ar { fill: var(--text); font-size: 6.5px; opacity: 0.75; }
+  .unit { font-size: 6px; opacity: 0.8; }
   .bar { fill: rgba(207, 181, 59, 0.45); } .bar.near { fill: var(--bad); }
-  .line { fill: none; stroke-width: 1.4; }
+  /* trait fin, de même épaisseur à l'écran en vue normale comme agrandie */
+  .line { fill: none; stroke-width: 1.1px; vector-effect: non-scaling-stroke; stroke-linejoin: round; }
   .legend { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 0.7rem; }
   .legend i { display: inline-block; width: 10px; height: 3px; margin-right: 4px; vertical-align: 2px; }
   .lb { background: rgba(207, 181, 59, 0.6); } .ln { background: var(--bad); }
