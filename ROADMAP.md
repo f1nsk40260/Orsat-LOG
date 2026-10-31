@@ -803,3 +803,4 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 ## Fait (31/10/2026) : échelles du graphe météo
 - Panneau Météo locale : graduations « rondes » sur les côtés du graphe 24 h,
   température à gauche (°C, or, avec lignes de repère) et pression à droite (hPa, bleu).
+  Valeurs en petite taille, unités °C/hPa au-dessus de la graduation haute (sans chevauchement).

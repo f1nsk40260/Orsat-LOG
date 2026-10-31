@@ -36,7 +36,7 @@
   const dirName = (d) => (d == null ? '' : DIRS[Math.round(d / 22.5) % 16]);
 
   // courbes 24 h : température (échelle à gauche) et pression (échelle à droite)
-  const W = 260, H = 90, PADL = 24, PADR = 30, PADB = 14, PADT = 6;
+  const W = 260, H = 90, PADL = 24, PADR = 30, PADB = 14, PADT = 13;
   const xOf = (time) => PADL + ((+time.slice(0, 2) + +time.slice(2, 4) / 60) / 24) * (W - PADL - PADR);
   const xH = (h) => PADL + (h / 24) * (W - PADL - PADR);
   // pas « rond » donnant au plus 5 graduations
@@ -117,8 +117,8 @@
         {#each pSeries.ticks as t}
           <text x={W - PADR + 3} y={t.y + 3} class="axis ap" text-anchor="start">{t.v}</text>
         {/each}
-        {#if tSeries.path}<text x={PADL - 3} y="5" class="axis at unit" text-anchor="end">°C</text>{/if}
-        {#if pSeries.path}<text x={W - PADR + 3} y="5" class="axis ap unit" text-anchor="start">hPa</text>{/if}
+        {#if tSeries.path}<text x={PADL - 3} y="6" class="axis at unit" text-anchor="end">°C</text>{/if}
+        {#if pSeries.path}<text x={W - PADR + 3} y="6" class="axis ap unit" text-anchor="start">hPa</text>{/if}
         {#each [0, 6, 12, 18, 24] as h}
           <line x1={xH(h)} x2={xH(h)} y1={PADT} y2={H - PADB} class="grid" />
           <text x={xH(h)} y={H - 3} class="axis" text-anchor="middle">{h}h</text>
@@ -164,8 +164,8 @@
   .grid { stroke: rgba(207, 181, 59, 0.12); }
   .hgrid { stroke: rgba(207, 181, 59, 0.07); }
   .axis { fill: var(--muted); font-size: 9px; }
-  .at { fill: var(--gold); font-size: 7.5px; } .ap { fill: rgb(140, 185, 230); font-size: 7.5px; }
-  .unit { font-size: 6.5px; opacity: 0.8; }
+  .at { fill: var(--gold); font-size: 6.5px; } .ap { fill: rgb(140, 185, 230); font-size: 6.5px; }
+  .unit { font-size: 6px; opacity: 0.8; }
   .t { fill: none; stroke: var(--gold); stroke-width: 2; }
   .p { fill: none; stroke: rgb(140, 185, 230); stroke-width: 1.5; stroke-dasharray: 4 2; }
   .legend { display: flex; gap: 12px; font-size: 0.72rem; }
