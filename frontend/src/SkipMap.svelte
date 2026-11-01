@@ -47,22 +47,44 @@
   });
   function onWheel(e) {
     e.preventDefault();
-    MAX_KM = Math.round(Math.min(KM_MAX, Math.max(KM_MIN, MAX_KM * (e.deltaY > 0 ? 1.25 : 0.8))));
+    // un cran de molette = ×1,25 / ×0,8 comme avant ; les pavés tactiles (petits deltas, très
+    // nombreux) zooment au prorata au lieu de sauter d'un cran à chaque évènement
+    const px = e.deltaMode === 1 ? e.deltaY * 33 : e.deltaMode === 2 ? e.deltaY * 400 : e.deltaY;
+    const steps = Math.max(-1, Math.min(1, px / 100));
+    if (!steps) return;
+    MAX_KM = Math.min(KM_MAX, Math.max(KM_MIN, MAX_KM * 1.25 ** steps));
   }
   const ZOOMS = [[250, '250 km'], [600, '600 km'], [1200, '1200 km'], [2500, '2500 km'], [5000, '5000 km']];
   // anneaux repères : environ 5 cercles, pas « rond »
   const ringStep = $derived([25, 50, 100, 200, 250, 500, 1000].find((s) => MAX_KM / s <= 6) ?? 1000);
   const ringKms = $derived(Array.from({ length: Math.floor(MAX_KM / ringStep) }, (_, i) => (i + 1) * ringStep));
-  // fonds de carte détaillés chargés à la demande : 1:50 M sous 1500 km, 1:10 M sous 600 km
+  // fonds de carte détaillés chargés à la demande (une seule fois) : 1:50 M sous 1500 km, 1:10 M sous 600 km
   const topo = (w) => ({ land: feature(w, w.objects.land ?? w.objects.countries), borders: mesh(w, w.objects.countries, (a, b) => a !== b) });
-  let fine = $state(null), finest = $state(null);
+  let fine = $state(null), finest = $state(null), fineAsked = false, finestAsked = false;
   $effect(() => {
-    if (MAX_KM < 1500 && !fine) import('world-atlas/countries-50m.json').then((m) => (fine = topo(m.default)));
-    if (MAX_KM < 600 && !finest) import('world-atlas/countries-10m.json').then((m) => (finest = topo(m.default)));
+    if (MAX_KM < 1500 && !fineAsked) { fineAsked = true; import('world-atlas/countries-50m.json').then((m) => (fine = topo(m.default))); }
+    if (MAX_KM < 600 && !finestAsked) { finestAsked = true; import('world-atlas/countries-10m.json').then((m) => (finest = topo(m.default))); }
   });
-  const detail = $derived(MAX_KM < 600 && finest ? finest : MAX_KM < 1500 && fine ? fine : null);
-  const landShown = $derived(detail ? detail.land : land);
-  const bordersShown = $derived(detail ? detail.borders : borders);
+
+  // Fond de carte tracé UNE fois, en kilomètres depuis le QTH (projection azimutale équidistante :
+  // un zoom n'est qu'un changement d'échelle autour du centre). La molette ne fait plus que changer
+  // l'échelle du groupe SVG ; avant, chaque cran reprojetait le monde entier (≈ 0,4 s en 1:10 M).
+  // Chaque niveau de détail est découpé au rayon maximal où il sert.
+  function kmPath(geo, home, km) {
+    const pr = geoAzimuthalEquidistant().rotate([-home[1], -home[0]]).scale(EARTH).translate([0, 0])
+      .clipAngle((km / EARTH) * 180 / Math.PI).precision(0.5);
+    return geoPath(pr)(geo) ?? '';
+  }
+  const homeKey = $derived(data?.ok ? data.home.join(',') : '');
+  const homeOf = (k) => k.split(',').map(Number);
+  const baseGeo = $derived(homeKey ? { land: kmPath(land, homeOf(homeKey), KM_MAX), borders: kmPath(borders, homeOf(homeKey), KM_MAX),
+                                       grat: kmPath(geoGraticule10(), homeOf(homeKey), KM_MAX) } : null);
+  const fineGeo = $derived(homeKey && fine ? { land: kmPath(fine.land, homeOf(homeKey), 1500), borders: kmPath(fine.borders, homeOf(homeKey), 1500) } : null);
+  const finestGeo = $derived(homeKey && finest ? { land: kmPath(finest.land, homeOf(homeKey), 600), borders: kmPath(finest.borders, homeOf(homeKey), 600) } : null);
+  const geoShown = $derived(MAX_KM < 600 && finestGeo ? finestGeo : MAX_KM < 1500 && fineGeo ? fineGeo : baseGeo);
+  // échelle écran (px par km) et transformation du groupe tracé en km
+  const pxPerKm = $derived(R / MAX_KM);
+  const kmTransform = $derived(`translate(${C},${C}) scale(${pxPerKm})`);
 
   // villes (Natural Earth, domaine public) : seuil de population selon le zoom, étiquettes sans chevauchement
   let cityList = $state(null);
@@ -95,7 +117,6 @@
     ? geoAzimuthalEquidistant().rotate([-data.home[1], -data.home[0]]).scale(scale).translate([C, C])
         .clipAngle((MAX_KM / EARTH) * 180 / Math.PI)
     : null);
-  const path = $derived(proj ? geoPath(proj) : null);
 
   // vue satellite : image reprojetée (2× la résolution affichée), recalculée après chaque zoom
   let sat = $state(false), satImg = $state(null), satMsg = $state('');
@@ -132,10 +153,11 @@
     const r = (km / MAX_KM) * R, a = (az * Math.PI) / 180;
     return [C + r * Math.sin(a), C - r * Math.cos(a)];
   };
+  // secteur en km depuis le QTH (dessiné dans le groupe à l'échelle) : ne dépend pas du zoom
+  const kxy = (az, km) => { const a = (az * Math.PI) / 180; return [km * Math.sin(a), -km * Math.cos(a)]; };
   function sector(az0, az1, r0, r1) {
-    const [x0, y0] = xy(az0, r1), [x1, y1] = xy(az1, r1), [x2, y2] = xy(az1, r0), [x3, y3] = xy(az0, r0);
-    const R1 = (r1 / MAX_KM) * R, R0 = (r0 / MAX_KM) * R;
-    return `M${x0},${y0} A${R1},${R1} 0 0 1 ${x1},${y1} L${x2},${y2} A${R0},${R0} 0 0 0 ${x3},${y3} Z`;
+    const [x0, y0] = kxy(az0, r1), [x1, y1] = kxy(az1, r1), [x2, y2] = kxy(az1, r0), [x3, y3] = kxy(az0, r0);
+    return `M${x0},${y0} A${r1},${r1} 0 0 1 ${x1},${y1} L${x2},${y2} A${r0},${r0} 0 0 0 ${x3},${y3} Z`;
   }
 
   const cells = $derived.by(() => {
@@ -144,7 +166,7 @@
     for (let i = 0; i < codes.length; i++) {
       const az = Math.floor(i / n) * step, k = i % n;
       const r0 = k ? data.rings[k - 1] : 0, r1 = data.rings[k];
-      if (r0 >= MAX_KM) continue;
+      // toutes les cases sont gardées : le disque de découpe masque (et rend insensibles) celles hors champ
       out.push({ d: sector(az - step / 2, az + step / 2, r0, r1), code: codes[i], az, r0, r1, muf: data.muf[i] });
     }
     return out;
@@ -232,21 +254,24 @@
       <svg viewBox="0 0 {SIZE} {SIZE}" class="map" bind:this={mapEl} role="img" aria-label={mode === 'listen' ? TX.aria(band) : `Carte azimutale des zones de silence sur ${band}`}>
         <defs>
           <clipPath id="disc"><circle cx={C} cy={C} r={R} /></clipPath>
-          <pattern id="nodata" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <!-- hachures « pas de mesure » : posées dans le groupe en km, on annule l'échelle pour garder 6 px à l'écran -->
+          <pattern id="nodata" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="scale({1 / pxPerKm}) rotate(45)">
             <rect width="3" height="6" fill="rgba(255,255,255,0.10)" /></pattern>
         </defs>
         <circle cx={C} cy={C} r={R} class="sea" />
         <g clip-path="url(#disc)">
-          {#if sat && satImg}<image href={satImg} x="0" y="0" width={SIZE} height={SIZE} />
-          {:else}<path d={path(landShown)} class="land" />{/if}
+          {#if sat && satImg}<image href={satImg} x="0" y="0" width={SIZE} height={SIZE} />{/if}
+          <g transform={kmTransform}>
+          {#if !(sat && satImg)}<path d={geoShown.land} class="land" />{/if}
           {#each cells as c}
             <path role="presentation" d={c.d} fill={fillFor(c.code)} class="cell"
                   onmouseenter={() => (hover = mode === 'listen' ? TX.cell(band, c.az, c.r0, c.r1, labelFor(c.code), c.muf) : `${band} · azimut ${c.az}° · ${c.r0}–${c.r1} km : ${labelFor(c.code)}${c.muf ? ` · MUF ${c.muf} MHz` : ''}`)}
                   onmouseleave={() => (hover = '')} />
           {/each}
-          <path d={path(geoGraticule10())} class="grat" />
-          <path d={path(bordersShown)} class="border" />
-          <path d={path(landShown)} class="coast" />
+          <path d={baseGeo.grat} class="grat" />
+          <path d={geoShown.borders} class="border" />
+          <path d={geoShown.land} class="coast" />
+          </g>
         </g>
         {#each ringKms as km}
           <circle cx={C} cy={C} r={(km / MAX_KM) * R} class="ring" />
@@ -333,10 +358,10 @@
   .side { flex: 1 1 300px; display: flex; flex-direction: column; gap: 8px; }
   .sea { fill: #10141a; stroke: var(--gold-soft); }
   .land { fill: #2a2a24; }
-  .coast { fill: none; stroke: rgba(230, 226, 211, 0.55); stroke-width: 0.7; pointer-events: none; }
-  .border { fill: none; stroke: rgba(230, 226, 211, 0.22); stroke-width: 0.5; pointer-events: none; }
-  .grat { fill: none; stroke: rgba(207, 181, 59, 0.08); pointer-events: none; }
-  .cell { stroke: none; }
+  .coast { vector-effect: non-scaling-stroke; fill: none; stroke: rgba(230, 226, 211, 0.55); stroke-width: 0.7; pointer-events: none; }
+  .border { vector-effect: non-scaling-stroke; fill: none; stroke: rgba(230, 226, 211, 0.22); stroke-width: 0.5; pointer-events: none; }
+  .grat { vector-effect: non-scaling-stroke; fill: none; stroke: rgba(207, 181, 59, 0.08); pointer-events: none; }
+  .cell { stroke: none; vector-effect: non-scaling-stroke; }
   .cell:hover { stroke: var(--gold); stroke-width: 1.2; }
   .ring { fill: none; stroke: rgba(207, 181, 59, 0.35); stroke-dasharray: 3 4; pointer-events: none; }
   .rlab { fill: var(--gold-soft); font-size: 10px; pointer-events: none; }
