@@ -824,3 +824,7 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
   à l'écran, hachures « pas de mesure » à 6 px).
 - Fonds détaillés 1:50 M et 1:10 M importés une seule fois (avant : une conversion à chaque cran pendant le chargement).
 - Pavé tactile : zoom proportionnel aux petits deltas (un cran de molette = ×1,25 comme avant).
+
+## Fait (01/11/2026) : carte « écoute » ouverte sur la bande en cours
+- `/log/ecoute?band=20m` : la page publique s'ouvre sur cette bande (passée par le bandeau du WebSDR, bande de la
+  fréquence écoutée au moment du clic). Sans paramètre, ou bande absente de la carte : 40m comme avant.
