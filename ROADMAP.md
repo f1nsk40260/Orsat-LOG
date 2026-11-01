@@ -814,3 +814,13 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - Sur les deux graphes 24 h (`frontend/src/chartzoom.js`) : molette = zoom autour du pointeur (30 min au plus près),
   glisser = choisir une plage (aussi au doigt), double-clic ou bouton « ↺ 24 h » = journée entière.
 - Graduations horaires adaptées à la plage (HH:MM), échelles latérales recalculées sur la plage affichée.
+
+## Fait (01/11/2026) : carte de propagation fluide au zoom
+- Carte azimutale (`frontend/src/SkipMap.svelte`, page publique « écoute » et carnet) : fond de carte, graticule
+  et cases tracés **une seule fois en kilomètres** depuis le QTH (par niveau de détail 1:110 M / 1:50 M / 1:10 M,
+  découpés au rayon où ils servent) ; la molette ne change plus que l'échelle du groupe SVG.
+  Avant, chaque cran reprojetait le monde entier : jusqu'à 10 s par cran sous 600 km (page figée, « plantage »).
+  Mesuré (Chromium) : moyenne ~2 s → ~40 ms par cran entre 1300 et 250 km. Aspect inchangé (traits à épaisseur fixe
+  à l'écran, hachures « pas de mesure » à 6 px).
+- Fonds détaillés 1:50 M et 1:10 M importés une seule fois (avant : une conversion à chaque cran pendant le chargement).
+- Pavé tactile : zoom proportionnel aux petits deltas (un cran de molette = ×1,25 comme avant).
