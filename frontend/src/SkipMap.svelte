@@ -15,13 +15,17 @@
   const TX = TXT[publicView ? PAGE_LANG : 'fr'];
   let mode = $state(publicView ? 'listen' : 'tx');     // 'tx' = émission depuis la station, 'listen' = écoute du WebSDR
   let data = $state(null);
-  let band = $state(publicView ? '40m' : '20m');
+  // page publique : s'ouvre sur la bande écoutée sur le WebSDR (?band=20m, passée par son bandeau)
+  const DEFAULT_BAND = publicView ? '40m' : '20m';
+  const URL_BAND = publicView ? (() => { try { return new URLSearchParams(location.search).get('band'); } catch { return null; } })() : null;
+  let band = $state(URL_BAND || DEFAULT_BAND);
   let onlyBand = $state(false);
   let hover = $state('');
 
   export async function refresh() {
     const get = publicView ? api.publicListenMap : mode === 'listen' ? api.listenMap : api.skipMap;
     data = await get().catch(() => ({ ok: false, msg: 'Serveur injoignable.' }));
+    if (data?.ok && !data.bands?.[band]) band = data.bands?.[DEFAULT_BAND] ? DEFAULT_BAND : Object.keys(data.bands ?? {})[0] ?? band;
   }
   $effect(() => { mode; refresh(); });
 
