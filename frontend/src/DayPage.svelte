@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
   import { api, deleteEntry } from './api.js';
   import { fmtFreq } from './util.js';
+  import { tciRetryNow } from './tciBrowser.js';
   import EntryForm from './EntryForm.svelte';
   import EntriesTable from './EntriesTable.svelte';
   import PropagationPanel from './PropagationPanel.svelte';
@@ -101,7 +102,10 @@
           {#if radio.ptt}<span class="tx">TX</span>{/if}
         </div>
         {#if !radio.connected && radio.error}
-          <div class="tci-error">{radio.error}</div>
+          <div class="tci-error">
+            {radio.error}
+            <button class="small retry" onclick={tciRetryNow} title="Réessayer la liaison TCI maintenant">Réessayer</button>
+          </div>
         {/if}
         <div class="freq mono">{fmtFreq(radio.freq)}<small> MHz</small></div>
         <div class="radio-mode">{radio.modulation ? radio.modulation.toUpperCase() : '—'}</div>
@@ -221,6 +225,7 @@
   .panel-title:has(.listeners) { display: flex; align-items: baseline; }
   .listeners { margin-left: auto; color: var(--gold); font-size: 0.72rem; letter-spacing: 0.04em; text-transform: none; font-weight: 500; }
   .tci-error { color: var(--warn); font-size: 0.78rem; margin-top: 6px; }
+  .tci-error .retry { margin-left: 8px; padding: 1px 8px; font-size: 0.75rem; }
   .tx { margin-left: auto; color: #fff; background: var(--bad); padding: 1px 8px; border-radius: 4px; font-weight: 700; }
   .freq { font-size: 2rem; color: var(--gold); margin: 12px 0 2px; text-shadow: 0 0 10px rgba(207, 181, 59, 0.35); }
   .freq small { font-size: 0.9rem; color: var(--gold-soft); }
