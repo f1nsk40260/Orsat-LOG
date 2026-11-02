@@ -840,3 +840,15 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - `listeners.py` : le carnet reste abonné au flux `/events` de PhantomSDR-ORSAT (même port que la chute d'eau,
   `snr.waterfall_candidates`) ; compte = `signal_clients` (auditeurs avec le son, la mesure SNR du carnet n'y entre pas).
   Diffusé dans l'état `websdr.listeners` (None = WebSDR injoignable, rien d'affiché) ; reconnexion toutes les 30 s.
+
+## Fait (02/11/2026) : liaison TCI avec AetherSDR plus rapide
+- Cause : les navigateurs freinent eux-mêmes les WebSocket en échec (Firefox : ×1,5 par échec jusqu'à 60 s, clé
+  = adresse + chemin + port ; Chromium : 1–5 s pour tout l'onglet au-delà de ~16 échecs en 2–4 min). Carnet ouvert
+  avant l'applet TCI d'AetherSDR → longue attente une fois AetherSDR prêt. AetherSDR, lui, envoie son état dès
+  la connexion (vérifié sur son code source) ; Orsat SDR (natif) n'est pas freiné.
+- `frontend/src/tciBrowser.js` : essais sur un chemin qui change (`/orsat-log/N`, ignoré par AetherSDR) ;
+  essais toutes les 2 s pendant 20 s après démarrage ou coupure, puis toutes les 20 s ; essai immédiat quand
+  l'opérateur revient sur le carnet (onglet, fenêtre, souris, molette) ; bouton « Réessayer » sous l'erreur TCI.
+- Firefox récent demande en plus l'autorisation d'accéder aux « applications et services de cet appareil »
+  (page publique → localhost) : la liaison attend la réponse. À autoriser une fois pour orsat.ddns.net
+  (cadenas → Permissions), valable pour le carnet et la page WebSDR.
