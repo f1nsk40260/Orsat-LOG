@@ -603,12 +603,13 @@ class Database:
 
     # --- synchronisation eQSL.cc ---
     def eqsl_pending(self, since="", limit=50):
-        """Contacts à envoyer vers eQSL (jamais d'écoute SWL), à partir du jour since (AAAAMMJJ)."""
+        """Contacts à envoyer vers eQSL, à partir du jour since (AAAAMMJJ) : QSO seuls,
+        jamais une écoute SWL ni un QSO de groupe (GRP) — décision F1NSK, 02/11/2026."""
         with self._lock:
             rows = self._con.execute(
-                "SELECT * FROM qso WHERE kind = 'QSO' AND eqsl_state = '' AND qso_date >= ? "
+                "SELECT * FROM qso WHERE kind = 'QSO' AND session_id IS NULL AND eqsl_state = '' AND qso_date >= ? "
                 "ORDER BY qso_date, time_on, id LIMIT ?", (since or "", limit)).fetchall()
-        return [dict(r) for r in rows if r["kind"] == "QSO"]
+        return [dict(r) for r in rows if r["kind"] == "QSO" and r["session_id"] is None]
 
     def eqsl_candidates(self, call, qso_date):
         """QSO du carnet de trafic avec cet indicatif, ce jour-là (rapprochement d'une eQSL reçue)."""
@@ -622,7 +623,7 @@ class Database:
         with self._lock:
             r = self._con.execute(
                 "SELECT SUM(eqsl_state = 'synced') AS synced, "
-                "SUM(eqsl_state = '' AND qso_date >= ?) AS pending, "
+                "SUM(eqsl_state = '' AND session_id IS NULL AND qso_date >= ?) AS pending, "
                 "SUM(eqsl_state = 'error') AS errors, SUM(coalesce(eqsl_rcvd, '') <> '') AS received "
                 "FROM qso WHERE kind = 'QSO'", (since or "",)).fetchone()
         return {k: r[k] or 0 for k in ("synced", "pending", "errors", "received")}
@@ -638,7 +639,8 @@ class Database:
     def eqsl_retry_errors(self):
         with self._lock:
             n = self._con.execute(
-                "UPDATE qso SET eqsl_state = '', eqsl_error = NULL WHERE kind = 'QSO' AND eqsl_state = 'error'").rowcount
+                "UPDATE qso SET eqsl_state = '', eqsl_error = NULL WHERE kind = 'QSO' AND session_id IS NULL "
+                "AND eqsl_state = 'error'").rowcount
             self._con.commit()
         return n
 

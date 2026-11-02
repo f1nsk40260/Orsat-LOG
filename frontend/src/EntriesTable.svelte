@@ -12,7 +12,8 @@
 
   // showDate = false sur la page du jour (la date est déjà en tête de page)
   // onchanged : appelé après une modification ou une suppression faite dans le formulaire d'édition
-  let { entries, ondelete, ondate, onchanged, showDate = true, empty = 'Aucune entrée.' } = $props();
+  // syncCols = true : colonnes QRZ et EQSL (carnet de trafic) au lieu des petits repères après l'indicatif
+  let { entries, ondelete, ondate, onchanged, showDate = true, syncCols = false, empty = 'Aucune entrée.' } = $props();
   let editing = $state(null);   // entrée ouverte dans le formulaire d'édition
   let card = $state(null);      // entrée ouverte dans la fiche (conditions du QSO)
 
@@ -38,7 +39,8 @@
         {#if showDate}<th>Date</th>{/if}
         <th>UTC</th><th>Type</th><th>Indicatif / station</th><th>Bande</th><th>Fréq.</th><th>Mode</th>
         <th>Env.</th><th title="RST reçu ou SINPO">Reçu</th><th>Locator</th><th>Pays</th><th>Dist.</th><th>Az.</th>
-        <th title="Flux solaire / indice K au moment de l'entrée">SFI / K</th><th>Nom / émetteur</th><th></th>
+        <th title="Flux solaire / indice K au moment de l'entrée">SFI / K</th><th>Nom / émetteur</th>
+        {#if syncCols}<th class="sync" title="Logbook QRZ.com">QRZ</th><th class="sync" title="eQSL.cc (QSO seulement, pas les QSO de groupe)">EQSL</th>{/if}<th></th>
       </tr>
     </thead>
     <tbody>
@@ -60,10 +62,10 @@
             {/if}
           </td>
           <td class="mono call-cell"><button type="button" class="ghost calllink" onclick={() => (card = q)}
-              title={`Fiche du QSO : carte, ligne grise et conditions de propagation${q.comment ? ' — ' + q.comment : ''}`}>{q.call}</button>{#if q.kind !== 'SWL' && q.qrz_state}<span
+              title={`Fiche du QSO : carte, ligne grise et conditions de propagation${q.comment ? ' — ' + q.comment : ''}`}>{q.call}</button>{#if !syncCols && q.kind !== 'SWL' && q.qrz_state}<span
               class="qrz q-{q.qrz_state}"
               title={q.qrz_state === 'synced' ? 'Synchronisé avec QRZ.com' : q.qrz_state === 'pending' ? 'En attente d\'envoi vers QRZ.com' : `Refusé par QRZ.com : ${q.qrz_error || ''}`}
-              >{q.qrz_state === 'synced' ? '✓' : q.qrz_state === 'pending' ? '⏳' : '⚠'}</span>{/if}{#if q.kind !== 'SWL' && (q.eqsl_rcvd || q.eqsl_state === 'synced' || q.eqsl_state === 'error')}<span
+              >{q.qrz_state === 'synced' ? '✓' : q.qrz_state === 'pending' ? '⏳' : '⚠'}</span>{/if}{#if !syncCols && q.kind !== 'SWL' && (q.eqsl_rcvd || q.eqsl_state === 'synced' || q.eqsl_state === 'error')}<span
               class="eqsl e-{q.eqsl_rcvd ? 'rcvd' : q.eqsl_state}"
               title={q.eqsl_rcvd ? `eQSL reçue du correspondant (${fmtDate(q.eqsl_rcvd)})` : q.eqsl_state === 'synced' ? 'Envoyé à eQSL.cc' : `Refusé par eQSL.cc : ${q.eqsl_error || ''}`}
               >e</span>{/if}</td>
@@ -90,6 +92,15 @@
                 + (q.sfi != null ? '\n\n' + tipSfi(q.sfi) : '') + (q.k_index != null ? '\n\n' + tipK(q.k_index) : '')}
               class:archive={q.solar_src === 'GFZ'}>{q.sfi != null ? Math.round(q.sfi) : ''}{q.k_index != null ? ` / ${+(+q.k_index).toFixed(1)}` : ''}</td>
           <td>{q.kind === 'SWL' ? q.qth : q.name}</td>
+          {#if syncCols}
+            <td class="sync">{#if q.qrz_state === 'synced'}<span class="ok" title="Synchronisé avec QRZ.com">✓</span>{:else if q.qrz_state === 'pending'}<span
+              class="q-pending" title="En attente d'envoi vers QRZ.com">⏳</span>{:else if q.qrz_state === 'error'}<span
+              class="q-error" title={`Refusé par QRZ.com : ${q.qrz_error || ''}`}>⚠</span>{/if}</td>
+            <td class="sync">{#if q.eqsl_state === 'synced'}<span
+              class="ok" title="Envoyé à eQSL.cc">✓</span>{:else if q.session_id}<span class="q-pending" title="QSO de groupe : jamais envoyé à eQSL">—</span>{:else if q.eqsl_state === 'error'}<span
+              class="q-error" title={`Refusé par eQSL.cc : ${q.eqsl_error || ''}`}>⚠</span>{/if}{#if q.eqsl_rcvd}<span
+              class="conf" title={`eQSL reçue du correspondant (${fmtDate(q.eqsl_rcvd)})`}>◆</span>{/if}</td>
+          {/if}
           <td>
             <button class="ghost edit" title="Modifier cette entrée" onclick={() => (editing = q)}>✎</button>
             {#if ondelete}
@@ -98,7 +109,7 @@
           </td>
         </tr>
       {:else}
-        <tr><td colspan="16" class="muted empty">{empty}</td></tr>
+        <tr><td colspan={syncCols ? 18 : 16} class="muted empty">{empty}</td></tr>
       {/each}
     </tbody>
   </table>
@@ -137,6 +148,9 @@
   .q-synced { color: var(--ok); opacity: 0.7; }
   .q-pending { color: var(--muted); }
   .q-error { color: var(--bad); }
+  th.sync, td.sync { text-align: center; width: 3.2em; }
+  td.sync .ok { color: var(--ok); font-weight: 700; cursor: help; }
+  td.sync .q-pending, td.sync .q-error { cursor: help; }
   /* repère eQSL.cc : « e » discret, vert quand l'eQSL du correspondant est reçue */
   .eqsl { margin-left: 4px; font-size: 0.68rem; font-weight: 600; font-style: italic; cursor: help; }
   .e-synced { color: var(--gold-soft); }

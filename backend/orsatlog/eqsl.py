@@ -8,7 +8,8 @@ API eQSL (https://www.eqsl.cc/qslcard/ADIFContentSpecs.cfm, ImportADIF.cfm, Down
     la page donne un lien vers un fichier .adi (les eQSL reçues), ou « You have no log entries ».
 
 Règles (demande F1NSK, 02/11/2026) :
-  - Seuls les contacts du carnet de trafic partent (kind = 'QSO'), JAMAIS les écoutes SWL.
+  - Seuls les contacts « QSO » du carnet de trafic partent : JAMAIS les écoutes SWL ni les QSO
+    de groupe (GRP, session_id renseigné).
   - Un QSO part une fois. eQSL ne sait ni corriger ni supprimer par l'API : un QSO déjà envoyé
     puis corrigé (indicatif, date, heure, bande, mode) repart, l'ancienne version est à
     supprimer à la main sur eQSL (noté au journal).
@@ -253,7 +254,7 @@ class EqslSync:
             if not batch:
                 break
             for q in batch:
-                if q["kind"] != "QSO":              # garde-fou : jamais une écoute
+                if q["kind"] != "QSO" or q.get("session_id") is not None:   # jamais une écoute ni un GRP
                     continue
                 if _already_sent(q):                # déjà envoyé à eQSL (noté chez QRZ.com)
                     self.db.update_qso(q["id"], {"eqsl_state": "synced", "eqsl_error": None})
