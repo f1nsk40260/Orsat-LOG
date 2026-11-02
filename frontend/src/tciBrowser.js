@@ -63,19 +63,22 @@ function handle(cmd) {
 // une minute d'attente une fois AetherSDR prêt. Parades :
 //  - chaque nouvel essai vise un chemin différent (AetherSDR ignore le chemin), ce qui
 //    évite le frein de Firefox ;
-//  - essais rapprochés (2 s) pendant 20 s après une coupure ou au démarrage, puis
-//    espacés (20 s) pour rester sous le seuil de Chromium ;
+//  - essais toutes les 2 s ; sous Chromium, toutes les 5 s au-delà de 20 s d'absence
+//    (au-delà, chaque essai y est de toute façon retardé de 1 à 5 s ; un rythme plus
+//    lent, essayé un temps, laissait jusqu'à 20 s d'attente sans toucher au carnet) ;
 //  - essai immédiat dès que l'opérateur revient sur le carnet (onglet, fenêtre,
 //    souris), ou sur le bouton « Réessayer ».
 const FAST_MS = 2000;                  // intervalle des essais rapprochés
 const FAST_FOR_MS = 20000;             // durée de la phase d'essais rapprochés
-const SLOW_MS = 20000;                 // intervalle ensuite
+const SLOW_MS = 5000;                  // intervalle ensuite, hors Firefox
+// Firefox : le chemin tournant suffit, aucun frein à ménager → toujours 2 s
+const IS_FIREFOX = typeof navigator !== 'undefined' && /firefox/i.test(navigator.userAgent);
 let attempt = 0;                       // essais ratés depuis la dernière liaison réussie
 let lostAt = 0;                        // début de la phase d'essais rapprochés
 let lastTry = 0;                       // heure du dernier essai lancé
 
 function nextDelay() {
-  return Date.now() - lostAt < FAST_FOR_MS ? FAST_MS : SLOW_MS;
+  return IS_FIREFOX || Date.now() - lostAt < FAST_FOR_MS ? FAST_MS : SLOW_MS;
 }
 
 function schedule(ms) {
