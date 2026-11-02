@@ -11,6 +11,25 @@ WebSDR **PhantomSDR-ORSAT** et servi par lui sous **https://orsat.ddns.net/log/*
 - **Gestion** : panneau admin du WebSDR, rubrique **Carnet ORSAT-LOG** : réglages (indicatif,
   locators station / WebSDR, TCI, météo), sauvegardes et restauration, mise à jour, état du service.
 
+## Ce que fait le carnet
+
+- **Agenda** : une page par jour UTC (saisie QSO / SWL / QSO de groupe, activité, notes, bilan),
+  calendrier, pages passées en consultation. **Carnet complet** avec recherche, import et export ADIF,
+  synchronisation automatique avec le logbook QRZ.com.
+- **Fiche QSO** : conditions du contact (indices solaires, météo spatiale, ionosphère mesurée, trajet sur carte).
+- **Propagation** : indices NOAA, météo spatiale (Kp, Bz, vent solaire, éruptions), bandes ouvertes et
+  portée par bande d'après les ionosondes, carte des zones de silence, fenêtre **Trajet** (tracé de rayons,
+  absorption D, chances de réception), **Analyse** du carnet (distances selon Kp, SFI, heure, direction).
+- **Météo locale** (station Weathercloud) : courbes température / pression avec leurs échelles,
+  bouton **Windy** pour ouvrir la carte Windy.
+- **Orages et QRN** : foudre en temps réel (Blitzortung), orage le plus proche, rose des secteurs, écart du
+  bruit par bande ; graphe 24 h avec échelles impacts (gauche) et bruit dB (droite), bouton **Blitz**
+  pour ouvrir la carte Blitzortung.
+- **Graphes zoomables** (Météo locale, Orages et QRN) : molette ou sélection à la souris sur l'axe du temps,
+  ↺ pour revenir aux 24 h.
+- **WebSDR** : stations entendues, mesure réelle du bruit et du SNR, indice de performance, page publique
+  **/log/ecoute** (zone d'écoute par bande, FR / EN / ES).
+
 ## Installation sur le PC du WebSDR (une seule fois)
 
 ```bash
@@ -43,6 +62,16 @@ fournisseur est cité dans chaque fiche.
 Identification des écoutes SWL : grille des émissions en ondes courtes EiBi (Eike Bierwirth),
 http://www.eibispace.de/.
 
+Indices solaires et météo spatiale en direct : NOAA Space Weather Prediction Center
+(https://services.swpc.noaa.gov/). Bandes ouvertes et cartes de propagation : mesures d'ionosondes via
+KC2G (https://prop.kc2g.com/, Andrew Rodland KC2G ; GIRO, NOAA, INGV, Australian SWS).
+
+Foudre : flux public de la carte Blitzortung.org (https://www.blitzortung.org/), réseau communautaire de
+détection, usage non commercial. Météo locale : Weathercloud (https://weathercloud.net/). Carte de vent :
+lien vers Windy (https://www.windy.com/). Correspondants (nom, QTH, photo, logbook) : QRZ.com.
+
+Fonds de carte : © Esri, HERE, Garmin, Maxar, Earthstar Geographics ; © les contributeurs OpenStreetMap ;
+Sentinel-2 cloudless by EOX IT Services GmbH (https://s2maps.eu, CC BY 4.0, données Copernicus Sentinel).
 
 `~/Orsat-LOG/data/` (jamais envoyé sur GitHub) : base `orsatlog.db`, copies quotidiennes
 `backups/`, clé de session `secret.key`.

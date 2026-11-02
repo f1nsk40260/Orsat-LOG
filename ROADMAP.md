@@ -828,3 +828,8 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 ## Fait (01/11/2026) : carte « écoute » ouverte sur la bande en cours
 - `/log/ecoute?band=20m` : la page publique s'ouvre sur cette bande (passée par le bandeau du WebSDR, bande de la
   fréquence écoutée au moment du clic). Sans paramètre, ou bande absente de la carte : 40m comme avant.
+
+## Fait (02/11/2026) : README à jour
+- Résumé des fonctions (agenda, propagation, Météo locale + Windy, Orages et QRN + Blitz, échelles et zoom des
+  graphes, WebSDR et page publique) et crédits des sources ajoutés (NOAA SWPC, KC2G, Blitzortung, Weathercloud,
+  Windy, QRZ.com, fonds de carte Esri / OSM / EOX).
