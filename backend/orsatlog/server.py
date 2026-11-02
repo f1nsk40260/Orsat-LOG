@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, dlayer, antennas, eibi, enrich, geo, ionosonde, kc2g, layers, lightning, listeners, partners, qrn, qrz, qrzxml, reach, snr, solar, spacewx, spots, weather
+from . import __version__, adif, auth, backup, dlayer, antennas, eibi, enrich, eqsl, geo, ionosonde, kc2g, layers, lightning, listeners, partners, qrn, qrz, qrzxml, reach, snr, solar, spacewx, spots, weather
 from .db import DATA_DIR, Database
 from .websdr import Page, WebSdrLink
 
@@ -55,6 +55,7 @@ async def _safe_send(ws, msg):
 
 websdr = WebSdrLink(on_change=lambda st: _broadcast(st, "websdr"))
 qrz_sync = qrz.QrzSync(db)
+eqsl_sync = eqsl.EqslSync(db)      # envoi des QSO vers eQSL.cc et relève des eQSL reçues
 qrz_dir = qrzxml.QrzXml(db)         # annuaire QRZ : photo, nom, QTH d'un indicatif
 grid_filler = qrzxml.GridFiller(db, qrz_dir)
 
@@ -127,6 +128,7 @@ async def run_enrich():
 async def lifespan(app):
     recorder = asyncio.create_task(_propagation_recorder())
     syncer = asyncio.create_task(qrz_sync.loop())
+    eqsler = asyncio.create_task(eqsl_sync.loop())
     enricher = asyncio.create_task(_enrich_loop())
     saver = asyncio.create_task(backup.daily_task(db))
     meter = asyncio.create_task(snr.loop(_store_snr))
@@ -143,6 +145,7 @@ async def lifespan(app):
     saver.cancel()
     meter.cancel()
     syncer.cancel()
+    eqsler.cancel()
     enricher.cancel()
 
 
@@ -358,6 +361,87 @@ async def admin_qrz_run(request: Request, full: bool = False):
     return _qrz_status()
 
 
+# ---------- synchronisation eQSL.cc (panneau admin) ----------
+def _eqsl_status():
+    s = db.get_settings()
+    since = s.get("eqsl_since", "")
+    return {"enabled": s.get("eqsl_sync") == "1", "user": s.get("eqsl_user", ""),
+            "password_set": bool(s.get("eqsl_password")), "nickname": s.get("eqsl_nickname", ""),
+            "since": since, **eqsl_sync.state, **db.eqsl_counts(since),
+            "refused": db.eqsl_errors(), "journal": list(eqsl_sync.journal)[-80:]}
+
+
+@app.get("/api/admin/eqsl")
+def admin_eqsl(request: Request):
+    _require_admin(request)
+    return _eqsl_status()
+
+
+class EqslIn(BaseModel):
+    user: str | None = None        # None = inchangé ; "" = effacer identifiant et mot de passe
+    password: str | None = None    # None ou "" = inchangé
+    nickname: str | None = None
+    since: str | None = None       # AAAAMMJJ ou AAAA-MM-JJ ; "" = tout le carnet
+    enabled: bool | None = None
+
+
+@app.post("/api/admin/eqsl")
+async def admin_eqsl_set(cfg: EqslIn, request: Request):
+    _require_admin(request)
+    cur = db.get_settings()
+    values = {}
+    if cfg.since is not None:
+        d = cfg.since.replace("-", "").replace("/", "").strip()
+        if d:
+            try:
+                datetime.strptime(d, "%Y%m%d")
+            except ValueError:
+                raise HTTPException(400, "Date de départ invalide (AAAA-MM-JJ)")
+        values["eqsl_since"] = d
+    if cfg.nickname is not None:
+        values["eqsl_nickname"] = cfg.nickname.strip()
+    if cfg.user is not None or cfg.password:
+        user = (cfg.user if cfg.user is not None else cur.get("eqsl_user", "")).strip().upper()
+        pwd = cfg.password or cur.get("eqsl_password", "")
+        if not user:
+            values.update(eqsl_user="", eqsl_password="", eqsl_last_inbox="")
+        else:
+            if not pwd:
+                raise HTTPException(400, "Mot de passe eQSL manquant")
+            nick = values.get("eqsl_nickname", cur.get("eqsl_nickname", ""))
+            try:      # identifiants essayés avant d'être enregistrés
+                await asyncio.to_thread(eqsl.EqslClient(user, pwd, nick).check)
+            except eqsl.EqslError as exc:
+                raise HTTPException(400, f"eQSL.cc : {exc}")
+            if user != cur.get("eqsl_user", ""):
+                values["eqsl_last_inbox"] = ""        # autre compte : boîte relue en entier
+            values.update(eqsl_user=user, eqsl_password=pwd)
+            eqsl_sync.note(f"Compte eQSL {user} vérifié et enregistré.")
+    if cfg.enabled is not None:
+        values["eqsl_sync"] = "1" if cfg.enabled else "0"
+        if cfg.enabled and not values.get("eqsl_since", cur.get("eqsl_since", "")) and cfg.since is None:
+            # première mise en service : l'historique ne part pas sans le vouloir
+            values["eqsl_since"] = datetime.now(timezone.utc).strftime("%Y%m%d")
+        eqsl_sync.note("Synchronisation automatique " + ("activée." if cfg.enabled else "désactivée."))
+    if values:
+        db.set_settings(values)
+    if eqsl_sync.enabled():
+        eqsl_sync.poke()
+    return _eqsl_status()
+
+
+@app.post("/api/admin/eqsl/run")
+async def admin_eqsl_run(request: Request, retry: bool = False):
+    """Synchroniser maintenant : envoi + relève des eQSL reçues (retry=true : renvoyer les refusés)."""
+    _require_admin(request)
+    s = db.get_settings()
+    if not (s.get("eqsl_user") and s.get("eqsl_password")):
+        raise HTTPException(400, "Aucun compte eQSL enregistré")
+    asyncio.create_task(eqsl_sync.run(inbox=True, retry=retry))
+    await asyncio.sleep(0.2)
+    return _eqsl_status()
+
+
 @app.post("/api/admin/restart")
 def admin_restart(request: Request):
     """Redémarrage par systemd (Restart=always), après une mise à jour."""
@@ -373,6 +457,7 @@ def get_settings(request: Request):
     if not auth.is_admin(request.headers):
         s.pop("qrz_api_key", None)        # la clé QRZ ne sort jamais vers les navigateurs
         s.pop("qrz_xml_password", None)
+        s.pop("eqsl_password", None)      # idem pour le mot de passe eQSL
     return s
 
 
@@ -894,6 +979,7 @@ async def add_qso(q: QsoIn):
     saved = db.add_qso(rec)
     if kind == "QSO":
         qrz_sync.poke()
+        eqsl_sync.poke()
     return saved
 
 
@@ -964,9 +1050,16 @@ def update_qso(qso_id: int, q: QsoEdit):
         rec["qrz_state"] = ""
         qrz_sync.note(f"{old['call']} {old['qso_date']} passé en SWL : il reste dans le logbook QRZ "
                       f"(n° {old['qrz_logid']}), à supprimer à la main si besoin.")
+    if kind == "QSO" and old.get("eqsl_state") and eqsl.eqsl_key(rec) != eqsl.eqsl_key(old):
+        # eQSL ne corrige pas par l'API : la nouvelle version repart, l'ancienne reste chez eQSL
+        if old["eqsl_state"] == "synced" and old.get("kind") == "QSO":
+            eqsl_sync.note(f"{old['call']} {old['qso_date']} {old['time_on'][:4]} corrigé : renvoyé vers eQSL ; "
+                           "l'ancienne version est à supprimer à la main sur eQSL.cc (Outbox).")
+        rec.update(eqsl_state="", eqsl_error=None)
     saved = db.update_qso(qso_id, rec)
     if kind == "QSO":
         qrz_sync.poke()
+        eqsl_sync.poke()
     return saved
 
 

@@ -27,7 +27,14 @@ DEFAULT_SETTINGS = {
     "qrz_xml_user": "",            # annuaire QRZ (photo, nom, QTH) : identifiant du compte QRZ
     "qrz_xml_password": "",        #   et son mot de passe (ne sort jamais vers les navigateurs)
     "qrz_full_done": "0",          # 1 = logbook QRZ rapatrié en entier une première fois
-    "qrz_last_pull": "",           # AAAA-MM-JJ de la dernière lecture des modifications   # identifiant de la station Weathercloud (F1NSK - Castets)
+    "qrz_last_pull": "",           # AAAA-MM-JJ de la dernière lecture des modifications
+    # Synchronisation avec eQSL.cc (réglée dans le panneau admin ; QSO seulement, jamais les SWL)
+    "eqsl_user": "",               # identifiant eQSL (l'indicatif, en général)
+    "eqsl_password": "",           #   et son mot de passe (ne sort jamais vers les navigateurs)
+    "eqsl_nickname": "",           # « QTH Nickname » eQSL si le compte en a plusieurs (sinon vide)
+    "eqsl_sync": "0",              # 1 = envoi automatique + relève des eQSL reçues
+    "eqsl_since": "",              # AAAAMMJJ : seuls les QSO à partir de ce jour partent
+    "eqsl_last_inbox": "",         # AAAAMMJJHHMM : relève des eQSL reçues depuis cet instant
 }
 
 QSO_FIELDS = [
@@ -36,6 +43,7 @@ QSO_FIELDS = [
     "distance_km", "bearing", "sfi", "a_index", "k_index",
     "qrz_logid", "qrz_state", "qrz_error", "adif_extra",
     "my_gridsquare", "country", "dxcc", "cont", "cqz", "ituz", "lat", "lon", "confirmed", "solar_src",
+    "eqsl_state", "eqsl_error", "eqsl_rcvd",
 ]
 
 _SCHEMA = """
@@ -172,6 +180,13 @@ class Database:
         for col, ddl in (("my_gridsquare", "TEXT"), ("country", "TEXT"), ("dxcc", "INTEGER"),
                          ("cont", "TEXT"), ("cqz", "INTEGER"), ("ituz", "INTEGER"), ("lat", "REAL"),
                          ("lon", "REAL"), ("confirmed", "TEXT"), ("solar_src", "TEXT")):
+            if col not in cols:
+                self._con.execute(f"ALTER TABLE qso ADD COLUMN {col} {ddl}")
+        # v1.28 : synchronisation eQSL.cc (eqsl.py)
+        #   eqsl_state : '' (pas encore envoyé), 'synced' (chez eQSL), 'error' (refusé, motif dans eqsl_error)
+        #   eqsl_rcvd  : AAAAMMJJ de l'eQSL reçue du correspondant (confirmation)
+        for col, ddl in (("eqsl_state", "TEXT NOT NULL DEFAULT ''"), ("eqsl_error", "TEXT"),
+                         ("eqsl_rcvd", "TEXT")):
             if col not in cols:
                 self._con.execute(f"ALTER TABLE qso ADD COLUMN {col} {ddl}")
         # QSO retirés du carnet mais laissés chez QRZ : la synchronisation ne les reprend plus
@@ -583,6 +598,47 @@ class Database:
             n = self._con.execute(
                 "UPDATE qso SET qrz_state = 'pending' WHERE kind = 'QSO' AND qrz_logid IS NULL "
                 "AND qrz_state IN ('', 'error')").rowcount
+            self._con.commit()
+        return n
+
+    # --- synchronisation eQSL.cc ---
+    def eqsl_pending(self, since="", limit=50):
+        """Contacts à envoyer vers eQSL (jamais d'écoute SWL), à partir du jour since (AAAAMMJJ)."""
+        with self._lock:
+            rows = self._con.execute(
+                "SELECT * FROM qso WHERE kind = 'QSO' AND eqsl_state = '' AND qso_date >= ? "
+                "ORDER BY qso_date, time_on, id LIMIT ?", (since or "", limit)).fetchall()
+        return [dict(r) for r in rows if r["kind"] == "QSO"]
+
+    def eqsl_candidates(self, call, qso_date):
+        """QSO du carnet de trafic avec cet indicatif, ce jour-là (rapprochement d'une eQSL reçue)."""
+        with self._lock:
+            rows = self._con.execute(
+                "SELECT * FROM qso WHERE kind = 'QSO' AND upper(call) = ? AND qso_date = ?",
+                (call.upper(), qso_date)).fetchall()
+        return [dict(r) for r in rows]
+
+    def eqsl_counts(self, since=""):
+        with self._lock:
+            r = self._con.execute(
+                "SELECT SUM(eqsl_state = 'synced') AS synced, "
+                "SUM(eqsl_state = '' AND qso_date >= ?) AS pending, "
+                "SUM(eqsl_state = 'error') AS errors, SUM(coalesce(eqsl_rcvd, '') <> '') AS received "
+                "FROM qso WHERE kind = 'QSO'", (since or "",)).fetchone()
+        return {k: r[k] or 0 for k in ("synced", "pending", "errors", "received")}
+
+    def eqsl_errors(self, limit=20):
+        with self._lock:
+            rows = self._con.execute(
+                "SELECT id, call, qso_date, time_on, band, mode, eqsl_error FROM qso "
+                "WHERE kind = 'QSO' AND eqsl_state = 'error' ORDER BY qso_date DESC, time_on DESC LIMIT ?",
+                (limit,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def eqsl_retry_errors(self):
+        with self._lock:
+            n = self._con.execute(
+                "UPDATE qso SET eqsl_state = '', eqsl_error = NULL WHERE kind = 'QSO' AND eqsl_state = 'error'").rowcount
             self._con.commit()
         return n
 

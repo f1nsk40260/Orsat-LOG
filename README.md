@@ -15,7 +15,7 @@ WebSDR **PhantomSDR-ORSAT** et servi par lui sous **https://orsat.ddns.net/log/*
 
 - **Agenda** : une page par jour UTC (saisie QSO / SWL / QSO de groupe, activité, notes, bilan),
   calendrier, pages passées en consultation. **Carnet complet** avec recherche, import et export ADIF,
-  synchronisation automatique avec le logbook QRZ.com.
+  synchronisation automatique avec le logbook QRZ.com, envoi des QSO vers eQSL.cc et relève des eQSL reçues.
 - **Fiche QSO** : conditions du contact (indices solaires, météo spatiale, ionosphère mesurée, trajet sur carte).
 - **Propagation** : indices NOAA, météo spatiale (Kp, Bz, vent solaire, éruptions), bandes ouvertes et
   portée par bande d'après les ionosondes, carte des zones de silence, fenêtre **Trajet** (tracé de rayons,
@@ -68,7 +68,7 @@ KC2G (https://prop.kc2g.com/, Andrew Rodland KC2G ; GIRO, NOAA, INGV, Australian
 
 Foudre : flux public de la carte Blitzortung.org (https://www.blitzortung.org/), réseau communautaire de
 détection, usage non commercial. Météo locale : Weathercloud (https://weathercloud.net/). Carte de vent :
-lien vers Windy (https://www.windy.com/). Correspondants (nom, QTH, photo, logbook) : QRZ.com.
+lien vers Windy (https://www.windy.com/). Correspondants (nom, QTH, photo, logbook) : QRZ.com. Cartes QSL électroniques : eQSL.cc (https://www.eqsl.cc/).
 
 Fonds de carte : © Esri, HERE, Garmin, Maxar, Earthstar Geographics ; © les contributeurs OpenStreetMap ;
 Sentinel-2 cloudless by EOX IT Services GmbH (https://s2maps.eu, CC BY 4.0, données Copernicus Sentinel).
