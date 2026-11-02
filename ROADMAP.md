@@ -874,3 +874,11 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
   « Synchroniser maintenant », « Renvoyer les refusés », compteurs, liste des refusés avec le motif d'eQSL, journal.
 - Carnet : petit « e » après l'indicatif (or = chez eQSL, vert = eQSL reçue du correspondant, rouge = refusé + motif).
 - Testé contre un faux eQSL (réponses ImportADIF / DownloadInBox) ; pas encore contre le vrai eQSL.cc.
+
+## Fait — v1.28.1 (02/11/2026) : eQSL sans les QSO de groupe, colonnes QRZ et EQSL
+- Retour F1NSK (synchro eQSL validée) : **seuls les contacts « QSO » partent vers eQSL, jamais les QSO de groupe (GRP)**
+  ni les SWL. `db.eqsl_pending` / `eqsl_counts` / `eqsl_retry_errors` : `session_id IS NULL` ; garde-fou dans `eqsl._push`.
+  Les GRP envoyés avant ce correctif restent chez eQSL (à supprimer à la main si besoin). La synchro QRZ garde les GRP.
+- Carnet → onglet Carnet de trafic : colonnes **QRZ** et **EQSL** (✓ vert = synchronisé, ⏳ en attente QRZ,
+  ⚠ refusé + motif, — = GRP non envoyé à eQSL, ◆ = eQSL reçue du correspondant). Ailleurs (page du jour),
+  les petits repères après l'indicatif restent.

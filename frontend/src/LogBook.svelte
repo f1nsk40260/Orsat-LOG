@@ -56,7 +56,7 @@
       {/if}
     </div>
     {#if filter.trim()}<p class="filtered">{shown.length} résultat{shown.length > 1 ? 's' : ''}</p>{/if}
-    <EntriesTable entries={shown} ondelete={removeEntry} ondate={onopenday} onchanged={load}
+    <EntriesTable entries={shown} ondelete={removeEntry} ondate={onopenday} onchanged={load} syncCols={kind === 'QSO'}
                   empty={kind === 'QSO' ? 'Aucun contact dans le carnet de trafic.' : "Aucune écoute dans le journal."} />
     <p class="hint">Cliquez sur une date pour ouvrir la page du jour correspondante.</p>
   </section>
