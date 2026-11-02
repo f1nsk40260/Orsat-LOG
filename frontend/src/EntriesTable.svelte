@@ -63,7 +63,10 @@
               title={`Fiche du QSO : carte, ligne grise et conditions de propagation${q.comment ? ' — ' + q.comment : ''}`}>{q.call}</button>{#if q.kind !== 'SWL' && q.qrz_state}<span
               class="qrz q-{q.qrz_state}"
               title={q.qrz_state === 'synced' ? 'Synchronisé avec QRZ.com' : q.qrz_state === 'pending' ? 'En attente d\'envoi vers QRZ.com' : `Refusé par QRZ.com : ${q.qrz_error || ''}`}
-              >{q.qrz_state === 'synced' ? '✓' : q.qrz_state === 'pending' ? '⏳' : '⚠'}</span>{/if}</td>
+              >{q.qrz_state === 'synced' ? '✓' : q.qrz_state === 'pending' ? '⏳' : '⚠'}</span>{/if}{#if q.kind !== 'SWL' && (q.eqsl_rcvd || q.eqsl_state === 'synced' || q.eqsl_state === 'error')}<span
+              class="eqsl e-{q.eqsl_rcvd ? 'rcvd' : q.eqsl_state}"
+              title={q.eqsl_rcvd ? `eQSL reçue du correspondant (${fmtDate(q.eqsl_rcvd)})` : q.eqsl_state === 'synced' ? 'Envoyé à eQSL.cc' : `Refusé par eQSL.cc : ${q.eqsl_error || ''}`}
+              >e</span>{/if}</td>
           <td>{q.band}</td>
           <td class="mono">
             {#if q.freq}
@@ -134,6 +137,11 @@
   .q-synced { color: var(--ok); opacity: 0.7; }
   .q-pending { color: var(--muted); }
   .q-error { color: var(--bad); }
+  /* repère eQSL.cc : « e » discret, vert quand l'eQSL du correspondant est reçue */
+  .eqsl { margin-left: 4px; font-size: 0.68rem; font-weight: 600; font-style: italic; cursor: help; }
+  .e-synced { color: var(--gold-soft); }
+  .e-rcvd { color: var(--ok); }
+  .e-error { color: var(--bad); }
   .datelink { padding: 0; color: var(--text); text-decoration: underline dotted var(--gold-soft); }
   .datelink:hover { color: var(--gold); box-shadow: none; }
   .edit { padding: 0 4px; color: var(--gold-soft); }

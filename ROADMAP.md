@@ -853,3 +853,24 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - Firefox récent demande en plus l'autorisation d'accéder aux « applications et services de cet appareil »
   (page publique → localhost) : la liaison attend la réponse. À autoriser une fois pour orsat.ddns.net
   (cadenas → Permissions), valable pour le carnet et la page WebSDR.
+
+## Fait — v1.28.0 (02/11/2026) : synchronisation avec eQSL.cc (QSO seulement)
+- Demande F1NSK : synchroniser le carnet de trafic avec eQSL, **uniquement les contacts QSO** (jamais les SWL).
+- `backend/orsatlog/eqsl.py` (API eQSL, `ORSATLOG_EQSL_URL` pour les essais) :
+  - Envoi : `ImportADIF.cfm`, un QSO par requête (ADIF : CALL, date, HHMM, bande, mode/sous-mode, fréquence,
+    RST envoyé, MY_GRIDSQUARE, QTH Nickname facultatif) ; ~5 s après une saisie, puis toutes les 15 min.
+    « Duplicate » = déjà chez eQSL (compté envoyé). QSO marqués `EQSL_QSL_SENT=Y` chez QRZ : pas renvoyés.
+  - Seuls les QSO **à partir d'une date** partent (`eqsl_since`, proposée au jour de la mise en service ;
+    vide = tout le carnet, chaque correspondant recevrait alors une eQSL).
+  - Colonnes `qso.eqsl_state` ('' à envoyer, 'synced', 'error' + `eqsl_error`) et `qso.eqsl_rcvd` (AAAAMMJJ).
+  - eQSL ne corrige ni ne supprime par l'API : QSO corrigé (indicatif, date, heure, bande, mode) → renvoyé,
+    l'ancienne version est à supprimer à la main dans l'Outbox eQSL (noté au journal). Suppression : rien chez eQSL.
+  - Confirmations : `DownloadInBox.cfm` toutes les 3 h (tout au premier passage, puis RcvdSince − 1 jour) ;
+    rapprochement indicatif + date + bande, ±30 min → `eqsl_rcvd`, `confirmed = 'eQSL'` si pas déjà LoTW / QSL.
+    La synchro QRZ ne l'efface plus (`qrz._merge` garde l'eQSL reçue).
+- Panneau admin → Carnet ORSAT-LOG → onglet **EQSL** (PhantomSDR-ORSAT `admin_extras.*`, routes
+  `/admin/api/orsatlog/eqsl` et `/eqsl/run`) : identifiant + mot de passe (vérifiés par une relève vide avant
+  enregistrement, mot de passe jamais renvoyé ni dans `/api/settings`), QTH Nickname, date de départ, synchro auto,
+  « Synchroniser maintenant », « Renvoyer les refusés », compteurs, liste des refusés avec le motif d'eQSL, journal.
+- Carnet : petit « e » après l'indicatif (or = chez eQSL, vert = eQSL reçue du correspondant, rouge = refusé + motif).
+- Testé contre un faux eQSL (réponses ImportADIF / DownloadInBox) ; pas encore contre le vrai eQSL.cc.

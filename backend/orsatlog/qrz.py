@@ -265,6 +265,8 @@ class QrzSync:
                 self.db.update_qso(local["id"], {"adif_extra": fields["adif_extra"]})
             else:
                 fields.pop("kind", None)
+                if local.get("eqsl_rcvd") and not fields.get("confirmed"):
+                    fields["confirmed"] = "eQSL"      # confirmation relevée chez eQSL.cc (eqsl.py)
                 self.db.update_qso(local["id"], fields)
                 changed += 1
         self.state["pulled"] += changed
