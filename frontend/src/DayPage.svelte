@@ -108,7 +108,14 @@
       </section>
       {#if websdr}
         <section class="panel radio">
-          <h2 class="panel-title">WebSDR ORSAT</h2>
+          <h2 class="panel-title">
+            WebSDR ORSAT
+            {#if websdr.listeners != null}
+              <span class="listeners" title="Auditeurs en ligne sur le WebSDR en ce moment">
+                {websdr.listeners} auditeur{websdr.listeners > 1 ? 's' : ''}
+              </span>
+            {/if}
+          </h2>
           <div class="tci-status">
             <span class="dot" class:on={websdr.connected}></span>
             {#if websdr.connected}
@@ -211,6 +218,8 @@
   .tci-status { display: flex; align-items: center; gap: 8px; font-size: 0.85rem; color: var(--muted); }
   .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--bad); box-shadow: 0 0 6px var(--bad); }
   .dot.on { background: var(--ok); box-shadow: 0 0 6px var(--ok); }
+  .panel-title:has(.listeners) { display: flex; align-items: baseline; }
+  .listeners { margin-left: auto; color: var(--gold); font-size: 0.72rem; letter-spacing: 0.04em; text-transform: none; font-weight: 500; }
   .tci-error { color: var(--warn); font-size: 0.78rem; margin-top: 6px; }
   .tx { margin-left: auto; color: #fff; background: var(--bad); padding: 1px 8px; border-radius: 4px; font-weight: 700; }
   .freq { font-size: 2rem; color: var(--gold); margin: 12px 0 2px; text-shadow: 0 0 10px rgba(207, 181, 59, 0.35); }

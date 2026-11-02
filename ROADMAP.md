@@ -833,3 +833,10 @@ PSK Reporter écarté pour l'instant (choix de l'opérateur).
 - Résumé des fonctions (agenda, propagation, Météo locale + Windy, Orages et QRN + Blitz, échelles et zoom des
   graphes, WebSDR et page publique) et crédits des sources ajoutés (NOAA SWPC, KC2G, Blitzortung, Weathercloud,
   Windy, QRZ.com, fonds de carte Esri / OSM / EOX).
+
+## Fait (02/11/2026) : auditeurs en ligne dans la carte WebSDR ORSAT
+- Carte « WebSDR ORSAT » de la page du jour : nombre d'auditeurs en ligne en haut à droite (« 3 auditeurs »),
+  connu même sans page WebSDR reliée.
+- `listeners.py` : le carnet reste abonné au flux `/events` de PhantomSDR-ORSAT (même port que la chute d'eau,
+  `snr.waterfall_candidates`) ; compte = `signal_clients` (auditeurs avec le son, la mesure SNR du carnet n'y entre pas).
+  Diffusé dans l'état `websdr.listeners` (None = WebSDR injoignable, rien d'affiché) ; reconnexion toutes les 30 s.

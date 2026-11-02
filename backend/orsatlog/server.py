@@ -18,7 +18,7 @@ from starlette.background import BackgroundTask
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import __version__, adif, auth, backup, dlayer, antennas, eibi, enrich, geo, ionosonde, kc2g, layers, lightning, partners, qrn, qrz, qrzxml, reach, snr, solar, spacewx, spots, weather
+from . import __version__, adif, auth, backup, dlayer, antennas, eibi, enrich, geo, ionosonde, kc2g, layers, lightning, listeners, partners, qrn, qrz, qrzxml, reach, snr, solar, spacewx, spots, weather
 from .db import DATA_DIR, Database
 from .websdr import Page, WebSdrLink
 
@@ -133,7 +133,9 @@ async def lifespan(app):
     prober = asyncio.create_task(partners.health_loop())
     dlay = asyncio.create_task(dlayer.loop())
     storms = asyncio.create_task(lightning.loop(_storm_center, _store_lightning, _storms_enabled))
+    audience = asyncio.create_task(listeners.loop(websdr.set_listeners))
     yield
+    audience.cancel()
     storms.cancel()
     dlay.cancel()
     prober.cancel()

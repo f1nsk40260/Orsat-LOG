@@ -68,6 +68,7 @@ class WebSdrLink:
             "submode": "",
             "ptt": False,
             "error": "",
+            "listeners": None,    # auditeurs en ligne sur le WebSDR (listeners.py) ; None = inconnu
         }
 
     async def on_page(self, page):
@@ -142,6 +143,9 @@ class WebSdrLink:
         self._set(freq=int(freq))
         if modulation:
             self._set_modulation(modulation)
+
+    def set_listeners(self, n):
+        self._set(listeners=n)
 
     def _set(self, **changes):
         changed = {k: v for k, v in changes.items() if self.state.get(k) != v}
